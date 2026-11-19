@@ -9,6 +9,8 @@ if Process.whereis(Credo.Supervisor) == nil, do: {:ok, _} = Application.ensure_a
 _ = Application.stop(:pinata)
 {:ok, _apps} = Application.ensure_all_started(:logger)
 Application.put_env(:pinata, :password_iterations, 1_000)
+# The peers of the multi-node tests share the SQLite file of the test VM (docs/technical/testing.md).
+Application.put_env(:pinata, :sqlite_in_multi_node, true)
 
 if System.get_env("DATABASE_URL") in [nil, ""] do
   path = Path.expand("../tmp/test.db", __DIR__)

@@ -48,7 +48,7 @@ Nothing outside `Persistence` names a Repo, a schema or a query. A text compared
 - `docs/pseudocode/`: reconstructed behaviour of the original handlers. Consult it before you implement a handler.
 - `docs/pseudocode/README.md`, section "Original-server bugs": the bug register. Check it before you copy a behaviour that looks unintended.
 - `re-data/captures/`: captures of real traffic with scenario notes. A capture wins over the reconstruction.
-- `server/docs/user/` and `server/docs/technical/`: the documentation of this server. The technical index lists the boundaries as built; the `Protocol` boundary of ADR 0001 is the module `Proto` there.
+- `server/docs/user/` and `server/docs/technical/`: the documentation of this server. The technical index lists the boundaries as built.
 - Root `CLAUDE.md`, section "Context budget": how to read the big reconstruction files.
 
 ## Documentation checklist

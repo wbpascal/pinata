@@ -1,21 +1,27 @@
 defmodule Proto.Packets.WorldInfo do
   @moduledoc "One world of the world list: number, name, status (nested in 0x0C0A and 0x0C1C)."
   use Proto.Packet
+  # official: worldno
   field :world_no, :u8
+  # official: worldname
   field :name, {:char, 16}
+  # official: worldstatus
   field :status, :u8
 end
 
 defmodule Proto.Packets.UserXtrapReq do
   @moduledoc "0x0C04 NC_USER_XTRAP_REQ, client to server."
   use Proto.Packet, opcode: 0x0C04
+  # official: XTrapClientKeyLength
   field :key_length, :u8
+  # official: XTrapClientKey
   field :key, {:char, 29}
 end
 
 defmodule Proto.Packets.UserXtrapAck do
   @moduledoc "0x0C05 NC_USER_XTRAP_ACK, server to client."
   use Proto.Packet, opcode: 0x0C05
+  # official: bSuccess
   field :success, :u8
 end
 
@@ -28,28 +34,34 @@ end
 defmodule Proto.Packets.UserLoginAck do
   @moduledoc "0x0C0A NC_USER_LOGIN_ACK, server to client: the world list."
   use Proto.Packet, opcode: 0x0C0A
+  # official: worldinfo, count numofworld
   array :worlds, Proto.Packets.WorldInfo, count: :u8
 end
 
 defmodule Proto.Packets.UserWorldselectReq do
   @moduledoc "0x0C0B NC_USER_WORLDSELECT_REQ, client to server."
   use Proto.Packet, opcode: 0x0C0B
+  # official: worldno
   field :world_no, :u8
 end
 
 defmodule Proto.Packets.UserWorldselectAck do
   @moduledoc "0x0C0C NC_USER_WORLDSELECT_ACK, server to client: status of the world, where to connect and the validation key."
   use Proto.Packet, opcode: 0x0C0C
+  # official: worldstatus
   field :world_status, :u8
   field :ip, {:char, 16}
   field :port, :u16
+  # official: validate_new
   field :validate, {:u16s, 32}
 end
 
 defmodule Proto.Packets.UserLoginworldReq do
   @moduledoc "0x0C0F NC_USER_LOGINWORLD_REQ, client to server (sent to WorldManager)."
   use Proto.Packet, opcode: 0x0C0F
+  # official: user
   field :user_name, {:char, 256}
+  # official: validate_new
   field :validate, {:u16s, 32}
 end
 
@@ -77,24 +89,39 @@ defmodule Proto.Packets.Avatar do
   field :slot, :u8
   field :loginmap, {:char, 12}
   field :delinfo, Proto.Packets.AvatarDeleteInfo
+  # official: shape
   bits gender: 1, chrclass: 5, race: 2
   field :hairtype, :u8
   field :haircolor, :u8
   field :faceshape, :u8
+  # official: equip (Equ_Head to Equ_AccShield)
   field :equip, {:u16s, 20}
+  # official: equip.upgrade.lefthand, .righthand
   bits upgrade_righthand: 4, upgrade_lefthand: 4
+  # official: equip.upgrade.body, .leg
   bits upgrade_leg: 4, upgrade_body: 4
+  # official: equip.upgrade.shoes
   bits upgrade_unused: 4, upgrade_shoes: 4
+  # official: nKQHandle
   field :kq_handle, :u32
+  # official: sKQMapName
   field :kq_map_name, {:char, 12}
+  # official: nKQCoord.x
   field :kq_x, :u32
+  # official: nKQCoord.y
   field :kq_y, :u32
+  # official: dKQDate
   field :kq_date, {:bytes, 3}
   bits kq_date_unused: 2, kq_date_sec: 6
+  # official: CharIDChangeData.bNeedChangeID
   field :need_change_id, :u8
+  # official: CharIDChangeData.bInit
   field :change_id_init, :u8
+  # official: CharIDChangeData.nRowNo
   field :change_id_row_no, :u32
+  # official: TutorialInfo.nTutorialState
   field :tutorial_state, :u32
+  # official: TutorialInfo.nTutorialStep
   field :tutorial_step, :u8
 end
 
@@ -102,14 +129,17 @@ defmodule Proto.Packets.UserLoginworldAck do
   @moduledoc "0x0C14 NC_USER_LOGINWORLD_ACK, server to client: the WorldManager session handle and the character list."
   use Proto.Packet, opcode: 0x0C14
   field :worldmanager, :u16
+  # official: avatar, count numofavatar
   array :avatars, Proto.Packets.Avatar, count: :u8
 end
 
 defmodule Proto.Packets.AvatarCreateReq do
   @moduledoc "0x1401 NC_AVATAR_CREATE_REQ, client to server (sent to WorldManager): slot, name and look of the new character."
   use Proto.Packet, opcode: 0x1401
+  # official: slotnum
   field :slot, :u8
   field :name, {:char, 20}
+  # official: char_shape
   bits gender: 1, chrclass: 5, race: 2
   field :hairtype, :u8
   field :haircolor, :u8
@@ -119,12 +149,14 @@ end
 defmodule Proto.Packets.AvatarCreatefailAck do
   @moduledoc "0x1404 NC_AVATAR_CREATEFAIL_ACK, server to client."
   use Proto.Packet, opcode: 0x1404
+  # official: err
   field :error, :u16
 end
 
 defmodule Proto.Packets.AvatarCreatesuccAck do
   @moduledoc "0x1406 NC_AVATAR_CREATESUCC_ACK, server to client: numofavatar (always 1) and the new AVATAR."
   use Proto.Packet, opcode: 0x1406
+  # official: avatar, count numofavatar
   array :avatars, Proto.Packets.Avatar, count: :u8
 end
 
@@ -137,6 +169,7 @@ end
 defmodule Proto.Packets.AvatarErasefailAck do
   @moduledoc "0x140A NC_AVATAR_ERASEFAIL_ACK, server to client. The client knows 0xC7 (guild master) and one text for every other code."
   use Proto.Packet, opcode: 0x140A
+  # official: err
   field :error, :u16
 end
 
@@ -149,6 +182,7 @@ end
 defmodule Proto.Packets.UserLoginworldfailAck do
   @moduledoc "0x0C15 NC_USER_LOGINWORLDFAIL_ACK, server to client."
   use Proto.Packet, opcode: 0x0C15
+  # official: errorcode
   field :error, :u16
 end
 
@@ -160,12 +194,14 @@ end
 defmodule Proto.Packets.UserConnectcutCmd do
   @moduledoc "0x0C17 NC_USER_CONNECTCUT_CMD, server to client."
   use Proto.Packet, opcode: 0x0C17
+  # official: reason
   field :error, :u16
 end
 
 defmodule Proto.Packets.UserNormallogoutCmd do
   @moduledoc "0x0C18 NC_USER_NORMALLOGOUT_CMD, client to server: 0 = quit, 1 = back to the character list."
   use Proto.Packet, opcode: 0x0C18
+  # official: LogoutType
   field :logout_type, :u8
 end
 
@@ -188,20 +224,25 @@ end
 defmodule Proto.Packets.UserWillWorldSelectAck do
   @moduledoc "0x0C34 NC_USER_WILL_WORLD_SELECT_ACK, server to client: the login token for the way back."
   use Proto.Packet, opcode: 0x0C34
+  # official: nError
   field :error, :u16
+  # official: sOTP
   field :otp, {:char, 32}
 end
 
 defmodule Proto.Packets.UserLoginWithOtpReq do
   @moduledoc "0x0C37 NC_USER_LOGIN_WITH_OTP_REQ, client to server (sent to Login)."
   use Proto.Packet, opcode: 0x0C37
+  # official: sOTP
   field :otp, {:char, 32}
 end
 
 defmodule Proto.Packets.UserUsLoginReq do
   @moduledoc "0x0C5A NC_USER_US_LOGIN_REQ, client to server."
   use Proto.Packet, opcode: 0x0C5A
+  # official: sUserName
   field :user_name, {:char, 260}
+  # official: sPassword
   field :password, {:char, 36}
   field :spawnapps, {:bytes, 20}
 end
@@ -209,6 +250,7 @@ end
 defmodule Proto.Packets.UserClientVersionCheckReq do
   @moduledoc "0x0C65 NC_USER_CLIENT_VERSION_CHECK_REQ, client to server."
   use Proto.Packet, opcode: 0x0C65
+  # official: sVersionKey
   field :version_key, {:char, 64}
 end
 
@@ -221,6 +263,8 @@ end
 defmodule Proto.Packets.UserClientRightversionCheckAck do
   @moduledoc "0x0C67 NC_USER_CLIENT_RIGHTVERSION_CHECK_ACK, server to client."
   use Proto.Packet, opcode: 0x0C67
+  # official: XTrapServerKeyLength
   field :xtrap_server_key_length, :u8
+  # official: XTrapServerKey
   field :xtrap_server_key, {:char, 1}
 end

@@ -19,6 +19,7 @@ defmodule Replay.Milestone1Test do
       endpoints: Replay.Topology.endpoints(),
       close_after: opts[:close_after] || [],
       sync_after: opts[:sync_after] || [],
+      masks: opts[:masks] || [],
       before: opts[:before] || %{}
     )
   end
@@ -26,7 +27,7 @@ defmodule Replay.Milestone1Test do
   @heartbeat_refusals "26_11_15_37_login-heartbeat-refusals-delete"
 
   test "26_11_15_login-logout", do: replay("26_11_15_login-logout", :login_logout, :end, close_after: [16])
-  test "26_11_15_login-errors", do: replay("26_11_15_login-errors", :login_errors, 18)
+  test "26_11_15_login-errors", do: replay("26_11_15_login-errors", :login_errors, :end)
   test "26_11_15_create-char", do: replay("26_11_15_create-char", :create_char, :end)
 
   test "26_11_15_37_login-heartbeat-refusals-delete",
@@ -63,8 +64,33 @@ defmodule Replay.Milestone1Test do
     replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 108, conn: "login#4")
   end
 
-  test "26_11_16_37b_char-select-rename-refusals",
-    do: replay("26_11_16_37b_char-select-rename-refusals", :char_select_rename_refusals, 9)
+  # Account B of the capture; the flag is set as the capture's server script did before each login.
+  for {conn, login, stop, flag, function} <- [
+        {"login#5", 112, 115, "blocked", :set_blocked},
+        {"login#6", 119, 122, "not login-able", :set_login_able}
+      ] do
+    test "26_11_15_37_login-heartbeat-refusals-delete: #{flag}" do
+      value = unquote(function) == :set_blocked
+
+      replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, unquote(stop),
+        conn: unquote(conn),
+        before: %{unquote(login) => fn -> :ok = apply(Persistence, unquote(function), ["testaccountB", value]) end}
+      )
+    end
+  end
+
+  # Stops before the rename 0x140F (index 27, milestone 2): the list, the refused create and five heartbeats.
+  test "26_11_16_37b_char-select-rename-refusals" do
+    reason =
+      "rename right of Test2 (a tCharacterChangeID row made by the capture's prep): character rename is " <>
+        "milestone 2, the rebuild sends the values of a character without one; the mask covers every character of the list"
+
+    masks =
+      for field <- [:need_change_id, :change_id_init, :change_id_row_no],
+          do: {Proto.Packets.UserLoginworldAck, [:avatars, field], reason}
+
+    replay("26_11_16_37b_char-select-rename-refusals", :char_select_rename_refusals, 26, masks: masks)
+  end
 
   defp wait_until(fun, tries \\ 50) do
     cond do

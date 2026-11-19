@@ -1,12 +1,15 @@
 defmodule Net.Connection do
   @moduledoc """
   One process per client socket. It sends the seed, cuts frames, decrypts and decodes them, answers heartbeats,
-  hands every other packet to the part handler and carries out the effects it returns (send, perform, close). It closes the socket, without
-  an error packet, on garbage, oversized frames and when a limit is exceeded.
+  hands every other packet to the part handler and carries out the effects it returns (send, perform, close). A packet
+  of the wrong size is dropped. It closes the socket, without an error packet, on an unknown opcode, on oversized
+  frames and when a limit is exceeded.
   See `docs/technical/processes.md`.
   """
 
   use ThousandIsland.Handler
+
+  require Logger
 
   alias Proto.Packets.MiscHeartbeatAck
   alias Proto.Packets.MiscHeartbeatReq
@@ -96,8 +99,20 @@ defmodule Net.Connection do
       state = %{state | cipher: cipher}
 
       case Proto.decode(plain) do
-        {:error, _reason} ->
+        # As the original: all three servers disconnect a client that sends an unregistered opcode.
+        {:error, :unknown_opcode} ->
+          <<opcode::little-16, _::binary>> = plain
+          Logger.info("Net: unknown opcode 0x#{Integer.to_string(opcode, 16)}, the connection is closed")
           {:close, state}
+
+        # As the original's length checks (0x0C5A, 0x0C37): the packet is dropped, the connection goes on.
+        # It counted for the packet rate and does not count as a sign of life for the heartbeat.
+        {:error, :bad_size} ->
+          Logger.debug(
+            "Net: dropped a packet of the wrong size (#{inspect(binary_part(plain, 0, min(2, byte_size(plain))))}, #{byte_size(plain)} bytes)"
+          )
+
+          frames(socket, state)
 
         {:ok, packet} ->
           handle(socket, packet, %{state | last_packet: Clock.monotonic_time(:millisecond), pinged?: false})

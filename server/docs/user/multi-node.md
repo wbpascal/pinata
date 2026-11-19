@@ -4,7 +4,7 @@ In multi-node mode the three parts (Login, WorldManager, Zone) run on separate n
 
 ## What you need
 
-- **PostgreSQL.** All nodes use one database, so `database.url` (or `DATABASE_URL`) must be a `postgres://` URL, the same on every node. The default SQLite file belongs to one node. Run the migrations once, before the nodes of a new version start: `bin/pinata eval 'Persistence.Release.migrate()'` (see [`operation.md`](operation.md)).
+- **PostgreSQL.** All nodes use one database, so `database.url` (or `DATABASE_URL`) must be a `postgres://` URL, the same on every node. SQLite works only in single-node mode: a node that runs only some parts, or has `cluster.nodes` set, does not start on it. Run the migrations once, before the nodes of a new version start: `bin/pinata eval 'Persistence.Release.migrate()'` (see [`operation.md`](operation.md)).
 - **The same data directory on every node** (see [`install.md`](install.md)); see the check below.
 - **The release or the image** (see [`install.md`](install.md)).
 

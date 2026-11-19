@@ -32,7 +32,7 @@ defmodule Settings do
     {parts, part_problems} = parts(env)
 
     case file_problems ++ value_problems ++ part_problems do
-      [] -> {:ok, values |> Map.put(:parts, parts) |> derive(env)}
+      [] -> values |> Map.put(:parts, parts) |> derive(env) |> check_database()
       [_ | _] = problems -> {:error, problems}
     end
   end
@@ -68,6 +68,21 @@ defmodule Settings do
   @doc "True when all parts run on this node and `cluster.nodes` is empty."
   @spec single_node?(%{:parts => [part()], :cluster => %{nodes: [String.t()]}, optional(atom()) => term()}) :: boolean()
   def single_node?(settings), do: settings.parts == @parts and settings.cluster.nodes == []
+
+  # SQLite is one file on one machine (ADR 0004). The tests run several nodes on one machine against one file
+  # and set `config :pinata, :sqlite_in_multi_node, true`; nothing else may.
+  defp check_database(settings) do
+    if single_node?(settings) or not String.starts_with?(settings.database.url, "sqlite:") or
+         Application.get_env(:pinata, :sqlite_in_multi_node, false) do
+      {:ok, settings}
+    else
+      {:error,
+       [
+         "database.url: SQLite works only in single-node mode (all parts on this node, cluster.nodes empty). " <>
+           "This node runs in multi-node mode: set a postgres:// URL, the same on every node"
+       ]}
+    end
+  end
 
   defp derive(settings, env) do
     single_node? = single_node?(settings)

@@ -32,11 +32,13 @@ The login flow is in [`flows/login.md`](flows/login.md).
 
 **Heartbeat.** The process checks once per second against `Clock`. After 30 s without a packet it sends `0x0804`; 180 s after that (210 s without a packet) it closes the socket. Only a successfully decoded packet resets the timer; stray bytes of an unfinished frame do not. `0x0804` and `0x0805` from the client are accepted in every state, so the original's L01-B11 is not copied (`docs/pseudocode/login/L01-process.md`). A test sets a fake clock source and sends the process `:check`.
 
+**A packet of the wrong size** (`Proto.decode/1` returns `:bad_size`: a known opcode with a payload of another length, or a body shorter than an opcode) is dropped and logged at debug level; the connection goes on in the same state. The original drops a `0x0C5A` and a `0x0C37` of the wrong length in the same way. A dropped packet counts for the packet rate and does not reset the heartbeat timer.
+
 **What closes a socket.** Never with an error packet.
 
 | Cause | Rule |
 |---|---|
-| Undecodable frame | `Proto.decode/1` returns an error |
+| Unknown opcode | `Proto.decode/1` returns `:unknown_opcode`; logged at info level with the opcode. The original does the same on all three servers |
 | Oversized frame | long header `00 len_lo len_hi` with `len` above 0x1FFD, closed once the 3 header bytes are in |
 | Heartbeat timeout | 210 s without a decoded packet |
 | `connection.max_packets_per_second` | more frames than this in a fixed 1 s window; heartbeats count |

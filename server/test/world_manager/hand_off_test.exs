@@ -210,14 +210,14 @@ defmodule WorldManager.HandOffTest do
         t |> token_login(otp) |> token_refused()
       end
 
-      test "a 0x0C37 of the wrong length closes the socket and keeps the token", t do
+      test "a 0x0C37 of the wrong length is dropped and keeps the token", t do
         {otp, wm} = t |> wm_session() |> token()
         TestClient.close(wm)
 
         {:ok, client} = TestClient.send_raw(version_checked(t), <<0x37, 0x0C, 0::248>>)
-        assert {:error, :closed} = TestClient.recv_raw(client)
+        assert {:error, :timeout} = TestClient.recv_raw(client, 100)
 
-        client = t |> token_login(otp) |> send!(%UserXtrapReq{key_length: 0, key: ""})
+        client = client |> send!(%UserLoginWithOtpReq{otp: otp}) |> send!(%UserXtrapReq{key_length: 0, key: ""})
         recv!(client, @world_list)
       end
 

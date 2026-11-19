@@ -63,4 +63,5 @@ Start-up errors from the database:
 | `database.url: unknown scheme: "...", expected sqlite:<path> or postgres://user:password@host/database` | the URL form is not one of the two |
 | `database.url: unknown scheme: a URL without scheme, expected ...` | the URL has no `scheme:` part at all (for example a bare file path) |
 | `database.url: cannot create the directory of <path> (...)` | the directory of the SQLite file cannot be created |
+| `database.url: SQLite works only in single-node mode ...` | the node runs only some parts or has `cluster.nodes` set, and the URL is `sqlite:` (also the default); set a `postgres://` URL (see [`multi-node.md`](multi-node.md)) |
 | `The database has N pending migration(s): ...` | PostgreSQL only; run the migrate command named in the message |
