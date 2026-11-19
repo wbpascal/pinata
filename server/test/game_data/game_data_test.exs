@@ -62,6 +62,15 @@ defmodule GameDataTest do
       dir
     end
 
+    test "does not enter symlinked directories", %{tmp_dir: tmp} do
+      files = [{"a.txt", "one"}, {"sub/b.txt", "two"}]
+      base = GameData.digest(make(Path.join(tmp, "a"), files))
+      loop = make(Path.join(tmp, "loop"), files)
+      File.ln_s!(loop, Path.join(loop, "self"))
+      File.ln_s!(loop, Path.join(loop, "sub/up"))
+      assert GameData.digest(loop) == base
+    end
+
     test "depends on content, names and the file set", %{tmp_dir: tmp} do
       files = [{"a.txt", "one"}, {"sub/b.txt", "two"}]
       base = GameData.digest(make(Path.join(tmp, "a"), files))

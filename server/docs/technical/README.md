@@ -41,7 +41,7 @@ The diagram leaves out three sets of arrows that the table has: the parts also u
 
 ```mermaid
 flowchart TD
-    S[Pinata.Supervisor] --> P[Persistence.Supervisor] & C[Cluster.Root] & L[Login.Supervisor] & W[WorldManager.Supervisor] & Z[Zone.Supervisor]
+    S[Pinata.Supervisor] --> P[Persistence.Supervisor] & C[Cluster.Root] & D["Cluster.DataDigest (multi-node only)"] & L[Login.Supervisor] & W[WorldManager.Supervisor] & Z[Zone.Supervisor]
 ```
 
 ## Release, image and compose

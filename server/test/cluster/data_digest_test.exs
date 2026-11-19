@@ -9,6 +9,9 @@ defmodule Cluster.DataDigestTest do
     peers = TestPeers.start(9330)
     on_exit(fn -> TestPeers.stop(peers) end)
 
+    # the WorldManager peer logs the refusal as an error; it is expected here and would show in the test output
+    :ok = :peer.call(peers.wm, Logger, :configure, [[level: :none]])
+
     # works while Zone.game_data/0 is []; when Zone declares tables, copy the test data directory and change one file
     bad_dir = Path.join(tmp_dir, "data")
     File.mkdir_p!(bad_dir)

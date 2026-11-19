@@ -31,7 +31,7 @@ Data directory digest mismatch, the node stops:
 Every node must use the same data directory.
 ```
 
-The WorldManager node logs an error naming the refused node. The check happens when the two nodes connect, so a node runs unchecked until it has seen the WorldManager node. The digest covers every file of the data directory (path, size and content) except `pinata.db*` at its top level. Single-node mode computes nothing.
+The WorldManager node logs an error naming the refused node. The check happens when the two nodes connect, so a node runs unchecked until it has seen the WorldManager node. The digest covers every file of the data directory (path, size and content) except `pinata.db*` at its top level; symlinked directories inside the data directory are not checked either. Single-node mode computes nothing.
 
 ## Example: Docker Compose
 

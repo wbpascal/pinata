@@ -57,7 +57,7 @@ RFC 4180 with a header row: comma separator, `"` quoting with `""`, quoted cells
 
 ## Digest (`GameData.digest/1`)
 
-SHA-256, lower-case hex, over every regular file below the data directory in sorted relative-path order. Per file the hash gets the relative path, a zero byte, the size as 64 bits and the content, so renaming, adding, removing or changing a file changes the digest. Top-level entries whose name starts with `pinata.db` (the default SQLite database and its WAL files) are left out. Only multi-node mode computes it, once at start-up (`Cluster.DataDigest`, see [`cluster.md`](cluster.md)). The imported 2016 `9Data` (222 MB) took 0.4 s on an Apple M1 Pro.
+SHA-256, lower-case hex, over every regular file below the data directory in sorted relative-path order. Per file the hash gets the relative path, a zero byte, the size as 64 bits and the content, so renaming, adding, removing or changing a file changes the digest. Top-level entries whose name starts with `pinata.db` (the default SQLite database and its WAL files) are left out. A symlinked directory is not entered (a link loop would never end), so files behind it are not part of the digest; a symlink to a file is hashed by its content. Only multi-node mode computes it, once at start-up (`Cluster.DataDigest`, see [`cluster.md`](cluster.md)). The imported 2016 `9Data` (222 MB) took 0.4 s on an Apple M1 Pro.
 
 ## Import without Mix (`GameData.Release.import_data/2`)
 

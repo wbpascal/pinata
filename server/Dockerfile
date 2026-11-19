@@ -13,7 +13,7 @@ RUN mix release
 
 FROM debian:trixie-20261104-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 locales tzdata ca-certificates \
+    && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 libsctp1 locales tzdata ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && sed -i '/en_US.UTF-8/s/^# //' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8

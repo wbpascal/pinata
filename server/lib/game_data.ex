@@ -30,7 +30,7 @@ defmodule GameData do
 
   @doc """
   SHA-256 (lower-case hex) of every file of the data directory: relative path, size and content, in path order.
-  The default SQLite files `pinata.db*` at the top level are left out.
+  The default SQLite files `pinata.db*` at the top level are left out. Symlinked directories are not entered.
   """
   @spec digest(Path.t()) :: String.t()
   def digest(data_dir) do
@@ -55,7 +55,14 @@ defmodule GameData do
     |> File.ls!()
     |> Enum.flat_map(fn name ->
       child = Path.join(rel, name)
-      if File.dir?(Path.join(dir, child)), do: files(dir, child), else: [child]
+      path = Path.join(dir, child)
+
+      cond do
+        # not entered: a link loop would never end
+        File.lstat!(path).type == :symlink and File.dir?(path) -> []
+        File.dir?(path) -> files(dir, child)
+        true -> [child]
+      end
     end)
   end
 
