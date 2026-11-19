@@ -143,6 +143,22 @@ defmodule Login.LoginTest do
     recv!(client, <<0x1C, 0x0C>> <> @world_list)
   end
 
+  test "after the login: a second xtrap is answered, other packets are ignored" do
+    {name, password} = account()
+
+    client =
+      listen()
+      |> connect()
+      |> login(name, password)
+      |> recv!(<<0x0A, 0x0C>> <> @world_list)
+      |> xtrap()
+      |> recv!(<<0x05, 0x0C, 1>>)
+      |> version()
+      |> send!(%UserWorldStatusReq{})
+
+    recv!(client, <<0x1C, 0x0C>> <> @world_list)
+  end
+
   test "world status before the login answer is ignored" do
     {name, password} = account()
     client = listen() |> connect() |> version() |> recv!(<<0x67, 0x0C, 1, 0>>) |> login_req(name, password)
