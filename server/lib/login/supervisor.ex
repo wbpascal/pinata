@@ -1,5 +1,5 @@
 defmodule Login.Supervisor do
-  @moduledoc "Root supervisor of `Login`. It starts the client listener."
+  @moduledoc "Root supervisor of `Login`. It starts the token process, then the client listener."
 
   use Supervisor
 
@@ -8,5 +8,8 @@ defmodule Login.Supervisor do
 
   @impl Supervisor
   def init(settings),
-    do: Supervisor.init([{Net.Listener, {Login.Handler, settings.login.port, settings}}], strategy: :one_for_one)
+    do:
+      Supervisor.init([Login.Tokens, {Net.Listener, {Login.Handler, settings.login.port, settings}}],
+        strategy: :one_for_one
+      )
 end

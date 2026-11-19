@@ -5,6 +5,9 @@ defmodule Login.Handler do
 
   `handle_packet/2` and `handle_info/2` are pure. Database and `Cluster` work is a `{:perform, request}` effect
   that `perform/1` carries out; its result comes back through `handle_info/2`.
+
+  A client coming back from WorldManager logs in with a login token (`0x0C37`; flow:
+  `docs/technical/flows/return-to-world-list.md`). `0x0C18` is ignored.
   """
 
   @behaviour Net.Handler
@@ -15,6 +18,7 @@ defmodule Login.Handler do
   alias Proto.Packets.UserConnectcutCmd
   alias Proto.Packets.UserLoginAck
   alias Proto.Packets.UserLoginfailAck
+  alias Proto.Packets.UserLoginWithOtpReq
   alias Proto.Packets.UserUsLoginReq
   alias Proto.Packets.UserWorldStatusAck
   alias Proto.Packets.UserWorldStatusReq
@@ -75,6 +79,9 @@ defmodule Login.Handler do
       {%{state | step: :open, user_name: name},
        [{:perform, {:check_login, name, %Login.Secret{value: password}, state.auto_create?}}]}
 
+  def handle_packet(%__MODULE__{step: :login} = state, %UserLoginWithOtpReq{otp: otp}),
+    do: {%{state | step: :open}, [{:perform, {:take_token, otp}}]}
+
   def handle_packet(%__MODULE__{step: :login} = state, _packet), do: {state, [:close]}
 
   # The key is not looked at (L00-B5 kept).
@@ -111,6 +118,12 @@ defmodule Login.Handler do
   def handle_info(state, {:taken_over, user_no}),
     do: {%{state | user_no: user_no}, [{:perform, {:world_list, UserLoginAck, state.worlds}}]}
 
+  def handle_info(state, {:token_taken, {:ok, user_no, user_name}}),
+    do: {%{state | user_no: user_no, user_name: user_name}, [{:perform, {:world_list, UserLoginAck, state.worlds}}]}
+
+  # No client text for 0x52 (L00-B4 kept by decision).
+  def handle_info(state, {:token_taken, :error}), do: {state, refuse(0x52)}
+
   def handle_info(state, {:world_list, module, infos}), do: {state, [{:send, struct!(module, worlds: infos)}]}
 
   def handle_info(state, {:world_selected, true, ack}), do: {%{state | user_no: :none}, [{:send, ack}]}
@@ -139,6 +152,17 @@ defmodule Login.Handler do
   def perform({:take_over, user_no}) do
     :ok = Cluster.Sessions.take_over(user_no)
     {:taken_over, user_no}
+  end
+
+  def perform({:take_token, otp}) do
+    case Login.Tokens.take(otp) do
+      {:ok, {user_no, user_name}} ->
+        :ok = Cluster.Sessions.take_over(user_no)
+        {:token_taken, {:ok, user_no, user_name}}
+
+      :error ->
+        {:token_taken, :error}
+    end
   end
 
   def perform({:world_list, module, worlds}) do

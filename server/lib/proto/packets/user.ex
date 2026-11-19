@@ -65,6 +65,12 @@ defmodule Proto.Packets.UserConnectcutCmd do
   field :error, :u16
 end
 
+defmodule Proto.Packets.UserNormallogoutCmd do
+  @moduledoc "0x0C18 NC_USER_NORMALLOGOUT_CMD, client to server: 0 = quit, 1 = back to the character list."
+  use Proto.Packet, opcode: 0x0C18
+  field :logout_type, :u8
+end
+
 defmodule Proto.Packets.UserWorldStatusReq do
   @moduledoc "0x0C1B NC_USER_WORLD_STATUS_REQ, empty, client to server."
   use Proto.Packet, opcode: 0x0C1B
@@ -74,6 +80,24 @@ defmodule Proto.Packets.UserWorldStatusAck do
   @moduledoc "0x0C1C NC_USER_WORLD_STATUS_ACK, server to client: the world list."
   use Proto.Packet, opcode: 0x0C1C
   array :worlds, Proto.Packets.WorldInfo, count: :u8
+end
+
+defmodule Proto.Packets.UserWillWorldSelectReq do
+  @moduledoc "0x0C33 NC_USER_WILL_WORLD_SELECT_REQ, empty, client to server (sent to WorldManager)."
+  use Proto.Packet, opcode: 0x0C33
+end
+
+defmodule Proto.Packets.UserWillWorldSelectAck do
+  @moduledoc "0x0C34 NC_USER_WILL_WORLD_SELECT_ACK, server to client: the login token for the way back."
+  use Proto.Packet, opcode: 0x0C34
+  field :error, :u16
+  field :otp, {:char, 32}
+end
+
+defmodule Proto.Packets.UserLoginWithOtpReq do
+  @moduledoc "0x0C37 NC_USER_LOGIN_WITH_OTP_REQ, client to server (sent to Login)."
+  use Proto.Packet, opcode: 0x0C37
+  field :otp, {:char, 32}
 end
 
 defmodule Proto.Packets.UserUsLoginReq do

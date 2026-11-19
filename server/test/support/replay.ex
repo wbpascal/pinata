@@ -19,7 +19,10 @@ defmodule Replay do
   the server packets byte for byte per connection.
 
   Options: `stop:` (required, a packet index or `:end`), `endpoints:` (required, connection kind to `{host, port}`),
-  `masks:` and `handles:` (per-test additions to `Replay.Masks`), `timeout:` (ms to wait for a packet, 2000).
+  `masks:` and `handles:` (per-test additions to `Replay.Masks`), `close_after:` (packet indices; the harness closes
+  the connection of that packet right after it, as the client did; the transcript holds no TCP close), `sync_after:`
+  (packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves
+  on), `timeout:` (ms to wait for a packet, 2000).
   """
 
   alias Replay.Failure
@@ -34,7 +37,17 @@ defmodule Replay do
   @doc "Replays a transcript; the first failure is returned."
   @spec run(Transcript.t(), keyword()) :: :ok | {:error, Failure.t()}
   def run(%Transcript{} = transcript, opts) do
-    opts = Keyword.validate!(opts, [:stop, :endpoints, masks: [], handles: [], timeout: 2000])
+    opts =
+      Keyword.validate!(opts, [
+        :stop,
+        :endpoints,
+        masks: [],
+        handles: [],
+        close_after: [],
+        sync_after: [],
+        timeout: 2000
+      ])
+
     masks = Masks.global() ++ opts[:masks]
     handles = Masks.handles() ++ opts[:handles]
     :ok = Masks.validate!(masks)
@@ -48,6 +61,8 @@ defmodule Replay do
       endpoints: Keyword.fetch!(opts, :endpoints),
       masks: masks,
       handles: handles,
+      close_after: opts[:close_after],
+      sync_after: opts[:sync_after],
       timeout: opts[:timeout]
     }
 
@@ -83,8 +98,52 @@ defmodule Replay do
     state = %{state | last: Map.put(state.last, packet.conn, packet.index)}
 
     case step(packet, state, ctx) do
-      {:ok, state} -> walk(rest, state, ctx)
-      {:error, _failure} = error -> close_all(state, error)
+      {:ok, state} ->
+        case sync_if_due(state, packet, ctx) do
+          {:ok, state} -> walk(rest, close_if_due(state, packet, ctx), ctx)
+          {:error, _failure} = error -> close_all(state, error)
+        end
+
+      {:error, _failure} = error ->
+        close_all(state, error)
+    end
+  end
+
+  # A heartbeat round trip: the server has handled the packet before the clock moves on. Needed where the server
+  # sends nothing and the replay leaves out the answer of a later issue.
+  defp sync_if_due(state, packet, ctx) do
+    with true <- packet.index in ctx.sync_after,
+         {:ok, client} <- TestClient.send_raw(Map.fetch!(state.clients, packet.conn), <<0x04, 0x08>>),
+         {:ok, client} <- sync_ack(client, packet, ctx) do
+      {:ok, put_client(state, packet.conn, client)}
+    else
+      false -> {:ok, state}
+      {:error, :closed} -> {:error, failure(:missing, ctx, packet, "the server closed the connection", [])}
+      {:error, _failure} = error -> error
+    end
+  end
+
+  defp sync_ack(client, packet, ctx) do
+    case next_body(client, ctx.timeout) do
+      {:ok, <<0x05, 0x08>>, client} ->
+        {:ok, client}
+
+      {:ok, <<opcode::little-16, payload::binary>>, _client} ->
+        lines = ["extra packet: #{opcode_text(opcode)}", "payload: #{hex(payload)}"]
+        {:error, failure(:extra, ctx, %{packet | opcode: opcode}, "extra packet", lines)}
+
+      {:error, _reason, _client} ->
+        {:error, failure(:missing, ctx, packet, "no answer to the heartbeat", [])}
+    end
+  end
+
+  # The client closed this connection after the packet; the transcript holds no TCP close.
+  defp close_if_due(state, packet, ctx) do
+    if packet.index in ctx.close_after do
+      TestClient.close(Map.fetch!(state.clients, packet.conn))
+      %{state | clients: Map.delete(state.clients, packet.conn), order: List.delete(state.order, packet.conn)}
+    else
+      state
     end
   end
 

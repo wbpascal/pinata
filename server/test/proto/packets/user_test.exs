@@ -6,7 +6,11 @@ defmodule Proto.Packets.UserTest do
     UserConnectcutCmd,
     UserLoginAck,
     UserLoginfailAck,
+    UserLoginWithOtpReq,
     UserLoginworldReq,
+    UserNormallogoutCmd,
+    UserWillWorldSelectAck,
+    UserWillWorldSelectReq,
     UserLoginworldfailAck,
     UserUsLoginReq,
     UserWorldselectAck,
@@ -84,5 +88,18 @@ defmodule Proto.Packets.UserTest do
     assert %UserLoginworldReq{user_name: "admin", validate: words} = roundtrip(UserLoginworldReq, req)
     assert length(words) == 32
     assert %UserLoginworldfailAck{error: 0x44} = roundtrip(UserLoginworldfailAck, <<0x44, 0>>)
+  end
+
+  test "login token packets" do
+    otp = "4c076e5e6a0d29ceb7ae233fc14cd455"
+    body = Base.decode16!("3463303736653565366130643239636562376165323333666331346364343535", case: :lower)
+
+    assert %UserWillWorldSelectAck{error: 0x1E58, otp: ^otp} =
+             roundtrip(UserWillWorldSelectAck, <<0x58, 0x1E>> <> body)
+
+    assert %UserLoginWithOtpReq{otp: ^otp} = roundtrip(UserLoginWithOtpReq, body)
+    assert %UserNormallogoutCmd{logout_type: 0} = roundtrip(UserNormallogoutCmd, <<0>>)
+    assert %UserWillWorldSelectReq{} = roundtrip(UserWillWorldSelectReq, <<>>)
+    assert {:error, :bad_size} = UserLoginWithOtpReq.decode(<<0::248>>)
   end
 end
