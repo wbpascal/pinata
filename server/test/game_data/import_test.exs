@@ -67,28 +67,89 @@ defmodule GameData.ImportTest do
     assert_raise RuntimeError, ~r/Shine/, fn -> GameData.Release.import_data(tmp_dir, Path.join(tmp_dir, "out")) end
   end
 
-  test "symlinks and unreadable files in the source", %{tmp_dir: tmp_dir} do
-    shine = Path.join([tmp_dir, "src", "Shine"])
-    File.mkdir_p!(Path.join(shine, "World"))
+  # A Shine folder under `dir`/src with the given files; returns the 9Data folder.
+  defp source(dir, files) do
+    Enum.each(files, fn {rel, content} ->
+      file = Path.join([dir, "src", "Shine", rel])
+      File.mkdir_p!(Path.dirname(file))
+      File.write!(file, content)
+    end)
+
+    Path.join(dir, "src")
+  end
+
+  defp tree(dir) do
+    dir |> Path.join("**/*") |> Path.wildcard() |> Enum.map(&Path.relative_to(&1, dir)) |> Enum.sort()
+  end
+
+  defp windows?, do: match?({:win32, _}, :os.type())
+
+  # On Windows the 9Data path is given with backslashes. Elsewhere a backslash is a character of a file name, so the
+  # folder name carries one. To Path.wildcard/2 a backslash is an escape in both cases, as `[` and `{` are syntax.
+  test "a source path with backslashes or pattern characters imports the same files", %{tmp_dir: tmp_dir} do
+    files = [
+      {"ItemInfo.shn", "shn"},
+      {"View/ItemViewInfo.shn", "view"},
+      {"World/ChrCommon.txt", File.read!(Path.join(@source, "World/ChrCommon.txt"))},
+      {"LuaScript/A.lua", "lua"},
+      {"AbState/Left.txt", "left out"}
+    ]
+
+    plain = source(Path.join(tmp_dir, "plain"), files)
+    assert {:ok, expected} = GameData.Import.run(plain, Path.join(tmp_dir, "out-plain"))
+    assert %{copied: 3, tables: tables, skipped: ["AbState/Left.txt"]} = expected
+    assert tables > 0
+
+    odd = source(Path.join(tmp_dir, if(windows?(), do: "odd [a] {b,c}", else: "odd \\ [a] {b,c}")), files)
+    odd = if windows?(), do: String.replace(odd, "/", "\\"), else: odd
+
+    assert {:ok, ^expected} = GameData.Import.run(odd, Path.join(tmp_dir, "out-odd"))
+    assert tree(Path.join(tmp_dir, "out-odd")) == tree(Path.join(tmp_dir, "out-plain"))
+  end
+
+  test "an import with nothing to write fails and creates nothing", %{tmp_dir: tmp_dir} do
+    src = source(tmp_dir, [{"AbState/X.txt", "x"}, {"Thing.xls", "x"}])
+    out = Path.join(tmp_dir, "out")
+
+    assert {:error, [message]} = GameData.Import.run(src, out)
+    assert message =~ "nothing to import"
+    refute File.exists?(out)
+
+    assert_raise RuntimeError, ~r/nothing to import/, fn -> GameData.Release.import_data(src, out) end
+    assert_raise Mix.Error, ~r/nothing to import/, fn -> Mix.Tasks.Pinata.ImportData.run([src, out]) end
+    refute File.exists?(out)
+  end
+
+  # Excluded where this OS user cannot create symlinks (test_helper.exs).
+  @tag :symlink
+  test "symlinks in the source are not followed", %{tmp_dir: tmp_dir} do
+    src = source(tmp_dir, [{"Real.shn", "real"}])
+    shine = Path.join(src, "Shine")
     File.write!(Path.join(tmp_dir, "secret.shn"), "secret")
     File.ln_s!(Path.join(tmp_dir, "secret.shn"), Path.join(shine, "Link.shn"))
     out = Path.join(tmp_dir, "out")
 
-    assert {:ok, %{copied: 0}} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
+    assert {:ok, %{copied: 1}} = GameData.Import.run(src, out)
+    assert File.exists?(Path.join(out, "shn/Real.shn"))
     refute File.exists?(Path.join(out, "shn/Link.shn"))
 
     File.mkdir_p!(Path.join(tmp_dir, "outside"))
     File.write!(Path.join(tmp_dir, "outside/X.shn"), "x")
     File.ln_s!(Path.join(tmp_dir, "outside"), Path.join(shine, "View"))
     File.rm_rf!(out)
-    assert {:ok, %{copied: 0}} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
+    assert {:ok, %{copied: 1}} = GameData.Import.run(src, out)
     refute File.exists?(Path.join(out, "shn/View/X.shn"))
-    File.rm!(Path.join(shine, "View"))
+  end
 
-    File.write!(Path.join(shine, "World/Bad.txt"), "#table\tT\n")
-    File.chmod!(Path.join(shine, "World/Bad.txt"), 0)
-    File.rm_rf!(out)
-    assert {:error, [message]} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
+  # Excluded on Windows (test_helper.exs): File.chmod/2 cannot take away the read right there.
+  @tag :unix_file_modes
+  test "an unreadable file in the source fails the import", %{tmp_dir: tmp_dir} do
+    src = source(tmp_dir, [{"Real.shn", "real"}, {"World/Bad.txt", "#table\tT\n"}])
+    File.chmod!(Path.join(src, "Shine/World/Bad.txt"), 0)
+    out = Path.join(tmp_dir, "out")
+
+    assert {:error, [message]} = GameData.Import.run(src, out)
     assert message =~ "World/Bad.txt: cannot read"
+    refute File.exists?(out)
   end
 end

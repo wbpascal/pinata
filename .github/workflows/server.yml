@@ -47,6 +47,114 @@ jobs:
 
       - run: mix deps.audit
 
+  # Windows: single-node mode with SQLite (docs/technical/testing.md, "Windows").
+  check-windows:
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: server
+        shell: bash
+    env:
+      MIX_ENV: test
+    steps:
+      # Some Files/ paths are longer than Windows allows by default; this must be set before the checkout.
+      - name: Long paths
+        working-directory: ${{ runner.temp }}
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@v7
+
+      - name: Data set for the tests (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - name: Dialyzer PLT cache
+        uses: actions/cache@v4
+        with:
+          path: server/plts
+          key: plt-${{ runner.os }}-mise-${{ hashFiles('mise.toml') }}-deps-${{ hashFiles('server/mix.lock') }}
+
+      - run: mix deps.get
+
+      - run: mix check
+
+      - run: mix deps.audit
+
+  # The release on Windows: import from a backslash path, start, account, login up to the character list, stop.
+  windows-smoke:
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: server
+        shell: pwsh
+    env:
+      MIX_ENV: test
+    steps:
+      - name: Long paths
+        working-directory: ${{ runner.temp }}
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@v7
+
+      - name: Data set (Git LFS, 9Data only)
+        working-directory: .
+        shell: bash
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - run: mix deps.get
+
+      - name: Release
+        env:
+          MIX_ENV: prod
+        run: mix release
+
+      - name: Import from a backslash path
+        run: _build\prod\rel\pinata\bin\pinata eval "GameData.Release.import_data(~S($env:GITHUB_WORKSPACE\Files\Server\2016\9Data), ~s(data))"
+
+      # Without -NoNewWindow and redirections Start-Process does not pass this step's handles on, so the step ends
+      # while the node runs on; cmd writes the node's output to a file.
+      - name: Start
+        run: |
+          Start-Process -FilePath cmd.exe -WindowStyle Hidden `
+            -ArgumentList "/c", "_build\prod\rel\pinata\bin\pinata.bat start > `"$env:RUNNER_TEMP\pinata.out`" 2>&1"
+          $deadline = (Get-Date).AddSeconds(120)
+          while ($true) {
+            try { [System.Net.Sockets.TcpClient]::new("127.0.0.1", 9010).Close(); break }
+            catch { if ((Get-Date) -gt $deadline) { throw "Login does not listen on 9010" }; Start-Sleep -Seconds 2 }
+          }
+
+      - name: Account
+        run: '"smoke-password" | _build\prod\rel\pinata\bin\pinata eval "Persistence.Release.create_account(~s(smoke))"'
+
+      - run: mix run --no-start test/support/smoke.exs 9010
+
+      - name: Stop
+        run: _build\prod\rel\pinata\bin\pinata stop
+
+      - name: Node output
+        if: failure()
+        run: Get-Content "$env:RUNNER_TEMP\pinata.out" -ErrorAction SilentlyContinue
+
   test-postgres:
     runs-on: ubuntu-24.04
     defaults:
@@ -106,7 +214,7 @@ jobs:
 
       - run: printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
 
-      - run: mix run --no-start test/support/compose_smoke.exs
+      - run: mix run --no-start test/support/smoke.exs 9010
 
       - name: Container logs
         if: failure()

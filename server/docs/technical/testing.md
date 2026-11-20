@@ -64,7 +64,7 @@ No test listens on or connects to a fixed port. Every port comes from the operat
 - `TestPeers.start/0` takes three new ports per call; the digest test takes one more for its Zone node.
 - `test/start_test.exs` restarts the application with the ports of `TestPorts.app()` (stopped at that moment, so free); the port-in-use test holds a listener on port 0 and names its port in the file.
 - A test that starts its own `Net.Listener` passes port 0 and reads the port with `ThousandIsland.listener_info/1` (`test/login/login_test.exs`, `test/net/connection_test.exs`).
-- The defaults 9010, 9110 and 9210 appear only as values: `test/settings_test.exs` checks the defaults, and packets of the captures carry 9110. A replay masks `port` of `UserWorldselectAck` whenever the WorldManager endpoint is not 9110, which with ports from the OS is practically always. The one exception is `test/support/compose_smoke.exs`, which connects to 9010 and 9110: it runs against the published ports of the Compose example and is not part of `mix test` (see "Compose smoke test").
+- The defaults 9010, 9110 and 9210 appear only as values: `test/settings_test.exs` checks the defaults, and packets of the captures carry 9110. A replay masks `port` of `UserWorldselectAck` whenever the WorldManager endpoint is not 9110, which with ports from the OS is practically always. The one exception is `test/support/smoke.exs`, which CI runs with the Login port 9010 (it takes the WorldManager port from the world-select answer): it runs against the published ports of the Compose example or the default ports of a release and is not part of `mix test` (see "Smoke test").
 
 A port is free when chosen and is bound a moment later; another process can take it in between. macOS hands out port-0 ports in sequence, Linux at random, so on Linux a port just released can be handed out again to the next bind on port 0. `TestPeers.start/0` closes this window for the peers by choosing their ports after the peer VMs are up (each VM binds its distribution listener on port 0 while booting); for the application of the test VM the window is a few milliseconds. It stays open for the Zone node of the digest test (its VM boots after `TestPorts.free(1)`) and for the stop/start cycles of `test/start_test.exs` and `test/persistence/migrations_test.exs`. A collision shows as a failed start of the part: `cannot listen on port <n>: address already in use`.
 
@@ -178,18 +178,42 @@ One multi-mode run on SQLite once failed with "Ecto repo Persistence.Repo.SQLite
 
 The test VM logs at `:warning` (the test settings file sets `log.level`), so tests stay quiet. A test that asserts on an `info` or `debug` line captures with `TestLog.capture/1` (`test/support/test_log.ex`): it raises the level to `:debug` for the captured function and restores `:warning` afterwards, and the module is `async: false`. Assert level, part and reason on the captured line in one match, for example `log =~ "[warning] Net: connection closed: packet rate exceeded, peer 127.0.0.1:"`; the line of a server-side close is written before the socket is closed, so it is in the capture once the client has seen the close. Lines of the peer nodes cannot be captured in the test VM; assert them on a listener started in the test VM.
 
-## Compose smoke test
+## Smoke test
 
-`test/support/compose_smoke.exs` is a script, not an ExUnit test (`test_helper.exs` loads only `support/**/*.ex`). It plays login, world select and the character list against `127.0.0.1:9010` and `9110` with `TestClient`, as the account `smoke` with the password `smoke-password`, retrying up to 15 times 2 seconds apart (the nodes need a moment to connect). CI job `compose-smoke` runs it; locally, in `server/` with a data directory in `data`:
+`test/support/smoke.exs` is a script, not an ExUnit test (`test_helper.exs` loads only `support/**/*.ex`). Its one argument is the Login port. It plays login, world select and the character list against `127.0.0.1` with `TestClient`, as the account `smoke` with the password `smoke-password`: Login on the given port, WorldManager on the port of the world-select answer. It retries up to 15 times 2 seconds apart (the nodes need a moment to start and connect) and exits with status 1 when the last try fails. Two CI jobs run it with the Login port 9010:
 
-```
-docker compose up -d --build
-printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
-MIX_ENV=test mix run --no-start test/support/compose_smoke.exs
-docker compose down -v
-```
+- `compose-smoke` (Linux) against the Docker Compose example. Locally, in `server/` with a data directory in `data`:
+
+  ```
+  docker compose up -d --build
+  printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
+  MIX_ENV=test mix run --no-start test/support/smoke.exs 9010
+  docker compose down -v
+  ```
+
+- `windows-smoke` against a release built on Windows in single-node mode with SQLite (see "Windows").
 
 `test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
+
+## Windows
+
+Windows is supported in single-node mode with SQLite ([`install.md`](../user/install.md), section "Windows"). Two CI jobs in `.github/workflows/server.yml` run on a pinned Windows runner (`windows-2025`), with the same triggers as the Linux jobs:
+
+- `check-windows`: sets `core.longpaths` before the checkout (some `Files/` paths are longer than Windows allows by default), pulls the `9Data` LFS files, and runs `mix deps.get`, `mix check` and `mix deps.audit` in `server/`, with its own Dialyzer PLT cache. It runs on SQLite in single-node topology only; PostgreSQL and the multi-node topology stay with `test-postgres` on Linux.
+- `windows-smoke`: builds the release (`MIX_ENV=prod mix release`), imports the 2016 `9Data` set given as a backslash path with `bin\pinata eval`, starts the node with `bin\pinata start` in the background, creates the account `smoke` with `bin\pinata eval`, runs `test/support/smoke.exs 9010` and stops the node with `bin\pinata stop`.
+
+The checkout is LF on every platform: `.gitattributes` sets `* text=auto eol=lf`, and `Files/** -text` keeps the original data byte-identical. The transcript reader and the generated-file comparisons rely on LF.
+
+Two tags exclude tests where they cannot work; `test_helper.exs` decides and prints the reason:
+
+| Tag | Excluded when | Tests |
+|---|---|---|
+| `:symlink` | creating a probe symlink fails: Windows without the symlink privilege (Developer Mode off, shell not elevated) | `test/game_data/import_test.exs` "symlinks in the source are not followed", `test/game_data/game_data_test.exs` "does not enter symlinked directories" |
+| `:unix_file_modes` | always on Windows: `File.chmod/2` does not take away the read right there | `test/game_data/import_test.exs` "an unreadable file in the source fails the import" |
+
+GitHub's Windows runners run elevated, so the `:symlink` tests run in `check-windows`.
+
+`test/game_data/import_test.exs` "a source path with backslashes or pattern characters imports the same files" runs on every platform: on Windows it gives the source as a backslash path, elsewhere the folder name holds a backslash; both, and `[` or `{`, used to be read as wildcard syntax.
 
 ## Limits
 

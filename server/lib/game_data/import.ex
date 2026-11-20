@@ -22,18 +22,32 @@ defmodule GameData.Import do
     cond do
       not File.dir?(shine) -> {:error, ["#{source}: no Shine folder, expected an original 9Data folder"]}
       not empty?(target) -> {:error, ["#{target}: exists and is not empty"]}
-      true -> import_files(shine, target)
+      true -> import_files(source, shine, target)
     end
   end
 
+  # Walks the folder with File.ls/1 and File.lstat/1, not Path.wildcard/2: a wildcard pattern built from the source
+  # path reads its backslashes (Windows separators) and characters like `[` or `{` as pattern syntax.
   # Symlinks are not followed, neither files nor directories: their targets are not part of the folder.
-  defp regular?(shine, file) do
-    paths = file |> Path.relative_to(shine) |> Path.split() |> Enum.scan(shine, &Path.join(&2, &1))
-    {last, dirs} = List.pop_at(paths, -1)
-
-    match?({:ok, %File.Stat{type: :regular}}, File.lstat(last)) and
-      Enum.all?(dirs, &match?({:ok, %File.Stat{type: :directory}}, File.lstat(&1)))
+  # -> [{rel, file} | {rel, {:error, errors}}]
+  defp entries(dir, rel) do
+    case File.ls(dir) do
+      {:ok, names} -> Enum.flat_map(names, &entry(Path.join(dir, &1), join(rel, &1)))
+      {:error, reason} -> [{rel, {:error, ["cannot read: #{:file.format_error(reason)}"]}}]
+    end
   end
+
+  defp entry(path, rel) do
+    case File.lstat(path) do
+      {:ok, %File.Stat{type: :directory}} -> entries(path, rel)
+      {:ok, %File.Stat{type: :regular}} -> [{rel, path}]
+      {:ok, %File.Stat{}} -> []
+      {:error, reason} -> [{rel, {:error, ["cannot read: #{:file.format_error(reason)}"]}}]
+    end
+  end
+
+  defp join(".", name), do: name
+  defp join(rel, name), do: rel <> "/" <> name
 
   defp read(file) do
     case File.read(file) do
@@ -44,30 +58,38 @@ defmodule GameData.Import do
 
   defp empty?(target), do: File.ls(target) in [{:ok, []}, {:error, :enoent}]
 
-  defp import_files(shine, target) do
-    files =
-      shine |> Path.join("**/*") |> Path.wildcard(match_dot: true) |> Enum.filter(&regular?(shine, &1)) |> Enum.sort()
-
-    items = Enum.map(files, fn file -> {file, Path.relative_to(file, shine)} end)
-    results = Enum.map(items, fn {file, rel} -> {rel, convert(file, rel)} end)
+  defp import_files(source, shine, target) do
+    results =
+      shine
+      |> entries(".")
+      |> Enum.sort()
+      |> Enum.map(fn
+        {rel, {:error, errors}} -> {rel, {:error, errors}}
+        {rel, file} -> {rel, convert(file, rel)}
+      end)
 
     case for({rel, {:error, errors}} <- results, error <- errors, do: "#{rel}: #{error}") do
-      [] ->
-        writes =
-          Enum.flat_map(results, fn
-            {_rel, {:ok, writes, _warnings}} -> writes
-            {_rel, :skip} -> []
-          end)
+      [] -> write_all(source, results, target)
+      errors -> {:error, errors}
+    end
+  end
 
-        write(writes, target)
+  defp write_all(source, results, target) do
+    writes =
+      Enum.flat_map(results, fn
+        {_rel, {:ok, writes, _warnings}} -> writes
+        {_rel, :skip} -> []
+      end)
 
-        warnings = for {rel, {:ok, _writes, warnings}} <- results, warning <- warnings, do: "#{rel}: #{warning}"
-        skipped = for {rel, :skip} <- results, do: rel
-        tables = Enum.count(writes, &match?({:csv, _, _, _}, &1))
-        {:ok, %{copied: length(writes) - tables, tables: tables, skipped: skipped, warnings: warnings}}
+    if writes == [] do
+      {:error, ["#{source}: nothing to import, no table or file of the Shine folder is one the server uses"]}
+    else
+      write(writes, target)
 
-      errors ->
-        {:error, errors}
+      warnings = for {rel, {:ok, _writes, warnings}} <- results, warning <- warnings, do: "#{rel}: #{warning}"
+      skipped = for {rel, :skip} <- results, do: rel
+      tables = Enum.count(writes, &match?({:csv, _, _, _}, &1))
+      {:ok, %{copied: length(writes) - tables, tables: tables, skipped: skipped, warnings: warnings}}
     end
   end
 

@@ -18,10 +18,12 @@ The steps are the same; steps 1 to 4 read as follows in PowerShell (see [`instal
 
 1. Install mise (for example `winget install jdx.mise`), then `mise install` at the repository root.
 2. In `server\`: `mix deps.get`, then `$env:MIX_ENV = "prod"; mix release`.
-3. In `server\`, with forward slashes in the `9Data` path: `_build\prod\rel\pinata\bin\pinata eval "GameData.Release.import_data(~s(C:/Fiesta/9Data), ~s(./data))"`. It must report more than 0 tables.
-4. In `server\`: `_build\prod\rel\pinata\bin\pinata start`. (From a source checkout: `mix pinata.import_data C:/Fiesta/9Data data` and `iex -S mix`.)
+3. In `server\`: `_build\prod\rel\pinata\bin\pinata eval "GameData.Release.import_data(~s(C:/Fiesta/9Data), ~s(./data))"`. It must report more than 0 tables.
+4. In `server\`: `_build\prod\rel\pinata\bin\pinata start`. (From a source checkout: `mix pinata.import_data C:\Fiesta\9Data data` and `iex -S mix`.)
 
-Stop the server with `Ctrl-C` twice in its window, or with `_build\prod\rel\pinata\bin\pinata stop` from another one.
+Stop the server with `_build\prod\rel\pinata\bin\pinata stop` from another window. `Ctrl-C` twice in its window was not tried on Windows.
+
+Windows supports single-node mode with SQLite; for multi-node mode see [`install.md`](install.md), section "Windows".
 
 ## What the player sees on a refusal
 

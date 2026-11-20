@@ -13,7 +13,7 @@ From a release (`MIX_ENV=prod mix release`, see [`install.md`](install.md)), in 
 | shell into the running node | `bin/pinata remote` |
 | run a command | `bin/pinata eval "<expression>"` |
 
-A string inside an expression is written `~s(...)`, not in double quotes. On Windows there is no `daemon`: `bin/pinata start` stays in the foreground of its window; stop it with `bin/pinata stop` from another window or with `Ctrl-C` twice. See [`install.md`](install.md), section "Windows", for the other differences.
+A string inside an expression is written `~s(...)`, not in double quotes. On Windows there is no `daemon`: `bin/pinata start` stays in the foreground of its window; stop it with `bin/pinata stop` from another window; that is the recommended way. `Ctrl-C` twice in its window was not tried on Windows. See [`install.md`](install.md), section "Windows", for the other differences.
 
 The settings file defaults to `./pinata.toml` and the data directory to `./data`, both relative to the working directory the command starts in, so start from the directory that holds them or set `PINATA_CONFIG` (path of the settings file) and `data_dir`. `PINATA_PARTS` chooses the parts of the node (see [`multi-node.md`](multi-node.md) and [`settings.md`](settings.md)). From a source checkout, `iex -S mix` in `server/` starts the same node.
 
@@ -28,6 +28,7 @@ Logs go to standard output; under Docker Compose read them with `docker compose 
 | the database messages in the next section | `database.url` is unusable or migrations are pending |
 | `Data directory digest mismatch, the node stops:` | multi-node mode: this node's data directory differs from that of the WorldManager node; the node stops with exit status 1 (see [`multi-node.md`](multi-node.md)) |
 | `<Part>: cannot listen on port <port>: address already in use. The node does not start.` (`<Part>` is `Login`, `WorldManager` or `Zone`) | the listener port of that part is already in use, for example by a node that is still running; stop it or change `login.port`, `world_manager.port` or `zone.port`. Other reasons (`permission denied`) use the same form. The OTP reports that follow it are not part of the message |
+| no message: the node starts and logs that it listens, but the client cannot connect or its connection hangs | Windows: another program listens on the same port on the loopback address `127.0.0.1`. Windows lets the node listen on `0.0.0.0` on that port without an error, and connections to `127.0.0.1` reach the other program (seen with Logitech G HUB on 9010). Check with `netstat -ano` (look for `127.0.0.1:<port>` in state `LISTENING` and the process id in the last column) and change `login.port`, `world_manager.port` or `zone.port` |
 
 ## Server log
 
