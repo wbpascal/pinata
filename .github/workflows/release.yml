@@ -1,0 +1,298 @@
+# Release workflow (server/docs/technical/testing.md, "Release workflow"). A pushed tag v<version> publishes that
+# version; a manual run does everything except publish.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: server
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      - name: Consistency check
+        id: check
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          elixir test/support/release_check.exs "$RUNNER_TEMP/release-text" $TAG
+          echo "version=$(cat "$RUNNER_TEMP/release-text/version")" >> "$GITHUB_OUTPUT"
+
+      - name: Release text into the job summary (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          dir="$RUNNER_TEMP/release-text"
+          {
+            echo "Manual run: nothing is published. A tag run would publish this release text."
+            echo
+            if [ -f "$dir/title" ]; then
+              echo "# $(cat "$dir/title")"
+              echo
+              cat "$dir/notes.md"
+            else
+              echo "CHANGELOG.md has no section for $(cat "$dir/version"); a tag run would fail."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-text
+          path: ${{ runner.temp }}/release-text
+          if-no-files-found: error
+
+  # One release archive per platform, each built natively and smoke-tested from the packed archive.
+  archive:
+    needs: consistency
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, cpu: x86_64, runner: ubuntu-24.04, ext: tar.gz }
+          - { os: linux, cpu: arm64, runner: ubuntu-24.04-arm, ext: tar.gz }
+          - { os: macos, cpu: arm64, runner: macos-15, ext: tar.gz }
+          - { os: windows, cpu: x86_64, runner: windows-2025, ext: zip }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: server
+        shell: bash
+    env:
+      V: ${{ needs.consistency.outputs.version }}
+      ARCHIVE: pinata-${{ needs.consistency.outputs.version }}-${{ matrix.os }}-${{ matrix.cpu }}.${{ matrix.ext }}
+    steps:
+      # Some Files/ paths are longer than Windows allows by default; this must be set before the checkout.
+      - name: Long paths
+        if: runner.os == 'Windows'
+        working-directory: ${{ runner.temp }}
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@v7
+
+      - name: Data set (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - run: mix deps.get
+
+      - name: Release
+        env:
+          MIX_ENV: prod
+        run: mix release
+
+      - name: Pack
+        run: |
+          mkdir "$RUNNER_TEMP/stage"
+          cp -R _build/prod/rel/pinata "$RUNNER_TEMP/stage/pinata-$V"
+          cd "$RUNNER_TEMP/stage"
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z a -tzip "../$ARCHIVE" "pinata-$V"
+          else
+            tar -czf "../$ARCHIVE" "pinata-$V"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE }}
+          path: ${{ runner.temp }}/${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+      # Smoke test from the packed archive, not from _build.
+      - name: Unpack and smoke test
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/unpacked" "$RUNNER_TEMP/node"
+          tar -xzf "$RUNNER_TEMP/$ARCHIVE" -C "$RUNNER_TEMP/unpacked"
+          test "$(ls "$RUNNER_TEMP/unpacked")" = "pinata-$V"
+          R="$RUNNER_TEMP/unpacked/pinata-$V"
+          test -x "$R/bin/pinata"
+          cd "$RUNNER_TEMP/node"
+          "$R/bin/pinata" eval "GameData.Release.import_data(~S($GITHUB_WORKSPACE/Files/Server/2016/9Data), ~s(data))"
+          "$R/bin/pinata" start > "$RUNNER_TEMP/pinata.out" 2>&1 &
+          for i in $(seq 60); do
+            if (echo > /dev/tcp/127.0.0.1/9010) 2> /dev/null; then break; fi
+            if [ "$i" = 60 ]; then echo "Login does not listen on 9010"; exit 1; fi
+            sleep 2
+          done
+          printf 'smoke-password\n' | "$R/bin/pinata" eval 'Persistence.Release.create_account("smoke")'
+          cd "$GITHUB_WORKSPACE/server"
+          MIX_ENV=test mix run --no-start test/support/smoke.exs 9010
+          "$R/bin/pinata" stop
+
+      # Windows: as the windows-smoke job of server.yml, from the unpacked archive.
+      - name: Unpack and import (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path "$env:RUNNER_TEMP\$env:ARCHIVE" -DestinationPath "$env:RUNNER_TEMP\unpacked"
+          $top = @(Get-ChildItem "$env:RUNNER_TEMP\unpacked").Name -join ","
+          if ($top -ne "pinata-$env:V") { throw "top level of the archive: $top" }
+          New-Item -ItemType Directory "$env:RUNNER_TEMP\node" | Out-Null
+          Set-Location "$env:RUNNER_TEMP\node"
+          & "$env:RUNNER_TEMP\unpacked\pinata-$env:V\bin\pinata.bat" eval "GameData.Release.import_data(~S($env:GITHUB_WORKSPACE\Files\Server\2016\9Data), ~s(data))"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Without -NoNewWindow and redirections Start-Process does not pass this step's handles on, so the step ends
+      # while the node runs on; cmd writes the node's output to a file.
+      - name: Start (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/node
+        run: |
+          Start-Process -FilePath cmd.exe -WindowStyle Hidden -WorkingDirectory "$env:RUNNER_TEMP\node" `
+            -ArgumentList "/c", "$env:RUNNER_TEMP\unpacked\pinata-$env:V\bin\pinata.bat start > `"$env:RUNNER_TEMP\pinata.out`" 2>&1"
+          $deadline = (Get-Date).AddSeconds(120)
+          while ($true) {
+            try { [System.Net.Sockets.TcpClient]::new("127.0.0.1", 9010).Close(); break }
+            catch { if ((Get-Date) -gt $deadline) { throw "Login does not listen on 9010" }; Start-Sleep -Seconds 2 }
+          }
+
+      - name: Account (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/node
+        run: '"smoke-password" | & "$env:RUNNER_TEMP\unpacked\pinata-$env:V\bin\pinata.bat" eval "Persistence.Release.create_account(~s(smoke))"'
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        env:
+          MIX_ENV: test
+        run: mix run --no-start test/support/smoke.exs 9010
+
+      - name: Stop (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/node
+        run: '& "$env:RUNNER_TEMP\unpacked\pinata-$env:V\bin\pinata.bat" stop'
+
+      - name: Node output
+        if: failure()
+        run: cat "$RUNNER_TEMP/pinata.out" || true
+
+  # The container image per CPU on its native runner, smoke-tested through the Compose example.
+  image:
+    needs: consistency
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: server
+    env:
+      MIX_ENV: test
+      IMAGE: ghcr.io/wbpascal/pinata:${{ needs.consistency.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Data set (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - run: mix deps.get
+
+      - run: mix pinata.import_data ../Files/Server/2016/9Data data
+
+      # The label links the package to the repository when it is pushed with the workflow's token.
+      - name: Image
+        run: docker build --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" -t "$IMAGE" .
+
+      # compose.yaml names $IMAGE (the consistency check), so Compose uses the image just built and pulls nothing.
+      - run: docker compose up -d
+
+      - run: printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
+
+      - run: mix run --no-start test/support/smoke.exs 9010
+
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v
+
+      - run: docker save "$IMAGE" | gzip > "$RUNNER_TEMP/image-${{ matrix.arch }}.tar.gz"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/image-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  # Tag runs only. Runs only when every archive and both images passed their smoke tests (needs). Nothing is pushed
+  # and no GitHub release exists before this job.
+  publish:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [consistency, archive, image]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    env:
+      V: ${{ needs.consistency.outputs.version }}
+      REPO: ghcr.io/wbpascal/pinata
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Image
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # Each CPU's image goes up under "latest" only to get its digest; the index below takes both tags.
+          refs=()
+          for arch in amd64 arm64; do
+            docker load -i "dist/image-$arch.tar.gz"
+            docker tag "$REPO:$V" "$REPO:latest"
+            digest=$(docker push "$REPO:latest" | grep -o 'digest: sha256:[0-9a-f]*' | cut -d' ' -f2)
+            refs+=("$REPO@$digest")
+          done
+          docker buildx imagetools create -t "$REPO:$V" -t "$REPO:latest" "${refs[@]}"
+
+      - name: GitHub release
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$(cat dist/title)" --notes-file dist/notes.md \
+            dist/pinata-*.tar.gz dist/pinata-*.zip server/compose.yaml server/compose.toml

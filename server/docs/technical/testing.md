@@ -182,10 +182,11 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 
 `test/support/smoke.exs` is a script, not an ExUnit test (`test_helper.exs` loads only `support/**/*.ex`). Its one argument is the Login port. It plays login, world select and the character list against `127.0.0.1` with `TestClient`, as the account `smoke` with the password `smoke-password`: Login on the given port, WorldManager on the port of the world-select answer. It retries up to 15 times 2 seconds apart (the nodes need a moment to start and connect) and exits with status 1 when the last try fails. Two CI jobs run it with the Login port 9010:
 
-- `compose-smoke` (Linux) against the Docker Compose example. Locally, in `server/` with a data directory in `data`:
+- `compose-smoke` (Linux) against the Docker Compose example. `compose.yaml` names the published image `ghcr.io/wbpascal/pinata:<version>`, so the job first builds the current commit under exactly that name (taken from `compose.yaml`), and Compose pulls nothing. Locally, in `server/` with a data directory in `data` (the tag is the one in `compose.yaml`):
 
   ```
-  docker compose up -d --build
+  docker build -t ghcr.io/wbpascal/pinata:0.1.0 .
+  docker compose up -d
   printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
   MIX_ENV=test mix run --no-start test/support/smoke.exs 9010
   docker compose down -v
@@ -194,6 +195,15 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 - `windows-smoke` against a release built on Windows in single-node mode with SQLite (see "Windows").
 
 `test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
+
+## Release workflow
+
+`.github/workflows/release.yml` publishes a version (terms in `GLOSSARY.md`). It runs on a pushed tag `v*` and by hand (`workflow_dispatch`); a manual run does everything except publish. Its jobs:
+
+- `consistency`: `elixir test/support/release_check.exs <out dir> [<tag>]` (needs only Elixir). The version is the one in `server/mix.exs`; the job fails when the image tag in `compose.yaml` (`ghcr.io/wbpascal/pinata:<tag>`) differs from it. On a tag run it also fails when the tag is not `v<version>`, when the root `CHANGELOG.md` has no `## <version> ...` section, or when that section's heading ends in `(unreleased)`. It writes the release text: the title is the section heading without `## ` and the unreleased mark, the body the section's text up to the next `## ` heading, verbatim. A manual run writes that text into the job summary. The logic is `ReleaseNotes` (`test/support/release_notes.ex`); `test/release_notes_test.exs` runs it under `mix check` with every failure case, the last section, and a heading with the same leading digits (`0.1.0` and `0.1.01`), and checks the repository's own files.
+- `archive`, one leg per platform, each on its own pinned runner and built natively: Linux x86_64 (`ubuntu-24.04`), Linux arm64 (`ubuntu-24.04-arm`), macOS arm64 (`macos-15`), Windows x86_64 (`windows-2025`). It runs `mix deps.get` and `MIX_ENV=prod mix release`, copies the release to `pinata-<version>/` and packs it as `pinata-<version>-<os>-<cpu>.tar.gz` (`.zip` on Windows, with 7-Zip), and keeps it as a workflow artifact. Then it smoke-tests the packed archive, not `_build`: unpacks it into an empty directory, checks the single top-level directory (and on Linux and macOS that `bin/pinata` is executable), imports the 2016 `9Data` set (Git LFS) with the release's `eval` into a separate working directory, starts the node in single-node mode with SQLite (`bin/pinata start` in the background), waits for port 9010, creates the account `smoke` with `eval` and a piped password, runs `test/support/smoke.exs 9010` and stops the node with `bin/pinata stop`. On Windows the start, account and stop steps are those of `windows-smoke`.
+- `image`, one leg per CPU on its native runner (`ubuntu-24.04` for amd64, `ubuntu-24.04-arm` for arm64): builds `server/Dockerfile` as `ghcr.io/wbpascal/pinata:<version>` with the label `org.opencontainers.image.source` (it links the package to the repository), smoke-tests it through the Compose example as `compose-smoke` does, and keeps it as an artifact (`docker save`).
+- `publish`, tag runs only, the last job and the only one with `contents: write` and `packages: write`. Its `needs` are `consistency`, `archive` and `image`, so it does not run when any of the six smoke tests (four archives, two images) fails. It pushes both images and joins them under the tags `<version>` and `latest` (`docker buildx imagetools create`), then creates the GitHub release for the tag, published directly: the title and body from the changelog section, and six assets, the four archives, `compose.yaml` and `compose.toml`. Before this job nothing is pushed to the registry and no GitHub release exists.
 
 ## Windows
 

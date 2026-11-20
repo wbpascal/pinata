@@ -3,9 +3,9 @@ name: server
 on:
   push:
     branches: [master]
-    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", ".github/workflows/server.yml"]
+    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", "CHANGELOG.md", ".github/workflows/server.yml"]
   pull_request:
-    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", ".github/workflows/server.yml"]
+    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", "CHANGELOG.md", ".github/workflows/server.yml"]
 
 permissions:
   contents: read
@@ -210,7 +210,11 @@ jobs:
 
       - run: mix pinata.import_data ../Files/Server/2016/9Data data
 
-      - run: docker compose up -d --build
+      # compose.yaml pulls the published image; build the current commit under exactly that name instead.
+      - name: Image of this commit
+        run: docker build -t "$(grep -o -m1 'ghcr.io/wbpascal/pinata:[^ ]*' compose.yaml)" .
+
+      - run: docker compose up -d
 
       - run: printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
 

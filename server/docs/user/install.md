@@ -47,7 +47,7 @@ _build\prod\rel\pinata\bin\pinata eval "GameData.Release.import_data(~s(C:/Fiest
 
 ## The container image
 
-`docker build -t pinata server/` builds an image with the release, started with `bin/pinata start` as an unprivileged user. On Windows the same command works with Docker Desktop and Linux containers; the image holds the Linux release whatever the host. It holds no data directory: mount one (for example at `/data`) and tell the node with `PINATA_CONFIG` or `data_dir`. [`multi-node.md`](multi-node.md) uses it in a Docker Compose example.
+`docker build -t pinata server/` builds an image with the release, started with `bin/pinata start` as an unprivileged user. On Windows the same command works with Docker Desktop and Linux containers; the image holds the Linux release whatever the host. It holds no data directory: mount one (for example at `/data`) and tell the node with `PINATA_CONFIG` or `data_dir`. Every version is also published as `ghcr.io/wbpascal/pinata:<version>` (and `latest`) for linux/amd64 and linux/arm64, built from the same `Dockerfile`; [`multi-node.md`](multi-node.md) uses it in a Docker Compose example.
 
 ## The data directory
 
