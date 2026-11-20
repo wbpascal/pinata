@@ -85,7 +85,7 @@ defmodule Replay do
     end
   end
 
-  # The captures hold the default WorldManager port; a topology on other ports (multi) cannot reproduce it.
+  # The captures hold the default WorldManager port; the test ports come from the OS and almost never equal it.
   defp port_masks(%{"wm" => {_host, 9110}}), do: []
 
   defp port_masks(_endpoints),

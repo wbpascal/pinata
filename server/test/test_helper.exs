@@ -28,10 +28,34 @@ if not File.exists?(Path.join(source, "Shine/ItemInfo.shn")) or
   raise "the tests need Files/Server/2016/9Data (run: git lfs pull)"
 end
 
+# Test client and replay harness, TestPorts (docs/technical/testing.md).
+{:ok, _modules, _diagnostics} =
+  "support/**/*.ex"
+  |> Path.expand(__DIR__)
+  |> Path.wildcard()
+  |> Kernel.ParallelCompiler.require(return_diagnostics: true)
+
 dir = Path.join(System.tmp_dir!(), "pinata-test-data-#{System.pid()}")
 File.rm_rf!(dir)
 {:ok, _report} = GameData.Import.run(source, dir)
-File.write!(dir <> ".toml", "data_dir = #{inspect(dir)}\n\n[log]\nlevel = \"warning\"\n")
+ports = TestPorts.choose_app()
+
+File.write!(dir <> ".toml", """
+data_dir = #{inspect(dir)}
+
+[log]
+level = "warning"
+
+[login]
+port = #{ports.login}
+
+[world_manager]
+port = #{ports.wm}
+
+[zone]
+port = #{ports.zone}
+""")
+
 System.put_env("PINATA_CONFIG", dir <> ".toml")
 System.put_env("PINATA_TEST_DATA_DIR", dir)
 {:ok, _apps} = Application.ensure_all_started(:pinata)
@@ -41,13 +65,6 @@ System.at_exit(fn _status ->
   File.rm_rf!(dir)
   File.rm!(dir <> ".toml")
 end)
-
-# Test client and replay harness (docs/technical/testing.md).
-{:ok, _modules, _diagnostics} =
-  "support/**/*.ex"
-  |> Path.expand(__DIR__)
-  |> Path.wildcard()
-  |> Kernel.ParallelCompiler.require(return_diagnostics: true)
 
 Replay.Topology.start()
 
