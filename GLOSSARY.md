@@ -95,6 +95,22 @@ The planning issue of one milestone. It is opened early to collect points for th
 A point where a milestone waits for named packet captures and a manual check with the real client before it may close.
 _Avoid_: gate
 
+**Release**:
+The self-contained server directory for one operating system and CPU, holding its own runtime. It is the same thing whether downloaded or built from source.
+_Avoid_: binary release, build, binaries
+
+**Version**:
+A numbered, published state of the server, made when a milestone closes. A milestone is not closed until its version exists.
+_Avoid_: release (that is the directory), milestone release
+
+**Release archive**:
+The downloadable file that holds the release of one version for one platform.
+_Avoid_: binary, download, package
+
+**Changelog**:
+The record of what each version changed for an administrator or a player: a title, a short summary of the most important changes, and every change one of them can observe. Internal work is not in it.
+_Avoid_: release notes, history
+
 **Original-server bug**:
 Behaviour of the original server judged unintended, listed in the bug register. Fixed silently unless the fix changes packets or gameplay.
 
