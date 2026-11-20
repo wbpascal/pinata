@@ -11,6 +11,9 @@ defmodule Pinata.Application do
     case Settings.load(System.get_env()) do
       {:ok, settings} ->
         Logger.configure(level: settings.log.level)
+        # Mix starts Logger before it reads config/config.exs: re-apply the formatter.
+        # No default handler exists in some runs (tests), so the result is ignored.
+        _ = :logger.update_handler_config(:default, :formatter, Logger.default_formatter())
         tables = settings.parts |> Enum.flat_map(&part(&1).game_data()) |> Enum.uniq()
 
         case GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references) do
