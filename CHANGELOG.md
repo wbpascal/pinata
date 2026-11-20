@@ -25,7 +25,9 @@ The first version: the unmodified 2016 client logs in, sees the world list, sele
 
 ### Differences from the original server
 
+- The answer to a client of the wrong version sends 0 in a byte the original never wrote (L00-B1) (#41).
 - WorldManager accepts a client only for the account Login selected the world for, and only within 30 s; the original took any account name the client sent and kept the selection forever (W01-B1) (#42).
 - A refused world select sends a zeroed key where the original sent 64 bytes of its own memory (P02-B23) (#42).
-- The character list sends zeros where the original sent stale delete information and two stray date bits (P02-B1, P02-B7) (#44).
+- The character list sends zeros where the original sent stale delete information, and both the character list and the answer to a character creation send zeros in two date bits the original left unset (P02-B1, P02-B7) (#44, #45).
 - A refused character creation sends the code that matches the reason, so the client shows "error in the Max Slot Number" for a wrong or used slot, "wrong class" for the Sentinel level rule and "Failed to create the character." for an invalid name or a database failure; the original reported these as a taken name or with a code the client shows nothing for (W01-B2, D02-B1) (#45).
+- An expired token for going back to the world list is always refused; the original could still accept one (L01-B9) (#47).

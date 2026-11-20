@@ -9,7 +9,8 @@ if [ "${added:-0}" != 0 ] && [ "${added:-0}" != - ]; then
   echo "CHANGELOG.md: $added line(s) added"
   exit 0
 fi
-if printf '%s\n' "${PR_BODY:-}" | tr -d '\r' | grep -q '^Changelog: none'; then
+# grep reads all its input: grep -q stops at the first match and tr then dies of SIGPIPE, which pipefail reports.
+if printf '%s\n' "${PR_BODY:-}" | tr -d '\r' | grep '^Changelog: none' > /dev/null; then
   echo "CHANGELOG.md unchanged; the description says why (Changelog: none)"
   exit 0
 fi

@@ -27,6 +27,14 @@ The server reads the game's data tables from one directory, the data directory. 
 bin/pinata eval "GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))"
 ```
 
+With only the container image, run the same import in a container, from the directory the data directory is to be made in:
+
+```
+docker run --rm --user "$(id -u):$(id -g)" -v <9Data folder>:/9data:ro -v "$PWD":/out ghcr.io/wbpascal/pinata:<version> eval "GameData.Release.import_data(~s(/9data), ~s(/out/data))"
+```
+
+This makes `data` in the current directory, owned by you (`--user`); the paths the command prints are those inside the container. It was tried on macOS arm64 with Docker Desktop (981 tables written); on a Linux host it was not tried.
+
 On Windows write the path inside `eval` with forward slashes or as `~S(...)` (see [Windows](#windows)). From a source checkout the same import is `mix pinata.import_data` (see [`from-source.md`](from-source.md)).
 
 The command copies the SHN tables, scripts and map geometry unchanged and converts the TXT tables to CSV files. It prints how many tables it wrote, how many files it copied and how many it left out, and a warning for each file it could not convert as a table. On a problem it prints all of them, writes nothing and exits with a non-zero status. A folder with nothing the server uses (no table and no file to copy) is such a problem: `<9Data folder>: nothing to import, no table or file of the Shine folder is one the server uses`. The target must not exist or must be empty; to bring an original data set in again, import it into a new directory and point `data_dir` at that.

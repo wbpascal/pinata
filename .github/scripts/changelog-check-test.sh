@@ -17,11 +17,13 @@ with_line=$(git rev-parse HEAD)
 
 expect() { # expect <pass|fail> <body> <to>
   if PR_BODY="$2" bash "$check" "$base" "$3" > /dev/null; then got=pass; else got=fail; fi
-  if [ "$got" != "$1" ]; then echo "FAIL: expected $1, got $got (body: '$2', to: $3)"; exit 1; fi
+  if [ "$got" != "$1" ]; then echo "FAIL: expected $1, got $got (body: '${2:0:80}', to: $3)"; exit 1; fi
 }
 expect fail "" "$no_line"
 expect fail "Some text. Changelog: none, inline" "$no_line"
 expect pass "$(printf 'Summary\r\n\r\nChangelog: none, CI only\r\n')" "$no_line"
 expect pass "" "$with_line"
 expect pass 'Changelog: none $(exit 1) `false` "' "$no_line"
+long=$(printf 'Changelog: none, long description\n%060000d\n' 0)
+for _ in $(seq 20); do expect pass "$long" "$no_line"; done # SIGPIPE race, see changelog-check.sh
 echo "changelog-check: all cases pass"

@@ -123,7 +123,7 @@ public_host = "127.0.0.1"
 nodes = ["pinata@login", "pinata@wm", "pinata@zone"]
 ```
 
-First import the data directory into `data` beside the two files, with the release archive of your machine (see [`install.md`](install.md), "The data directory"; the data directory is the same on every platform). Then, in that directory:
+First import the data directory into `data` beside the two files, with the release archive of your machine or with the image (see [`install.md`](install.md), "The data directory"; the data directory is the same on every platform). Then, in that directory:
 
 ```
 docker compose up -d
