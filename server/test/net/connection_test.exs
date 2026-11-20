@@ -84,7 +84,9 @@ defmodule Net.ConnectionTest do
     def handle_info(state, :done), do: {state, List.duplicate({:send, %MiscSeedAck{seed: 1}}, 5)}
 
     @impl Net.Handler
+    # Tells the test that the request was taken, so the client resets the connection only after that.
     def perform(:wait) do
+      send(:persistent_term.get({__MODULE__, :test}), :request_taken)
       Process.sleep(100)
       :done
     end
@@ -119,6 +121,7 @@ defmodule Net.ConnectionTest do
     on_exit(fn ->
       Application.delete_env(:pinata, :clock_source)
       :persistent_term.erase({FakeClock, :now})
+      :persistent_term.erase({SlowHandler, :test})
     end)
   end
 
@@ -390,6 +393,7 @@ defmodule Net.ConnectionTest do
   end
 
   test "a send that fails closes with one warning and no client-close line" do
+    :persistent_term.put({SlowHandler, :test}, self())
     {listener, port} = listen(SlowHandler)
     {socket, cipher} = connect(port, linger: {true, 0})
     {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
@@ -399,6 +403,7 @@ defmodule Net.ConnectionTest do
     log =
       TestLog.capture(fn ->
         :ok = :gen_tcp.send(socket, req)
+        assert_receive :request_taken, 2000
         :ok = :gen_tcp.close(socket)
         assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2000
       end)
