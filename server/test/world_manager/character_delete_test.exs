@@ -15,8 +15,8 @@ defmodule WorldManager.CharacterDeleteTest do
   alias Proto.Packets.UserXtrapReq
 
   @key "20151116141627"
-  @login {~c"127.0.0.1", 9010}
-  @wm {~c"127.0.0.1", 9110}
+  defp login_endpoint, do: {~c"127.0.0.1", TestPorts.local().login}
+  defp wm_endpoint, do: {~c"127.0.0.1", TestPorts.local().wm}
 
   setup do
     Persistence.Repo.active().query!("DELETE FROM accounts")
@@ -47,7 +47,7 @@ defmodule WorldManager.CharacterDeleteTest do
   end
 
   defp select(name) do
-    client = connect(@login)
+    client = connect(login_endpoint())
     client = client |> send!(%UserClientVersionCheckReq{version_key: @key}) |> recv!(<<0x67, 0x0C, 1, 0>>)
 
     client =
@@ -65,7 +65,7 @@ defmodule WorldManager.CharacterDeleteTest do
   # the client after the character list (0x0C14) has been read
   defp world_login(name \\ "admin") do
     {key, _login} = select(name)
-    client = @wm |> connect() |> send!(%UserLoginworldReq{user_name: name, validate: key})
+    client = wm_endpoint() |> connect() |> send!(%UserLoginworldReq{user_name: name, validate: key})
     assert {:ok, <<0x14, 0x0C, _::binary>>, client} = TestClient.recv_raw(client)
     client
   end

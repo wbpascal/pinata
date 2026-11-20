@@ -33,10 +33,12 @@ defmodule WorldManager.HandOffTest do
 
     case topology do
       :single ->
+        local = TestPorts.local()
+
         %{
-          login: {~c"127.0.0.1", 9010},
-          wm: {~c"127.0.0.1", 9110},
-          wm_port: 9110,
+          login: {~c"127.0.0.1", local.login},
+          wm: {~c"127.0.0.1", local.wm},
+          wm_port: local.wm,
           call: fn _part, m, f, a -> apply(m, f, a) end
         }
 

@@ -23,7 +23,9 @@ defmodule Replay.Masks do
         {Proto.Packets.UserClientWrongversionCheckAck, :unused,
          "uninitialised memory (L00-B1): the original never writes this byte, the rebuild sends 0"},
         {Proto.Packets.UserWorldselectAck, :ip,
-         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"}
+         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"},
+        {Proto.Packets.UserWorldselectAck, :port,
+         "test port: the capture has the WorldManager port 9110, the tests listen on a port the operating system picks"}
       ] ++
         delinfo_masks() ++
         [

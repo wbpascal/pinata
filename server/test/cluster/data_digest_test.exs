@@ -1,12 +1,12 @@
 defmodule Cluster.DataDigestTest do
-  # Starts real nodes on fixed ports.
+  # Starts real nodes.
   use ExUnit.Case, async: false
 
   @moduletag :tmp_dir
   @moduletag timeout: 120_000
 
   test "a Zone node with another data directory is refused by the WorldManager node", %{tmp_dir: tmp_dir} do
-    peers = TestPeers.start(9330)
+    peers = TestPeers.start()
     on_exit(fn -> TestPeers.stop(peers) end)
 
     # the WorldManager peer logs the refusal as an error; it is expected here and would show in the test output
@@ -18,12 +18,13 @@ defmodule Cluster.DataDigestTest do
     File.write!(Path.join(bad_dir, "x.txt"), "x")
 
     config = Path.join(tmp_dir, "pinata.toml")
+    [zone_port] = TestPorts.free(1)
 
     File.write!(config, """
     data_dir = #{inspect(bad_dir)}
 
     [zone]
-    port = 9339
+    port = #{zone_port}
 
     [cluster]
     nodes = [#{inspect(to_string(peers.nodes.wm))}]

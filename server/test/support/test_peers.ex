@@ -19,23 +19,12 @@ defmodule TestPeers do
           config: Path.t()
         }
 
-  @doc "Starts the three peers and connects them. The client ports are `base_port` (Login), +1 (WorldManager), +2 (Zone)."
-  @spec start(:inet.port_number()) :: t()
-  def start(base_port \\ 9310) do
-    config = Path.join(System.tmp_dir!(), "pinata-peers-#{System.pid()}-#{base_port}.toml")
-
-    File.write!(config, """
-    data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}
-
-    [login]
-    port = #{base_port}
-
-    [world_manager]
-    port = #{base_port + 1}
-
-    [zone]
-    port = #{base_port + 2}
-    """)
+  @doc "Starts the three peers and connects them. The client ports come from `TestPorts.pick/0`."
+  @spec start() :: t()
+  def start do
+    ports = TestPorts.pick()
+    config = Path.join(System.tmp_dir!(), "pinata-peers-#{System.pid()}-#{System.unique_integer([:positive])}.toml")
+    File.write!(config, "data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}\n" <> TestPorts.toml(ports))
 
     {login, login_node} = start_peer("login", "login", config)
     {wm, wm_node} = start_peer("world_manager", "world_manager", config)
@@ -48,9 +37,9 @@ defmodule TestPeers do
       login: login,
       wm: wm,
       zone: zone,
-      login_port: base_port,
-      wm_port: base_port + 1,
-      zone_port: base_port + 2,
+      login_port: ports.login,
+      wm_port: ports.wm,
+      zone_port: ports.zone,
       nodes: %{login: login_node, wm: wm_node, zone: zone_node},
       config: config
     }

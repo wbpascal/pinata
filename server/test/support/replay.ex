@@ -52,7 +52,7 @@ defmodule Replay do
         timeout: 2000
       ])
 
-    masks = Masks.global() ++ port_masks(opts[:endpoints]) ++ opts[:masks]
+    masks = Masks.global() ++ opts[:masks]
     handles = Masks.handles() ++ opts[:handles]
     :ok = Masks.validate!(masks)
     :ok = Masks.validate!(handles)
@@ -84,15 +84,6 @@ defmodule Replay do
       end
     end
   end
-
-  # The captures hold the default WorldManager port; a topology on other ports (multi) cannot reproduce it.
-  defp port_masks(%{"wm" => {_host, 9110}}), do: []
-
-  defp port_masks(_endpoints),
-    do: [
-      {Proto.Packets.UserWorldselectAck, :port,
-       "the WorldManager of this topology listens on another port than the capture's"}
-    ]
 
   @doc "Like `run/2`; fails the test with the failure message."
   @spec assert_replay(Transcript.t(), keyword()) :: :ok

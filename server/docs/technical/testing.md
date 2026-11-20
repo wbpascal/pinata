@@ -54,7 +54,7 @@ Before committing a transcript, review it for sensitive data: account names, pas
 
 ## Test code layout
 
-`server/test/support/` holds test-only code: `TestClock`, `TestClient`, `Replay` and the `Replay.*` modules. `server/test/test_helper.exs` loads it. It is not part of the application, so the `boundary` compiler and Dialyzer do not see it.
+`server/test/support/` holds test-only code: `TestClock`, `TestClient`, `TestPeers`, `TestPorts`, `Replay` and the `Replay.*` modules. `server/test/test_helper.exs` compiles it before it starts the application. It is not part of the application, so the `boundary` compiler and Dialyzer do not see it.
 
 ## Test client
 
@@ -125,7 +125,7 @@ The opcode name comes from `docs/protocol/opcodes.json`. The field lines need a 
 
 ## Masks
 
-A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, the payload byte of `0x0C66` L00-B1, the `ip` of `0x0C0C`, and `delinfo` (P02-B1) and `kq_date_unused` (P02-B7) of the AVATAR in `0x0C14`, `kq_date_unused` of the AVATAR in `0x1406`); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
+A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, the payload byte of `0x0C66` L00-B1, the `ip` and `port` of `0x0C0C`, and `delinfo` (P02-B1) and `kq_date_unused` (P02-B7) of the AVATAR in `0x0C14`, `kq_date_unused` of the AVATAR in `0x1406`); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
 
 Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name, offset, size, sub}` per field (offset in the payload; for an array the offset of its count and size `nil`). A `bits` field masks its whole byte.
 
@@ -137,11 +137,23 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 
 `Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture, `login_heartbeat_refusals_delete/0` the characters "Test1235" and "Test2" (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`); later issues add more.
 
+## Ports
+
+No test listens on or connects to a fixed port. Reason: another program can own a default port (Logitech G HUB listens on `127.0.0.1:9010`; on Windows our listener still binds `0.0.0.0:9010` without an error and the connections reach the other program, on Linux the start fails with `eaddrinuse`).
+
+A test that starts its own listener passes port 0 to `Net.Listener` and reads the port with `ThousandIsland.listener_info/1` (`test/login/login_test.exs`, `test/net/connection_test.exs`, `test/replay/harness_test.exs`).
+
+A node reads its ports from the settings file and the schema refuses 0, so `TestPorts` (`test/support/test_ports.ex`) picks them first: `free(n)` listens on port 0 n times, reads the ports and closes the sockets; `pick/0` returns `%{login:, wm:, zone:}`; `toml/1` gives the three port sections of a settings file. `test_helper.exs` picks the ports of the application of the test VM and stores them with `put_local/1`; tests read them with `TestPorts.local/0`. `TestPeers.start/0` and the digest test pick their own.
+
+Limit: between the close and the node's own listen another program could take the port. The ports are OS-picked ephemeral ports and the window is short.
+
+New tests: never write a port number; use port 0, `TestPorts.local/0`, a `TestPeers` result or `Replay.Topology.endpoints/0`.
+
 ## Topology
 
-`PINATA_TEST_TOPOLOGY` selects where the replay connects; `Replay.Topology.start/0` reads it once from `test_helper.exs` (after the support files are compiled, before `ExUnit.start/0`) and keeps the result in `persistent_term`. `single` (default) uses the application `test_helper.exs` starts, on ports 9010, 9110, 9210. `multi` starts `TestPeers.start(9320)`: Login, WorldManager and Zone each on a `:peer` node, client ports 9320, 9321, 9322; the peers stop at exit. Another value raises. The test VM still runs its own application in `multi`, but nothing connects to it.
+`PINATA_TEST_TOPOLOGY` selects where the replay connects; `Replay.Topology.start/0` reads it once from `test_helper.exs` (after the support files are compiled, before `ExUnit.start/0`) and keeps the result in `persistent_term`. `single` (default) uses the application `test_helper.exs` starts, on the ports of `TestPorts.local/0`. `multi` starts `TestPeers.start()`: Login, WorldManager and Zone each on a `:peer` node; the peers stop at exit. Another value raises. The test VM still runs its own application in `multi`, but nothing connects to it.
 
-`Replay.Topology.call(part, module, function, args)` (`part` is `:login`, `:wm` or `:zone`) runs a call in this VM for `single` and on the peer for `multi`; a test that reaches into the server (the "world closed" and "world full" tests of `milestone1_test.exs`) goes through it. `Replay.Topology.all/3` calls in this VM and on every peer; the harness sets the clock source and the `TestClock` time that way, because each node has its own clock. In `multi` the world-select port of the capture (9110) cannot match, so `Replay` masks `port` of `UserWorldselectAck` for any WorldManager endpoint other than 9110.
+`Replay.Topology.call(part, module, function, args)` (`part` is `:login`, `:wm` or `:zone`) runs a call in this VM for `single` and on the peer for `multi`; a test that reaches into the server (the "world closed" and "world full" tests of `milestone1_test.exs`) goes through it. `Replay.Topology.all/3` calls in this VM and on every peer; the harness sets the clock source and the `TestClock` time that way, because each node has its own clock. In `multi` the world-select port of the capture (9110) cannot match in any topology, so `port` of `UserWorldselectAck` is a global mask; `hand_off_test.exs` checks the port.
 
 The topology runs on any database (the peers use the `DATABASE_URL` of the test VM; SQLite is a file shared by all VMs; `Settings` refuses SQLite in multi-node mode, so `test_helper.exs` and `TestPeers` set `config :pinata, :sqlite_in_multi_node, true`, which nothing else may set). CI runs the whole suite once single-node on SQLite (job `check`) and once `multi` on PostgreSQL (job `test-postgres`). The variable is for tests only, so it is not in the user documentation.
 
@@ -154,13 +166,13 @@ The topology runs on any database (the peers use the `DATABASE_URL` of the test 
 
 ## Peer nodes
 
-`TestPeers.start(base_port \\ 9310)` (`test/support/test_peers.ex`) starts three `:peer` nodes: `PINATA_PARTS=login` (client port `base`), `world_manager` (`base + 1`) and `zone` (`base + 2`). They share one settings file (`pinata-peers-<os pid>-<base>.toml`), the database of the test VM, and the cookie; Login and Zone are connected to the WorldManager node, not to the test VM, so the control connection is standard I/O. The result holds the peer pids (`login`, `wm`, `zone`), the ports (`login_port`, `wm_port`, `zone_port`) and `nodes` (the node names). `TestClock` is loaded on all peers so a test can move their clocks. `test/world_manager/hand_off_test.exs` runs every test in both topologies: `:single` (the application of the test VM, ports 9010 and 9110) and `:peers` (base 9310). The peers have no `cluster.nodes`, so they are multi-node nodes and run `Cluster.DataDigest`.
+`TestPeers.start()` (`test/support/test_peers.ex`, no argument) starts three `:peer` nodes: `PINATA_PARTS=login`, `world_manager` and `zone`. Their client ports come from `TestPorts.pick/0`. They share one settings file (`pinata-peers-<os pid>-<unique integer>.toml`), the database of the test VM, and the cookie; Login and Zone are connected to the WorldManager node, not to the test VM, so the control connection is standard I/O. The result holds the peer pids (`login`, `wm`, `zone`), the ports (`login_port`, `wm_port`, `zone_port`) and `nodes` (the node names). `TestClock` is loaded on all peers so a test can move their clocks. `test/world_manager/hand_off_test.exs` runs every test in both topologies: `:single` (the application of the test VM, on `TestPorts.local/0`) and `:peers`. The peers have no `cluster.nodes`, so they are multi-node nodes and run `Cluster.DataDigest`.
 
 One multi-mode run on SQLite once failed with "Ecto repo Persistence.Repo.SQLite not started" in every test after one point; it could not be reproduced (20 repeated runs). That error means the application of the test VM was stopped. `test/start_test.exs` and `test/persistence/migrations_test.exs` stop it and start it again in `on_exit`; if that start fails, the rest of the run fails. When it happens again, the first failure of the run settles the cause: it shows the reason `Application.start/1` returned.
 
 ## Digest test
 
-`test/cluster/data_digest_test.exs` starts peers on base 9330, then a real node (`elixir --name ... -e`, the code paths of the test VM, `PINATA_PARTS=zone`, `cluster.nodes` naming the WorldManager peer) with a data directory that differs. It asserts exit status 1, the message and both digests in the output, and that the WorldManager peer is still alive. The log level of the WorldManager peer is set to `:none`, so its expected refusal error does not show in the test output. The node halts itself with status 3 after 30 seconds if it is never refused. While `Zone.game_data/0` is `[]` any different directory works; when Zone declares tables, copy the test data directory and change one file.
+`test/cluster/data_digest_test.exs` starts peers, then a real node (`elixir --name ... -e`, the code paths of the test VM, `PINATA_PARTS=zone`, `cluster.nodes` naming the WorldManager peer) with a data directory that differs; its Zone port comes from `TestPorts.free(1)`. It asserts exit status 1, the message and both digests in the output, and that the WorldManager peer is still alive. The log level of the WorldManager peer is set to `:none`, so its expected refusal error does not show in the test output. The node halts itself with status 3 after 30 seconds if it is never refused. While `Zone.game_data/0` is `[]` any different directory works; when Zone declares tables, copy the test data directory and change one file.
 
 ## Compose smoke test
 

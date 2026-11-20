@@ -41,17 +41,18 @@ defmodule Pinata.StartTest do
     System.put_env("PINATA_CONFIG", path)
   end
 
-  test "with only data_dir set every supervisor starts", %{tmp_dir: tmp_dir} do
-    use_file(tmp_dir, "")
+  test "with data_dir and the ports set every supervisor starts", %{tmp_dir: tmp_dir} do
+    ports = TestPorts.local()
+    use_file(tmp_dir, TestPorts.toml(ports))
     assert :ok = Application.start(:pinata)
     assert running() == @supervisors
     assert Process.whereis(Cluster.DataDigest) == nil
 
-    for port <- [9010, 9110, 9210] do
+    for port <- [ports.login, ports.wm, ports.zone] do
       {socket, cipher} = connect(port)
 
       # 0x0807 reaches the Zone stub handler, which ignores it; the socket stays open. Login and WorldManager close on it: they expect 0x0C65 and 0x0C0F.
-      {seed_packet, cipher} = if port in [9010, 9110], do: {<<>>, cipher}, else: encrypted(cipher, <<0x07, 0x08, 0, 0>>)
+      {seed_packet, cipher} = if port != ports.zone, do: {<<>>, cipher}, else: encrypted(cipher, <<0x07, 0x08, 0, 0>>)
       :ok = :gen_tcp.send(socket, seed_packet)
       {heartbeat, _cipher} = encrypted(cipher, <<0x04, 0x08>>)
       :ok = :gen_tcp.send(socket, heartbeat)
@@ -60,7 +61,7 @@ defmodule Pinata.StartTest do
   end
 
   test "with a valid file every supervisor starts", %{tmp_dir: tmp_dir} do
-    use_file(tmp_dir, "public_host = \"203.0.113.7\"\n\n[login]\nport = 9011\n")
+    use_file(tmp_dir, "public_host = \"203.0.113.7\"\n" <> TestPorts.toml(TestPorts.local()))
     assert :ok = Application.start(:pinata)
     assert running() == @supervisors
   end
@@ -93,7 +94,7 @@ defmodule Pinata.StartTest do
     assert :ok = Application.start(:pinata)
     assert running() == [Persistence.Supervisor, Cluster.Root, Login.Supervisor]
     assert is_pid(Process.whereis(Cluster.DataDigest))
-    connect(9010)
-    assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", 9110, [:binary, active: false])
+    connect(TestPorts.local().login)
+    assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", TestPorts.local().wm, [:binary, active: false])
   end
 end

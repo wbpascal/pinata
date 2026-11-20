@@ -1,7 +1,7 @@
 defmodule Replay.Topology do
   @moduledoc """
   Where the replay connects, chosen by the environment variable `PINATA_TEST_TOPOLOGY` (`single` or `multi`).
-  `start/0` runs once from `test_helper.exs`; `multi` starts the three `TestPeers` on ports 9320 to 9322.
+  `start/0` runs once from `test_helper.exs`; `multi` starts the three `TestPeers`; every port comes from `TestPorts`.
   """
 
   @type endpoints :: %{String.t() => {charlist(), :inet.port_number()}}
@@ -23,7 +23,7 @@ defmodule Replay.Topology do
           %{}
 
         :multi ->
-          peers = TestPeers.start(9320)
+          peers = TestPeers.start()
           System.at_exit(fn _status -> TestPeers.stop(peers) end)
           peers
       end
@@ -39,8 +39,9 @@ defmodule Replay.Topology do
         %{"login" => {~c"127.0.0.1", login}, "wm" => {~c"127.0.0.1", wm}, "zone" => {~c"127.0.0.1", zone}}
 
       %{} ->
-        # the application test_helper.exs starts, on the default ports
-        %{"login" => {~c"127.0.0.1", 9010}, "wm" => {~c"127.0.0.1", 9110}, "zone" => {~c"127.0.0.1", 9210}}
+        # the application test_helper.exs starts
+        %{login: login, wm: wm, zone: zone} = TestPorts.local()
+        %{"login" => {~c"127.0.0.1", login}, "wm" => {~c"127.0.0.1", wm}, "zone" => {~c"127.0.0.1", zone}}
     end
   end
 
