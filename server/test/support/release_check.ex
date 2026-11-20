@@ -1,4 +1,4 @@
-defmodule ReleaseNotes do
+defmodule ReleaseCheck do
   @moduledoc """
   The consistency check and the release text of the release workflow (`.github/workflows/release.yml`,
   `docs/technical/testing.md`, "Release workflow"). Pure functions on the file contents; `release_check.exs` reads
@@ -8,7 +8,7 @@ defmodule ReleaseNotes do
   @image "ghcr.io/wbpascal/pinata"
 
   @type files :: %{mix_exs: String.t(), compose: String.t(), changelog: String.t()}
-  @type section :: %{title: String.t(), notes: String.t(), unreleased: boolean()}
+  @type section :: %{title: String.t(), text: String.t(), unreleased: boolean()}
 
   @doc """
   Checks the files against each other. `tag` is the pushed tag, or `:none` outside a tag run: then only the version
@@ -45,7 +45,7 @@ defmodule ReleaseNotes do
 
   @doc """
   The section of `version` in the changelog: the `## <version> ...` heading up to the next `## ` heading or the end.
-  `title` is the heading without `## ` and without the ` (unreleased)` mark, `notes` the text below it, trimmed.
+  `title` is the heading without `## ` and without the ` (unreleased)` mark, `text` the text below it, trimmed.
   """
   @spec section(String.t(), String.t()) :: {:ok, section()} | :error
   def section(changelog, version) do
@@ -65,7 +65,7 @@ defmodule ReleaseNotes do
         {:ok,
          %{
            title: title |> String.replace_suffix("(unreleased)", "") |> String.trim(),
-           notes: body |> Enum.join("\n") |> String.trim(),
+           text: body |> Enum.join("\n") |> String.trim(),
            unreleased: String.ends_with?(title, "(unreleased)")
          }}
     end

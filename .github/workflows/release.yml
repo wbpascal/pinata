@@ -41,7 +41,7 @@ jobs:
             if [ -f "$dir/title" ]; then
               echo "# $(cat "$dir/title")"
               echo
-              cat "$dir/notes.md"
+              cat "$dir/text.md"
             else
               echo "CHANGELOG.md has no section for $(cat "$dir/version"); a tag run would fail."
             fi
@@ -204,6 +204,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
+        shell: bash
         working-directory: server
     env:
       MIX_ENV: test
@@ -282,17 +283,17 @@ jobs:
         run: |
           set -euo pipefail
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          # Each CPU's image goes up under "latest" only to get its digest; the index below takes both tags.
+          # Each CPU's image goes up under the version's tag only to get its digest; the index below then takes both
+          # tags, so "latest" moves once, to the index for both CPUs.
           refs=()
           for arch in amd64 arm64; do
             docker load -i "dist/image-$arch.tar.gz"
-            docker tag "$REPO:$V" "$REPO:latest"
-            digest=$(docker push "$REPO:latest" | grep -o 'digest: sha256:[0-9a-f]*' | cut -d' ' -f2)
+            digest=$(docker push "$REPO:$V" | grep -o 'digest: sha256:[0-9a-f]*' | cut -d' ' -f2)
             refs+=("$REPO@$digest")
           done
           docker buildx imagetools create -t "$REPO:$V" -t "$REPO:latest" "${refs[@]}"
 
       - name: GitHub release
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$(cat dist/title)" --notes-file dist/notes.md \
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$(cat dist/title)" --notes-file dist/text.md \
             dist/pinata-*.tar.gz dist/pinata-*.zip server/compose.yaml server/compose.toml
