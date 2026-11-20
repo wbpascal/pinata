@@ -26,6 +26,14 @@ _Avoid_: cluster mode, distributed mode, split mode
 One game universe with its own characters, behind a shared Login. Several may exist; one is configured for now.
 _Avoid_: realm, shard, server
 
+**Server log**:
+The lines a node writes about its own operation for the administrator: start-up, connections, failures.
+_Avoid_: log (alone), debug output, console output
+
+**Game log**:
+The stored record of what players did, kept so an administrator can verify what happened and restore a lost item by hand.
+_Avoid_: log (alone), audit log, action log
+
 ### Sources of truth
 
 **Original server**:
