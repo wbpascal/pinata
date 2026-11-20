@@ -1,7 +1,6 @@
 # Multi-node example: PostgreSQL and one container per part. See docs/user/multi-node.md.
 x-node: &node
-  image: pinata:local
-  build: .
+  image: ghcr.io/wbpascal/pinata:0.1.0
   volumes:
     - ./compose.toml:/etc/pinata/pinata.toml:ro
     - ./data:/data:ro

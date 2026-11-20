@@ -35,15 +35,14 @@ The WorldManager node logs an error naming the refused node. The check happens w
 
 ## Example: Docker Compose
 
-`compose.yaml` and `compose.toml` in `server/` start PostgreSQL, run the migrations once, and start one container per part, all from one image (built by `docker compose up --build`, see [`install.md`](install.md)). The nodes read `compose.toml` and the data directory `server/data` (read-only). The ports 9010, 9110 and 9210 are published on the host, so the client connects to `127.0.0.1:9010`.
+`compose.yaml` and `compose.toml` in `server/` start PostgreSQL, run the migrations once, and start one container per part, all from one image: `ghcr.io/wbpascal/pinata` with the tag of the server's version, which `docker compose up` pulls from the GitHub container registry (see [`install.md`](install.md); while the package is private, log in first with `docker login ghcr.io` and a token that may read it). To run a source checkout instead, build that image under the same name first: `docker build -t ghcr.io/wbpascal/pinata:0.1.0 .` in `server/` (the tag in `compose.yaml`). The nodes read `compose.toml` and the data directory `server/data` (read-only). The ports 9010, 9110 and 9210 are published on the host, so the client connects to `127.0.0.1:9010`.
 
 `compose.yaml`:
 
 ```yaml
 # Multi-node example: PostgreSQL and one container per part. See docs/user/multi-node.md.
 x-node: &node
-  image: pinata:local
-  build: .
+  image: ghcr.io/wbpascal/pinata:0.1.0
   volumes:
     - ./compose.toml:/etc/pinata/pinata.toml:ro
     - ./data:/data:ro
@@ -128,7 +127,7 @@ Commands, in `server/`:
 
 ```
 mix pinata.import_data <9Data folder> data
-docker compose up -d --build
+docker compose up -d
 printf 'my-password\n' | docker compose exec -T login /app/bin/pinata eval "Persistence.Release.create_account(~s(<name>))"
 docker compose logs -f
 docker compose down -v
