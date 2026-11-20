@@ -62,6 +62,8 @@ defmodule GameDataTest do
       dir
     end
 
+    # Excluded where this OS user cannot create symlinks (test_helper.exs).
+    @tag :symlink
     test "does not enter symlinked directories", %{tmp_dir: tmp} do
       files = [{"a.txt", "one"}, {"sub/b.txt", "two"}]
       base = GameData.digest(make(Path.join(tmp, "a"), files))

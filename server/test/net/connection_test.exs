@@ -84,7 +84,9 @@ defmodule Net.ConnectionTest do
     def handle_info(state, :done), do: {state, List.duplicate({:send, %MiscSeedAck{seed: 1}}, 5)}
 
     @impl Net.Handler
+    # Tells the test that the request was taken, so the client resets the connection only after that.
     def perform(:wait) do
+      send(:persistent_term.get({__MODULE__, :test}), :request_taken)
       Process.sleep(100)
       :done
     end
@@ -119,6 +121,7 @@ defmodule Net.ConnectionTest do
     on_exit(fn ->
       Application.delete_env(:pinata, :clock_source)
       :persistent_term.erase({FakeClock, :now})
+      :persistent_term.erase({SlowHandler, :test})
     end)
   end
 
@@ -161,6 +164,24 @@ defmodule Net.ConnectionTest do
     :ok
   end
 
+  # Waits until the connection has handled what the client sent. Client data reaches the process as a message some
+  # time after the send returns, so `:sys.get_state/1` alone is no barrier for it: it only shows an idle process.
+  defp await(listener, done?, tries \\ 500) do
+    {_socket, state} = :sys.get_state(conn_pid(listener))
+
+    cond do
+      done?.(state) ->
+        :ok
+
+      tries == 0 ->
+        flunk("the connection did not reach the awaited state: #{inspect(state)}")
+
+      true ->
+        Process.sleep(10)
+        await(listener, done?, tries - 1)
+    end
+  end
+
   defp nothing(socket), do: assert(:gen_tcp.recv(socket, 0, 0) == {:error, :timeout})
   defp closed(socket), do: assert(:gen_tcp.recv(socket, 0, 1000) == {:error, :closed})
 
@@ -179,7 +200,8 @@ defmodule Net.ConnectionTest do
 
     {ack, cipher} = frame(cipher, <<0x05, 0x08>>)
     :ok = :gen_tcp.send(socket, ack)
-    _ = :sys.get_state(conn_pid(listener))
+    # The acknowledgement must be taken at 30 000: taken after the clock moves on, it would count as fresh.
+    await(listener, &(not &1.pinged?))
     set_now(210_000)
     check(listener)
     assert {:ok, <<2, 4, 8>>} = :gen_tcp.recv(socket, 3, 1000)
@@ -246,7 +268,7 @@ defmodule Net.ConnectionTest do
     log =
       TestLog.capture(fn ->
         :ok = :gen_tcp.send(socket, [short, tiny])
-        :sys.get_state(conn_pid(listener))
+        await(listener, &(&1.window_count == 2))
       end)
 
     assert log =~ "[debug] Net: dropped a packet of the wrong size (\"\\a\\b\", 3 bytes), peer 127.0.0.1:"
@@ -390,6 +412,7 @@ defmodule Net.ConnectionTest do
   end
 
   test "a send that fails closes with one warning and no client-close line" do
+    :persistent_term.put({SlowHandler, :test}, self())
     {listener, port} = listen(SlowHandler)
     {socket, cipher} = connect(port, linger: {true, 0})
     {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
@@ -399,6 +422,7 @@ defmodule Net.ConnectionTest do
     log =
       TestLog.capture(fn ->
         :ok = :gen_tcp.send(socket, req)
+        assert_receive :request_taken, 2000
         :ok = :gen_tcp.close(socket)
         assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2000
       end)

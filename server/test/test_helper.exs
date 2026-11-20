@@ -35,7 +35,8 @@ end
   |> Path.wildcard()
   |> Kernel.ParallelCompiler.require(return_diagnostics: true)
 
-dir = Path.join(System.tmp_dir!(), "pinata-test-data-#{System.pid()}")
+# Path.expand/1 turns the backslashes of a Windows temp path into slashes: the tests build wildcard patterns from it.
+dir = Path.join(Path.expand(System.tmp_dir!()), "pinata-test-data-#{System.pid()}")
 File.rm_rf!(dir)
 {:ok, _report} = GameData.Import.run(source, dir)
 ports = TestPorts.choose_app()
@@ -68,4 +69,34 @@ end)
 
 Replay.Topology.start()
 
-ExUnit.start()
+# Tests tagged :symlink create symlinks. Windows allows that only with the symlink privilege (Developer Mode or an
+# elevated shell); without it File.ln_s/2 fails with :eperm, and the tests are excluded.
+probe = Path.join(Path.expand(System.tmp_dir!()), "pinata-symlink-probe-#{System.pid()}")
+File.rm_rf!(probe)
+File.mkdir_p!(probe)
+
+symlink =
+  case File.ln_s(probe, Path.join(probe, "link")) do
+    :ok ->
+      []
+
+    {:error, reason} ->
+      IO.puts("Excluding :symlink tests: this user cannot create symlinks (#{:file.format_error(reason)}).")
+      [:symlink]
+  end
+
+File.rm_rf!(probe)
+
+# Tests tagged :unix_file_modes take the read right away with File.chmod/2. On Windows that does not make a file
+# unreadable, so they are excluded there.
+file_modes =
+  case :os.type() do
+    {:win32, _} ->
+      IO.puts("Excluding :unix_file_modes tests: Windows has no Unix file modes.")
+      [:unix_file_modes]
+
+    {:unix, _} ->
+      []
+  end
+
+ExUnit.start(exclude: symlink ++ file_modes)

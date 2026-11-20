@@ -12,17 +12,28 @@ On Windows, install mise first (for example `winget install jdx.mise`) and activ
 
 ## Windows
 
-A release built on Windows runs on Windows. It was tried on Windows 11 with PowerShell 7 and `cmd` (2026-11-20). What differs from the other pages:
+A release built on Windows runs on Windows. It was tried on Windows 11 with PowerShell 7 and `cmd` (2026-11-20), and CI builds, tests and smoke-tests it on Windows at every change.
+
+Supported on Windows is **single-node mode with SQLite**. PostgreSQL, multi-node mode and `bin\pinata install` (a Windows service) are not supported there; nothing stops them from starting, but they are not tested. For multi-node mode run Linux containers, for example with Docker Desktop: [`multi-node.md`](multi-node.md) has a Docker Compose example.
+
+Before you clone, allow long paths in Git: some files under `Files/` have paths longer than Windows allows by default, and the checkout fails with `Filename too long`. The setting must be in place before the files are written, so it cannot come with the repository:
+
+```
+git config --global core.longpaths true
+```
+
+The repository's `.gitattributes` makes every text file LF on every platform, whatever `core.autocrlf` says; `mix format --check-formatted` and some tests depend on it. A clone made before that rule came in still has CRLF files; check them out again once, in the repository root, with no changes of your own in it: `git rm -r --cached -q .` and then `git reset --hard`.
+
+What differs from the other pages:
 
 | Topic | On Windows |
 |---|---|
 | the command | The file is `bin\pinata.bat`. PowerShell accepts `bin/pinata` as written on the other pages; `cmd` needs backslashes: `bin\pinata`. |
 | strings in `eval` and `rpc` | Keep the form of these pages: the expression in double quotes, every string inside it as `~s(...)`. Double quotes inside the expression are lost on the way to the node, so `eval 'f("<name>")'` fails with a syntax error. |
 | paths in `eval` | Write them with forward slashes: `~s(C:/Fiesta/9Data)`. With backslashes use `~S(C:\pinata\data)` (capital `S`). |
-| the `9Data` folder of the import | Forward slashes only, also with `mix pinata.import_data`. With backslashes the import finds no files, reports `0 tables written as CSV, 0 files copied` and creates nothing. |
 | paths in `pinata.toml` | Forward slashes (`data_dir = "C:/pinata/data"`) or a TOML literal string (`data_dir = 'C:\pinata\data'`). `database.url` takes either: `sqlite:C:/pinata/data/pinata.db`. |
 | environment variables | PowerShell: `$env:PINATA_CONFIG = "C:\pinata\pinata.toml"`; `cmd`: `set PINATA_CONFIG=C:\pinata\pinata.toml`. They hold for that window. |
-| background start | There is no `daemon`. `bin\pinata start` runs in the foreground of its window. `bin\pinata install` registers the release as a Windows service; this was not tried. |
+| background start | There is no `daemon`. `bin\pinata start` runs in the foreground of its window. `bin\pinata install` (a Windows service) is not supported. |
 | time zone | The node uses the time zone of Windows. Of the `TZ` values only `UTC` has an effect. |
 | piped password | `'my-password' \| bin\pinata eval "Persistence.Release.create_account(~s(<name>))"` in PowerShell |
 
@@ -31,6 +42,8 @@ The import from a release, in `server\`:
 ```
 _build\prod\rel\pinata\bin\pinata eval "GameData.Release.import_data(~s(C:/Fiesta/9Data), ~s(./data))"
 ```
+
+`mix pinata.import_data C:\Fiesta\9Data data` takes the path with backslashes too.
 
 ## The container image
 
@@ -44,9 +57,9 @@ The server reads the game's data tables from one directory, the data directory. 
 mix pinata.import_data <9Data folder> <new data directory>
 ```
 
-From a release, which has no `mix`, the same import is `bin/pinata eval "GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))"`. On Windows write the `9Data` path with forward slashes in both forms (see [Windows](#windows)).
+From a release, which has no `mix`, the same import is `bin/pinata eval "GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))"`. On Windows write the path inside `eval` with forward slashes or as `~S(...)` (see [Windows](#windows)).
 
-The command copies the SHN tables, scripts and map geometry unchanged and converts the TXT tables to CSV files. It prints how many tables it wrote, how many files it copied and how many it left out, and a warning for each file it could not convert as a table. On a problem it prints all of them and writes nothing. The target must not exist or must be empty; to bring an original data set in again, import it into a new directory and point `data_dir` at that.
+The command copies the SHN tables, scripts and map geometry unchanged and converts the TXT tables to CSV files. It prints how many tables it wrote, how many files it copied and how many it left out, and a warning for each file it could not convert as a table. On a problem it prints all of them, writes nothing and exits with a non-zero status. A folder with nothing the server uses (no table and no file to copy) is such a problem: `<9Data folder>: nothing to import, no table or file of the Shine folder is one the server uses`. The target must not exist or must be empty; to bring an original data set in again, import it into a new directory and point `data_dir` at that.
 
 Then set the directory in `pinata.toml` (default `./data`, see [`settings.md`](settings.md)):
 

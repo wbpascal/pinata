@@ -134,6 +134,6 @@ docker compose logs -f
 docker compose down -v
 ```
 
-On Windows (Docker Desktop, PowerShell) write the import path with forward slashes (`mix pinata.import_data C:/Fiesta/9Data data`) and start the third command with `'my-password' |` in place of `printf 'my-password\n' |`; the others are unchanged. These commands were not tried on Windows.
+On Windows (Docker Desktop with Linux containers, PowerShell; the recommended way to run multi-node mode there) start the third command with `'my-password' |` in place of `printf 'my-password\n' |`; the others are unchanged. These commands were not tried on Windows.
 
 `down -v` also deletes the database volume; `docker compose down` keeps it. The password of the example database and its cookie are for a trial on one machine only.
