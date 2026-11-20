@@ -79,3 +79,36 @@ A reviewer passes or fails a PR on these six points:
 4. For everything the diff renames or removes, the reviewer greps `server/docs/` for the old name and finds no hits.
 5. A PR that changes no documentation says why in its description.
 6. Every new failure branch, server-initiated close and start-up step in the diff writes a server log line, or the PR says why not.
+
+## Changelog checklist
+
+`CHANGELOG.md` at the repository root records, per version, what an administrator or a player can observe: a client action that now works, a setting, a command, a start-up error, a changed default. Internal work (test harness, CI, refactoring) is not in it. The top section is always the next version, marked `(unreleased)`, and every PR adds its own lines to it. The form of a section:
+
+```
+## 0.1.0 – Login to character select (unreleased)
+
+<two to four sentences: the most important changes of this version>
+
+### New
+- one line per observable change, with its issue number (#45)
+
+### Fixed
+- one line per defect of an earlier version (#61)
+
+### Differences from the original server
+- only fixes of original-server bugs that change packets or gameplay
+
+### Moving from the previous version
+- migrations, changed settings, whether the data directory must be imported again
+```
+
+The title is the milestone's name unless a sharper one fits. A heading with nothing under it is left out. "Fixed" is for defects of an earlier Pinata version; a fix of an original-server bug goes under "Differences from the original server", and only when it changes packets or gameplay. Lines stay in issue-number order until the version is published.
+
+The charting session of a milestone opens its section (`docs/roadmap.md`, "Rules"). The issue "Publish version 0.N.0" sets the date in place of `(unreleased)`, checks that every observable change has its line and orders the lines. A fix version `0.N.P` is tagged on master: at that point the lines of the top section so far become the section of the fix version, with a title written for it, and a new unreleased section opens above it.
+
+A reviewer passes or fails a PR on these four points:
+
+1. A change an administrator or player can observe has a line in the top section, under the right heading, with its issue number.
+2. A PR that leaves `CHANGELOG.md` untouched has a line starting with `Changelog: none` in its description, followed by the reason. CI checks only that one of the two is there.
+3. The overview is unchanged unless the PR does one of three things, and the description names which: it delivers a capability named in the milestone's row of `docs/roadmap.md` that the overview lacks; it adds a step every administrator must take when moving to the version; it removes or breaks something an earlier version had. The overview stays at two to four sentences, so a change rewrites it and does not append.
+4. Sections of published versions are not changed.

@@ -12,7 +12,7 @@ Both flags refuse a login with the right password. They differ in what they mean
 | The player sees | "The ID has been blocked." | "The World Servers are down for maintenance." |
 | Use it to | ban one account | keep an account out without calling it banned, for example players during maintenance while staff accounts stay login-able |
 | New account | not blocked | login-able |
-| Change it | `mix pinata.account.block` and `unblock` (below) | `Persistence.set_login_able/2`, no command yet (see the end of this page) |
+| Change it | `Persistence.Release.block` and `unblock` (below) | `Persistence.set_login_able/2`, no command yet (see the end of this page) |
 
 When an account is both blocked and not login-able, the player sees the blocked message. A wrong password is reported as a wrong password whatever the flags say.
 
@@ -24,13 +24,13 @@ A name is 1 to 255 printable ASCII characters (`!` to `~`), no spaces. Names are
 
 ## Commands
 
-Run them in `server/` with `mix`, or from a release with `bin/pinata eval`. They use the same settings file and `DATABASE_URL` as the node and may run while the node runs. On SQLite they migrate the database first; on PostgreSQL they refuse while migrations are pending (see [`operation.md`](operation.md)).
+Run them from the release with `bin/pinata eval`, or from a source checkout with `mix` in `server/` (see [`from-source.md`](from-source.md)). They use the same settings file and `DATABASE_URL` as the node and may run while the node runs. On SQLite they migrate the database first; on PostgreSQL they refuse while migrations are pending (see [`operation.md`](operation.md)).
 
-| Action | From source | From a release |
+| Action | From the release | From source |
 |---|---|---|
-| create | `mix pinata.account.create <name>` | `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` |
-| block | `mix pinata.account.block <name>` | `bin/pinata eval "Persistence.Release.block(~s(<name>))"` |
-| unblock | `mix pinata.account.unblock <name>` | `bin/pinata eval "Persistence.Release.unblock(~s(<name>))"` |
+| create | `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` | `mix pinata.account.create <name>` |
+| block | `bin/pinata eval "Persistence.Release.block(~s(<name>))"` | `mix pinata.account.block <name>` |
+| unblock | `bin/pinata eval "Persistence.Release.unblock(~s(<name>))"` | `mix pinata.account.unblock <name>` |
 
 Create asks `Password: `. The password is echoed while you type it. The game client sends the MD5 of the typed password, so the server stores the hash of that MD5; that the client's MD5 covers only the typed password is not yet verified against a capture.
 

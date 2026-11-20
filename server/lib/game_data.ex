@@ -82,8 +82,9 @@ defmodule GameData do
     else
       {:error,
        [
-         "#{data_dir}: data directory not found. Create it from an original 9Data folder with: " <>
-           "mix pinata.import_data <9Data folder> #{data_dir}"
+         "#{data_dir}: data directory not found. Create it from an original 9Data folder with the release command " <>
+           "bin/pinata eval \"GameData.Release.import_data(~s(<9Data folder>), ~s(#{data_dir}))\" " <>
+           "or, from a source checkout, with mix pinata.import_data <9Data folder> #{data_dir}"
        ]}
     end
   end

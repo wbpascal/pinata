@@ -196,6 +196,10 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 
 `test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
 
+## Changelog step
+
+The `changelog` job of `.github/workflows/server.yml` runs on pull requests only. It passes when the PR adds at least one line to `CHANGELOG.md` (the diff between the merge commit and its first parent, the base) or when the PR description has a line starting with `Changelog: none`; it checks nothing else (the rest is the changelog checklist of `server/AGENTS.md`). The description reaches `.github/scripts/changelog-check.sh` only through the environment variable `PR_BODY`. The workflow also runs on `edited`, so a description edited after a failed step runs it again; every job runs then, so that no skipped job stands in for an earlier failure of the same commit. The job first runs `.github/scripts/changelog-check-test.sh`, which tries the script in a throw-away repository: no line and no `Changelog: none` fails, `Changelog: none` in the middle of a line fails, the line (also with CRLF line ends, as GitHub stores a description) passes, an added changelog line passes, and shell syntax in the description is not run.
+
 ## Release workflow
 
 `.github/workflows/release.yml` publishes a version (terms in `GLOSSARY.md`). It runs on a pushed tag `v*` and by hand (`workflow_dispatch`); a manual run does everything except publish. Its jobs:
