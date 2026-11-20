@@ -41,7 +41,7 @@ File.rm_rf!(dir)
 # No fixed port: another program may own a default port (docs/technical/testing.md, "Ports").
 ports = TestPorts.pick()
 TestPorts.put_local(ports)
-File.write!(dir <> ".toml", "data_dir = #{inspect(dir)}\n" <> TestPorts.toml(ports))
+File.write!(dir <> ".toml", "data_dir = #{inspect(dir)}\n\n[log]\nlevel = \"warning\"\n" <> TestPorts.toml(ports))
 System.put_env("PINATA_CONFIG", dir <> ".toml")
 System.put_env("PINATA_TEST_DATA_DIR", dir)
 {:ok, _apps} = Application.ensure_all_started(:pinata)

@@ -95,6 +95,17 @@ defmodule Settings.Schema do
         ]
       ]
     ],
+    log: [
+      type: :keyword_list,
+      keys: [
+        level: [
+          type: {:custom, Settings.Schema, :log_level, []},
+          type_doc: "`\"debug\"`, `\"info\"`, `\"warning\"` or `\"error\"`",
+          default: "info",
+          doc: "The lowest level the server log prints (see operation.md)."
+        ]
+      ]
+    ],
     data: [
       type: :keyword_list,
       keys: [
@@ -116,6 +127,16 @@ defmodule Settings.Schema do
   @spec public_host(term()) :: {:ok, String.t()} | {:error, String.t()}
   def public_host(host) when is_binary(host) and byte_size(host) in 1..15, do: {:ok, host}
   def public_host(other), do: {:error, "expected a string of 1 to 15 bytes, got: #{inspect(other)}"}
+
+  @doc false
+  @spec log_level(term()) :: {:ok, :debug | :info | :warning | :error} | {:error, String.t()}
+  def log_level("debug"), do: {:ok, :debug}
+  def log_level("info"), do: {:ok, :info}
+  def log_level("warning"), do: {:ok, :warning}
+  def log_level("error"), do: {:ok, :error}
+
+  def log_level(other),
+    do: {:error, "expected \"debug\", \"info\", \"warning\" or \"error\", got: #{inspect(other)}"}
 
   @doc "The NimbleOptions schema."
   @spec schema() :: keyword()

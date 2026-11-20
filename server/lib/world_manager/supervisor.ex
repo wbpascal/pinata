@@ -12,7 +12,7 @@ defmodule WorldManager.Supervisor do
       for world <- settings.world,
           do: Supervisor.child_spec({WorldManager.World, world}, id: {WorldManager.World, world.number})
 
-    listener = {Net.Listener, {WorldManager.Handler, settings.world_manager.port, settings}}
+    listener = {Net.Listener, {"WorldManager", WorldManager.Handler, settings.world_manager.port, settings}}
     Supervisor.init(worlds ++ [listener], strategy: :one_for_one)
   end
 end

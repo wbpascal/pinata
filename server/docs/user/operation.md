@@ -17,7 +17,7 @@ A string inside an expression is written `~s(...)`, not in double quotes. On Win
 
 The settings file defaults to `./pinata.toml` and the data directory to `./data`, both relative to the working directory the command starts in, so start from the directory that holds them or set `PINATA_CONFIG` (path of the settings file) and `data_dir`. `PINATA_PARTS` chooses the parts of the node (see [`multi-node.md`](multi-node.md) and [`settings.md`](settings.md)). From a source checkout, `iex -S mix` in `server/` starts the same node.
 
-Logs go to standard output; under Docker Compose read them with `docker compose logs`. Start-up failures are printed to standard error. A node logs at start-up the number of game tables and rows it loaded and how long it took.
+Logs go to standard output; under Docker Compose read them with `docker compose logs`. Start-up failures are printed to standard error. A node logs at start-up the number of game tables and rows it loaded and how long it took. What the server log holds, and how to read it, is in "Server log" below.
 
 ## Start-up failures
 
@@ -27,7 +27,59 @@ Logs go to standard output; under Docker Compose read them with `docker compose 
 | `Invalid game data, the node does not start:` followed by one line per problem | the data directory is missing or a table is damaged (see [`install.md`](install.md)) |
 | the database messages in the next section | `database.url` is unusable or migrations are pending |
 | `Data directory digest mismatch, the node stops:` | multi-node mode: this node's data directory differs from that of the WorldManager node; the node stops with exit status 1 (see [`multi-node.md`](multi-node.md)) |
-| `Application pinata exited: ... failed to start child: Login.Supervisor ... :eaddrinuse` (also `WorldManager.Supervisor`, `Zone.Supervisor`) | the listener port of that part is already in use, for example by a node that is still running; stop it or change `login.port`, `world_manager.port` or `zone.port` |
+| `<Part>: cannot listen on port <port>: address already in use. The node does not start.` (`<Part>` is `Login`, `WorldManager` or `Zone`) | the listener port of that part is already in use, for example by a node that is still running; stop it or change `login.port`, `world_manager.port` or `zone.port`. Other reasons (`permission denied`) use the same form. The OTP reports that follow it are not part of the message |
+
+## Server log
+
+Every line is `date time [level] Part: message`, for example
+
+```
+2026-11-20 14:03:11.482 [info] Login: listening on 0.0.0.0:9010
+```
+
+Timestamps are UTC whatever the machine's time zone. `Part` is `Login`, `WorldManager`, `Zone`, `Pinata`, `Cluster`, `Persistence` or `GameData`. The setting `log.level` (`debug`, `info`, `warning` or `error`, default `info`; see [`settings.md`](settings.md)) is the lowest level that is printed.
+
+| Level | Meaning | Examples |
+|---|---|---|
+| `error` | the server failed, an administrator must act | database failure, digest mismatch |
+| `warning` | the server is degraded or defended itself | limit exceeded, send failed, node lost, world unavailable |
+| `info` | normal events worth a line | node started, listening, login accepted or refused, client protocol violations (unknown opcode, wrong first packet, wrong version key) |
+| `debug` | per-packet and per-connection detail | dropped wrong-size packet, connection accepted, close initiated by the client |
+
+A password, a login token, a world key or the database URL is never printed. An account name is printed in double quotes, as it was typed. A peer is the address and port of the client, for example `127.0.0.1:51234`.
+
+Lines an administrator acts on:
+
+| Line | Level | Meaning / what to do |
+|---|---|---|
+| `<Part>: listening on <address>:<port>` | info | the listener is bound; the address is the one the socket reports |
+| `Pinata: node started, parts <parts>, <single-node or multi-node> mode, database <sqlite or postgres>` | info | the node is up; this is the last start-up line |
+| `<Part>: connection closed: oversized frame, peer <peer>` | info | the client sent a frame larger than the protocol allows; the server cut it off |
+| `<Part>: connection closed: unknown opcode 0x<opcode>, peer <peer>` | info | the client sent a packet the server does not know; it was cut off |
+| `<Part>: connection closed: wrong first packet, peer <peer>` | info | the first packet was not the one the part expects (`0x0C65` at Login, `0x0C0F` at WorldManager) |
+| `Login: connection closed: unexpected packet instead of the login, peer <peer>` | info | after the version check the client did not send a login |
+| `Login: connection closed: wrong version key, peer <peer>` | info | the client's version key differs from `client_version_key`; the client needs the other build or the setting needs changing |
+| `<Part>: connection closed: session replaced, peer <peer>` | info | the same account logged in again; the older connection was cut off |
+| `<Part>: connection closed: heartbeat timeout, peer <peer>` | info | the client was silent for 210 s |
+| `<Part>: connection closed: packet rate exceeded, peer <peer>` | warning | the client sent more than `connection.max_packets_per_second` packets in one second |
+| `<Part>: connection closed: unsent bytes exceeded, peer <peer>` | warning | the client does not read what the server sends (`connection.max_unsent_bytes`) |
+| `<Part>: connection closed: send failed, peer <peer>` | warning | a send to the client failed, usually because the client had already gone |
+| `WorldManager: connection closed: world login refused, no matching reservation, peer <peer>` | info | the client came to WorldManager with a key Login never gave it, or with an old one |
+| `WorldManager: connection closed: character list failed, database failure, peer <peer>` | warning | the database failed; look for the `Persistence` line before it |
+| `Login: login accepted, account "<name>", peer <peer>` | info | the login succeeded |
+| `Login: login accepted with a login token, account "<name>", peer <peer>` | info | a client came back from WorldManager to the world list |
+| `Login: connection closed: login refused, account "<name>", unknown account, peer <peer>` | info | no such account (and `login.auto_create_accounts` is off); the name is as typed |
+| `Login: connection closed: login refused, account "<name>", wrong password, peer <peer>` | info | the password did not match |
+| `Login: connection closed: login refused, account "<name>", blocked, peer <peer>` | info | the account is blocked |
+| `Login: connection closed: login refused, account "<name>", not login-able, peer <peer>` | info | the account may not log in |
+| `Login: connection closed: login refused, account "<name>", database failure, peer <peer>` | info | the database failed; look for the `Persistence` line before it. The client is told "unknown account" |
+| `Login: connection closed: login refused, unknown or expired login token, peer <peer>` | info | the client used a login token that does not exist, was used or is older than 10 s |
+| `Cluster: node <node> connected` | info | multi-node mode: another node joined |
+| `Cluster: node <node> lost` | warning | multi-node mode: a node went away |
+| `Login: world <number> (<name>) is available` | info | multi-node mode: the WorldManager of the world is reachable from Login |
+| `Login: world <number> (<name>) is unavailable` | warning | multi-node mode: the world was available and is not any more |
+
+The four cluster lines appear in multi-node mode only. Login looks the worlds up once a second; a world is reported unavailable only after it was available, so a Login node that starts before the WorldManager node logs nothing until the world appears. A close by the client is logged at `debug` only.
 
 ## Memory
 

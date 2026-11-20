@@ -83,7 +83,7 @@ defmodule Replay.HarnessTest do
   end
 
   defp listen(handler) do
-    pid = start_supervised!({Net.Listener, {handler, 0, %{connection: @limits}}})
+    pid = start_supervised!({Net.Listener, {"Net", handler, 0, %{connection: @limits}}})
     {:ok, {_address, port}} = ThousandIsland.listener_info(pid)
     %{"login" => {~c"127.0.0.1", port}}
   end
@@ -240,7 +240,7 @@ defmodule Replay.HarnessTest do
 
   test "test client" do
     {:ok, {_address, port}} =
-      ThousandIsland.listener_info(start_supervised!({Net.Listener, {Stub, 0, %{connection: @limits}}}))
+      ThousandIsland.listener_info(start_supervised!({Net.Listener, {"Net", Stub, 0, %{connection: @limits}}}))
 
     client = TestClient.connect(~c"127.0.0.1", port)
     assert_raise ArgumentError, fn -> TestClient.send_raw(client, <<0x04, 0x08>>) end

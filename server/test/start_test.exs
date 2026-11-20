@@ -41,12 +41,29 @@ defmodule Pinata.StartTest do
     System.put_env("PINATA_CONFIG", path)
   end
 
+  # The job environment chooses the database (CI runs the suite against Postgres too), so the expected name follows it.
+  defp database,
+    do: if(String.starts_with?(System.fetch_env!("DATABASE_URL"), "sqlite:"), do: "sqlite", else: "postgres")
+
   test "with data_dir and the ports set every supervisor starts", %{tmp_dir: tmp_dir} do
     ports = TestPorts.local()
     use_file(tmp_dir, TestPorts.toml(ports))
-    assert :ok = Application.start(:pinata)
+    log = TestLog.capture(fn -> assert :ok = Application.start(:pinata) end)
     assert running() == @supervisors
     assert Process.whereis(Cluster.DataDigest) == nil
+    assert Process.whereis(Cluster.NodeLog) == nil
+    assert Process.whereis(Login.WorldWatch) == nil
+
+    assert log =~ "[info] Login: listening on 0.0.0.0:#{ports.login}\n"
+    assert log =~ "[info] WorldManager: listening on 0.0.0.0:#{ports.wm}\n"
+    assert log =~ "[info] Zone: listening on 0.0.0.0:#{ports.zone}\n"
+
+    assert log =~
+             "[info] Pinata: node started, parts login, world_manager, zone, single-node mode, database #{database()}\n"
+
+    refute log =~ System.fetch_env!("DATABASE_URL")
+    refute log =~ "test.db"
+    refute log =~ "pinata.db"
 
     for port <- [ports.login, ports.wm, ports.zone] do
       {socket, cipher} = connect(port)
@@ -89,12 +106,29 @@ defmodule Pinata.StartTest do
     assert running() == []
   end
 
-  test "PINATA_PARTS=login starts only the Login part", %{tmp_dir: _tmp_dir} do
+  test "a port in use is one line on standard error and the node does not start", %{tmp_dir: tmp_dir} do
+    {:ok, listener} = :gen_tcp.listen(0, [])
+    {:ok, port} = :inet.port(listener)
+    use_file(tmp_dir, TestPorts.toml(%{TestPorts.local() | login: port}))
+
+    output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
+    :ok = :gen_tcp.close(listener)
+
+    assert output =~ "Login: cannot listen on port #{port}: address already in use. The node does not start."
+    assert running() == []
+  end
+
+  test "PINATA_PARTS=login starts only the Login part", %{tmp_dir: tmp_dir} do
+    ports = TestPorts.local()
+    use_file(tmp_dir, TestPorts.toml(ports))
     System.put_env("PINATA_PARTS", "login")
-    assert :ok = Application.start(:pinata)
+    log = TestLog.capture(fn -> assert :ok = Application.start(:pinata) end)
     assert running() == [Persistence.Supervisor, Cluster.Root, Login.Supervisor]
     assert is_pid(Process.whereis(Cluster.DataDigest))
-    connect(TestPorts.local().login)
-    assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", TestPorts.local().wm, [:binary, active: false])
+    assert is_pid(Process.whereis(Cluster.NodeLog))
+    assert is_pid(Process.whereis(Login.WorldWatch))
+    assert log =~ "[info] Pinata: node started, parts login, multi-node mode, database #{database()}\n"
+    connect(ports.login)
+    assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", ports.wm, [:binary, active: false])
   end
 end

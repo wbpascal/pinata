@@ -3,8 +3,6 @@ defmodule WorldManager.CharacterListTest do
 
   @moduletag capture_log: true
 
-  import ExUnit.CaptureLog
-
   alias Proto.Packets.{
     MiscGametimeReq,
     UserAvatarListReq,
@@ -185,12 +183,15 @@ defmodule WorldManager.CharacterListTest do
     on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
 
     log =
-      capture_log(fn ->
+      TestLog.capture(fn ->
         client = world_login() |> recv!(<<0x15, 0x0C, 0x46, 0x00>>)
         assert {:error, :closed} = TestClient.recv_raw(client)
       end)
 
     assert log =~ "the database failed in list_characters"
+
+    assert log =~
+             "[warning] WorldManager: connection closed: character list failed, database failure, peer 127.0.0.1:"
   end
 
   test "0x0C1F lists again", %{id: id} do

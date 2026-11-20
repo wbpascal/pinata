@@ -40,6 +40,24 @@ Schema and queries must run on PostgreSQL and SQLite (ADR 0004). No tool checks 
 
 Nothing outside `Persistence` names a Repo, a schema or a query. A text compared without case gets a second, normalised column with a plain unique index (`accounts.name_key`).
 
+## Server log
+
+- Every line is `Part: message`, where the part is the part or boundary that writes it (`Login`, `WorldManager`, `Zone`, `Pinata`, `Cluster`, `Persistence`, `GameData`). The format and the timestamps (UTC) come from `config/config.exs`; the level from the setting `log.level`.
+- Levels:
+
+  | Level | Meaning |
+  |---|---|
+  | `error` | the server failed, an administrator must act (database failure, digest mismatch) |
+  | `warning` | the server is degraded or defended itself (limit exceeded, send failed, node lost, world unavailable) |
+  | `info` | normal events worth a line (node started, listening, login accepted or refused, client protocol violations) |
+  | `debug` | per-packet and per-connection detail |
+
+  Client misbehaviour is never `error`.
+- Every server-initiated close and every failure branch writes exactly one line with its reason.
+- Never log passwords, tokens or the database URL.
+- A handler does not call `Logger`: it returns `{:log, level, message}` or `{:close, level, reason}` and `Net.Connection` adds the part and the peer address.
+- Tests assert on the captured line (level, part, reason) with `TestLog.capture/1`. No tool checks the convention; the reviewer does (checklist point 6).
+
 ## Where the documentation is
 
 - `GLOSSARY.md`: the project's vocabulary. Use its terms in code, documentation and issues.
@@ -53,10 +71,11 @@ Nothing outside `Persistence` names a Repo, a schema or a query. A text compared
 
 ## Documentation checklist
 
-A reviewer passes or fails a PR on these five points:
+A reviewer passes or fails a PR on these six points:
 
 1. Every setting, `mix` task, command, GM command or start-up error added or changed in the diff appears in the user documentation.
 2. Every new part, boundary or process type appears in the technical documentation.
 3. Every new flow where a client action crosses a part or process boundary has a sequence diagram in `server/docs/technical/flows/`.
 4. For everything the diff renames or removes, the reviewer greps `server/docs/` for the old name and finds no hits.
 5. A PR that changes no documentation says why in its description.
+6. Every new failure branch, server-initiated close and start-up step in the diff writes a server log line, or the PR says why not.

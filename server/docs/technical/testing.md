@@ -174,6 +174,10 @@ One multi-mode run on SQLite once failed with "Ecto repo Persistence.Repo.SQLite
 
 `test/cluster/data_digest_test.exs` starts peers, then a real node (`elixir --name ... -e`, the code paths of the test VM, `PINATA_PARTS=zone`, `cluster.nodes` naming the WorldManager peer) with a data directory that differs; its Zone port comes from `TestPorts.free(1)`. It asserts exit status 1, the message and both digests in the output, and that the WorldManager peer is still alive. The log level of the WorldManager peer is set to `:none`, so its expected refusal error does not show in the test output. The node halts itself with status 3 after 30 seconds if it is never refused. While `Zone.game_data/0` is `[]` any different directory works; when Zone declares tables, copy the test data directory and change one file.
 
+## Asserting server log lines
+
+The test VM logs at `:warning` (the test settings file sets `log.level`), so tests stay quiet. A test that asserts on an `info` or `debug` line captures with `TestLog.capture/1` (`test/support/test_log.ex`): it raises the level to `:debug` for the captured function and restores `:warning` afterwards, and the module is `async: false`. Assert level, part and reason on the captured line in one match, for example `log =~ "[warning] Net: connection closed: packet rate exceeded, peer 127.0.0.1:"`; the line of a server-side close is written before the socket is closed, so it is in the capture once the client has seen the close. Lines of the peer nodes cannot be captured in the test VM; assert them on a listener started in the test VM.
+
 ## Compose smoke test
 
 `test/support/compose_smoke.exs` is a script, not an ExUnit test (`test_helper.exs` loads only `support/**/*.ex`). It plays login, world select and the character list against `127.0.0.1:9010` and `9110` with `TestClient`, as the account `smoke` with the password `smoke-password`, retrying up to 15 times 2 seconds apart (the nodes need a moment to connect). CI job `compose-smoke` runs it; locally, in `server/` with a data directory in `data`:

@@ -24,7 +24,12 @@ defmodule TestPeers do
   def start do
     ports = TestPorts.pick()
     config = Path.join(System.tmp_dir!(), "pinata-peers-#{System.pid()}-#{System.unique_integer([:positive])}.toml")
-    File.write!(config, "data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}\n" <> TestPorts.toml(ports))
+
+    File.write!(
+      config,
+      "data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}\n\n[log]\nlevel = \"warning\"\n" <>
+        TestPorts.toml(ports)
+    )
 
     {login, login_node} = start_peer("login", "login", config)
     {wm, wm_node} = start_peer("world_manager", "world_manager", config)
@@ -48,7 +53,10 @@ defmodule TestPeers do
   @doc "Stops the three peers and deletes the settings file."
   @spec stop(t()) :: :ok
   def stop(%{login: login, wm: wm, zone: zone, config: config}) do
-    Enum.each([login, wm, zone], &:peer.stop/1)
+    # Otherwise the survivors print "node lost" for each peer that stops first.
+    peers = [login, wm, zone]
+    Enum.each(peers, &:peer.call(&1, Logger, :configure, [[level: :none]]))
+    Enum.each(peers, &:peer.stop/1)
     File.rm(config)
     :ok
   end

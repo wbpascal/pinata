@@ -6,11 +6,14 @@ defmodule Net.Handler do
   state and a decoded packet (or message) in, new state and effects out. Heartbeat packets (`0x0804`, `0x0805`)
   never reach them. `perform/1` is the only impure callback: the connection process calls it for a
   `{:perform, request}` effect and hands its return value to `handle_info/2`. A message `{:cluster, term}` sent to
-  the connection process also goes to `handle_info/2`. `:close` closes the socket after the effects before it;
-  effects after it are not run.
+  the connection process also goes to `handle_info/2`. `{:close, level, reason}` closes the socket after the effects
+  before it and writes the close line; effects after it are not run. `{:log, level, message}` writes a line. The
+  connection adds the part and the peer address to both. A message never holds a password, a token or a world key.
   """
 
-  @type effect :: {:send, struct()} | :close | {:perform, term()}
+  @type level :: :debug | :info | :warning
+  @type effect ::
+          {:send, struct()} | {:log, level(), String.t()} | {:close, level(), String.t()} | {:perform, term()}
 
   @callback init(settings :: Settings.t()) :: term()
   @callback handle_packet(state :: term(), packet :: struct()) :: {term(), [effect()]}
