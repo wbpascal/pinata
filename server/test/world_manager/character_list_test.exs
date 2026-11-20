@@ -16,8 +16,6 @@ defmodule WorldManager.CharacterListTest do
   }
 
   @key "20151116141627"
-  @login {~c"127.0.0.1", 9010}
-  @wm {~c"127.0.0.1", 9110}
   @equip_slots [1, 24, 12, 7, 10, 19, 21, 22, 20, 8, 27, 28, 26, 11, 13, 9, 17, 18, 25, 29]
 
   setup do
@@ -49,7 +47,7 @@ defmodule WorldManager.CharacterListTest do
   end
 
   defp select(name) do
-    client = connect(@login)
+    client = connect(TestPorts.endpoint(:login))
     client = client |> send!(%UserClientVersionCheckReq{version_key: @key}) |> recv!(<<0x67, 0x0C, 1, 0>>)
 
     client =
@@ -66,7 +64,7 @@ defmodule WorldManager.CharacterListTest do
 
   defp world_login(name \\ "admin") do
     {key, _login} = select(name)
-    @wm |> connect() |> send!(%UserLoginworldReq{user_name: name, validate: key})
+    TestPorts.endpoint(:wm) |> connect() |> send!(%UserLoginworldReq{user_name: name, validate: key})
   end
 
   defp list(client) do

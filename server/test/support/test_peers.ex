@@ -19,10 +19,17 @@ defmodule TestPeers do
           config: Path.t()
         }
 
-  @doc "Starts the three peers and connects them. The client ports are `base_port` (Login), +1 (WorldManager), +2 (Zone)."
-  @spec start(:inet.port_number()) :: t()
-  def start(base_port \\ 9310) do
-    config = Path.join(System.tmp_dir!(), "pinata-peers-#{System.pid()}-#{base_port}.toml")
+  @doc """
+  Starts the three peers and connects them. Their client ports come from `TestPorts.free/1`, chosen after the peer VMs
+  are up: each VM binds its distribution listener on port 0, which on Linux could take a port chosen before.
+  """
+  @spec start() :: t()
+  def start do
+    config = Path.join(System.tmp_dir!(), "pinata-peers-#{System.pid()}-#{System.unique_integer([:positive])}.toml")
+    {login, login_node} = boot_peer("login", "login", config)
+    {wm, wm_node} = boot_peer("world_manager", "world_manager", config)
+    {zone, zone_node} = boot_peer("zone", "zone", config)
+    [login_port, wm_port, zone_port] = TestPorts.free(3)
 
     File.write!(config, """
     data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}
@@ -31,18 +38,16 @@ defmodule TestPeers do
     level = "warning"
 
     [login]
-    port = #{base_port}
+    port = #{login_port}
 
     [world_manager]
-    port = #{base_port + 1}
+    port = #{wm_port}
 
     [zone]
-    port = #{base_port + 2}
+    port = #{zone_port}
     """)
 
-    {login, login_node} = start_peer("login", "login", config)
-    {wm, wm_node} = start_peer("world_manager", "world_manager", config)
-    {zone, zone_node} = start_peer("zone", "zone", config)
+    Enum.each([login, wm, zone], &start_app/1)
     true = :peer.call(login, Node, :connect, [wm_node])
     true = :peer.call(zone, Node, :connect, [wm_node])
     _ = :peer.call(login, :global, :sync, [], @call_timeout)
@@ -51,9 +56,9 @@ defmodule TestPeers do
       login: login,
       wm: wm,
       zone: zone,
-      login_port: base_port,
-      wm_port: base_port + 1,
-      zone_port: base_port + 2,
+      login_port: login_port,
+      wm_port: wm_port,
+      zone_port: zone_port,
       nodes: %{login: login_node, wm: wm_node, zone: zone_node},
       config: config
     }
@@ -70,7 +75,7 @@ defmodule TestPeers do
     :ok
   end
 
-  defp start_peer(label, parts, config) do
+  defp boot_peer(label, parts, config) do
     {:ok, pid, node} =
       :peer.start(%{
         name: :peer.random_name(~c"pinata_#{label}"),
@@ -88,8 +93,10 @@ defmodule TestPeers do
     :ok = :peer.call(pid, Logger, :configure, [[level: :warning]])
 
     _ = :peer.call(pid, Code, :require_file, [Path.expand("test_clock.ex", __DIR__)], @call_timeout)
-
-    {:ok, _} = :peer.call(pid, Application, :ensure_all_started, [:pinata], @call_timeout)
     {pid, node}
+  end
+
+  defp start_app(pid) do
+    {:ok, _} = :peer.call(pid, Application, :ensure_all_started, [:pinata], @call_timeout)
   end
 end
