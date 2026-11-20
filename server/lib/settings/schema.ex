@@ -8,7 +8,7 @@ defmodule Settings.Schema do
       type: :string,
       default: "./data",
       doc:
-        "The data directory, written by `mix pinata.import_data` (see install.md). The node does not start without it."
+        "The data directory, written by `bin/pinata eval \"GameData.Release.import_data(...)\"`, from a source checkout by `mix pinata.import_data` (see install.md). The node does not start without it."
     ],
     public_host: [
       type: {:custom, Settings.Schema, :public_host, []},

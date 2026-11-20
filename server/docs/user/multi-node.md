@@ -35,7 +35,7 @@ The WorldManager node logs an error naming the refused node. The check happens w
 
 ## Example: Docker Compose
 
-`compose.yaml` and `compose.toml` in `server/` start PostgreSQL, run the migrations once, and start one container per part, all from one image: `ghcr.io/wbpascal/pinata` with the tag of the server's version, which `docker compose up` pulls from the GitHub container registry (see [`install.md`](install.md); while the package is private, log in first with `docker login ghcr.io` and a token that may read it). To run a source checkout instead, build that image under the same name first: `docker build -t ghcr.io/wbpascal/pinata:0.1.0 .` in `server/` (the tag in `compose.yaml`). The nodes read `compose.toml` and the data directory `server/data` (read-only). The ports 9010, 9110 and 9210 are published on the host, so the client connects to `127.0.0.1:9010`.
+Download `compose.yaml` and `compose.toml` of a version from the [releases page](https://github.com/wbpascal/pinata/releases) into one directory. They start PostgreSQL, run the migrations once, and start one container per part, all from one image: `ghcr.io/wbpascal/pinata` with the tag of that version, which `docker compose up` pulls from the GitHub container registry (see [`install.md`](install.md), also for the `docker login ghcr.io` needed while the repository is private). The nodes read `compose.toml` and the data directory `data` beside the two files (read-only). The ports 9010, 9110 and 9210 are published on the host, so the client connects to `127.0.0.1:9010`. To run your own build instead, see [`from-source.md`](from-source.md).
 
 `compose.yaml`:
 
@@ -123,16 +123,17 @@ public_host = "127.0.0.1"
 nodes = ["pinata@login", "pinata@wm", "pinata@zone"]
 ```
 
-Commands, in `server/`:
+First import the data directory into `data` beside the two files, with the release archive of your machine or with the image (see [`install.md`](install.md), "The data directory"; the data directory is the same on every platform). Then, in that directory:
 
 ```
-mix pinata.import_data <9Data folder> data
 docker compose up -d
 printf 'my-password\n' | docker compose exec -T login /app/bin/pinata eval "Persistence.Release.create_account(~s(<name>))"
 docker compose logs -f
 docker compose down -v
 ```
 
-On Windows (Docker Desktop with Linux containers, PowerShell; the recommended way to run multi-node mode there) start the third command with `'my-password' |` in place of `printf 'my-password\n' |`; the others are unchanged. These commands were not tried on Windows.
+On Windows (Docker Desktop with Linux containers, PowerShell; the recommended way to run multi-node mode there) start the second command with `'my-password' |` in place of `printf 'my-password\n' |`; the others are unchanged. These commands were not tried on Windows.
 
 `down -v` also deletes the database volume; `docker compose down` keeps it. The password of the example database and its cookie are for a trial on one machine only.
+
+To move to a new version, download the `compose.yaml` of the new version (its image tag is the new version) over the old one, run `docker compose up -d` again, and read "Moving from the previous version" in the changelog section of the new version (see [`operation.md`](operation.md), "Moving to a new version"). Compose runs the migrations of the new version before it starts the nodes. `compose.toml` and the database volume stay.

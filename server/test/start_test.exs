@@ -107,6 +107,7 @@ defmodule Pinata.StartTest do
 
     output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
 
+    assert output =~ "GameData.Release.import_data"
     assert output =~ "mix pinata.import_data"
     assert output =~ missing
     assert running() == []

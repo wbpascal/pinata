@@ -3,14 +3,37 @@ name: server
 on:
   push:
     branches: [master]
-    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", "CHANGELOG.md", ".github/workflows/server.yml"]
+    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", "CHANGELOG.md", ".github/workflows/server.yml",
+            ".github/scripts/**"]
+  # "edited": a description edited after a failed changelog step runs the workflow again (all jobs, so that no skipped
+  # job stands in for an earlier failure of the same commit).
   pull_request:
-    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", "CHANGELOG.md", ".github/workflows/server.yml"]
+    types: [opened, synchronize, reopened, edited]
+    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", "CHANGELOG.md", ".github/workflows/server.yml",
+            ".github/scripts/**"]
 
 permissions:
   contents: read
 
 jobs:
+  # Pull requests only: a line added to CHANGELOG.md, or "Changelog: none" in the description (server/AGENTS.md,
+  # "Changelog checklist"). The description reaches the script only through the environment.
+  changelog:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      # The checkout is the PR merged into its base; its first parent is the base.
+      - name: 'Changelog line or "Changelog: none"'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          bash .github/scripts/changelog-check-test.sh
+          bash .github/scripts/changelog-check.sh HEAD^1 HEAD
+
   check:
     runs-on: ubuntu-24.04
     defaults:

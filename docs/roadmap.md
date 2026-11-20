@@ -14,6 +14,10 @@ The order in which the Elixir server is built. Terms (Milestone, Capture checkpo
   `wayfinder:map`, attached to the GitHub milestone). The map is opened as soon as the GitHub milestone exists and
   collects points that come up during earlier work. It is charted when the milestone before closes: that session
   checks the captures, triages the original-server bugs and cuts the milestone into issues.
+- **Version:** a milestone closes with its version published. The session that charts a milestone map adds the
+  issue "Publish version 0.N.0" as the milestone's last one, opens the version's section in
+  [`CHANGELOG.md`](../CHANGELOG.md) with its title and a first overview from the milestone's row below, and gives
+  every issue it cuts a "Done when" line pointing at the changelog checklist of `server/AGENTS.md`.
 - **Capture checkpoint:** a milestone's captures are recorded and validated before its issues are cut. It closes
   after capture replay passes and the user has confirmed it with the real client. A feature without any capture
   scenario (guild tournament) is built from the pseudocode and closes on the manual check alone.

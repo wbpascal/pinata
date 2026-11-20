@@ -2,7 +2,7 @@
 
 ## Start, stop, logs
 
-From a release (`MIX_ENV=prod mix release`, see [`install.md`](install.md)), in the release directory or with the path to `bin/pinata`:
+From the release (see [`install.md`](install.md)), with the path to its `bin/pinata`:
 
 | Action | Command |
 |---|---|
@@ -15,7 +15,7 @@ From a release (`MIX_ENV=prod mix release`, see [`install.md`](install.md)), in 
 
 A string inside an expression is written `~s(...)`, not in double quotes. On Windows there is no `daemon`: `bin/pinata start` stays in the foreground of its window; stop it with `bin/pinata stop` from another window; that is the recommended way. `Ctrl-C` twice in its window was not tried on Windows. See [`install.md`](install.md), section "Windows", for the other differences.
 
-The settings file defaults to `./pinata.toml` and the data directory to `./data`, both relative to the working directory the command starts in, so start from the directory that holds them or set `PINATA_CONFIG` (path of the settings file) and `data_dir`. `PINATA_PARTS` chooses the parts of the node (see [`multi-node.md`](multi-node.md) and [`settings.md`](settings.md)). From a source checkout, `iex -S mix` in `server/` starts the same node.
+The settings file defaults to `./pinata.toml` and the data directory to `./data`, both relative to the working directory the command starts in, so start from the directory that holds them or set `PINATA_CONFIG` (path of the settings file) and `data_dir`. `PINATA_PARTS` chooses the parts of the node (see [`multi-node.md`](multi-node.md) and [`settings.md`](settings.md)). To start a node from a source checkout, see [`from-source.md`](from-source.md).
 
 Logs go to standard output; under Docker Compose read them with `docker compose logs`. Start-up failures are printed to standard error. A node logs at start-up the number of game tables and rows it loaded and how long it took. What the server log holds, and how to read it, is in "Server log" below.
 
@@ -111,7 +111,7 @@ A database created by an earlier build must be deleted: the initial migration ga
 
 - `sqlite:<path>`: the default is `sqlite:./data/pinata.db`. The file and its directory are created and migrated at every start. Nothing to do.
 - `postgres://user:password@host/database`: the node refuses to start while migrations are pending. Run them once before you start the nodes of a new version:
-  `bin/pinata eval "Persistence.Release.migrate()"` from a release, or `mix pinata.migrate` in `server/`.
+  `bin/pinata eval "Persistence.Release.migrate()"` (from a source checkout `mix pinata.migrate`, see [`from-source.md`](from-source.md)).
 
 On Windows a SQLite path may use either slash: `sqlite:C:/pinata/data/pinata.db` or `sqlite:C:\pinata\data\pinata.db` (in the settings file, backslashes need a TOML literal string in single quotes).
 
@@ -124,3 +124,15 @@ Start-up errors from the database:
 | `database.url: cannot create the directory of <path> (...)` | the directory of the SQLite file cannot be created |
 | `database.url: SQLite works only in single-node mode ...` | the node runs only some parts or has `cluster.nodes` set, and the URL is `sqlite:` (also the default); set a `postgres://` URL (see [`multi-node.md`](multi-node.md)) |
 | `The database has N pending migration(s): ...` | PostgreSQL only; run the migrate command named in the message |
+
+## Moving to a new version
+
+1. Stop the node (every node, in multi-node mode).
+2. Unpack the release archive of the new version beside the old release (see [`install.md`](install.md)). It makes its own directory `pinata-<version>`, so the old release stays as it is.
+3. Keep `pinata.toml` and the data directory where they are; the new release reads them as the old one did.
+4. Run the migrations. SQLite: nothing to do, the node migrates the database at start-up. PostgreSQL: `pinata-<version>/bin/pinata eval "Persistence.Release.migrate()"` with the new release, once, before the nodes start.
+5. Start the node with the new release: `pinata-<version>/bin/pinata start`.
+
+A database of any version reaches every later one, so a version may be skipped. The changelog section of each version (`CHANGELOG.md` at the repository root, and the text of the release on the releases page) says under "Moving from the previous version" what else is needed, for example importing the data directory again; when you skip versions, read that heading of every version you skip.
+
+With the container image, the new version is a new image tag; for the Docker Compose example see [`multi-node.md`](multi-node.md).
