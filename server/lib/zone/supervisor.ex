@@ -8,5 +8,5 @@ defmodule Zone.Supervisor do
 
   @impl Supervisor
   def init(settings),
-    do: Supervisor.init([{Net.Listener, {Zone.Handler, settings.zone.port, settings}}], strategy: :one_for_one)
+    do: Supervisor.init([{Net.Listener, {"Zone", Zone.Handler, settings.zone.port, settings}}], strategy: :one_for_one)
 end

@@ -274,6 +274,35 @@ defmodule WorldManager.HandOffTest do
       assert {:error, :closed} = TestClient.recv_raw(client)
     end
 
+    test "server log: wrong first packet, refused key, logout, token login and refused token", t do
+      log =
+        TestLog.capture(fn ->
+          client = t.wm |> connect() |> send!(%UserWorldStatusReq{})
+          assert {:error, :closed} = TestClient.recv_raw(client)
+
+          refused(world_login(t, "admin", List.duplicate(1, 32)))
+
+          {key, _login} = select(t)
+          wm = t |> world_login("admin", key) |> alive()
+          {otp, wm} = token(wm)
+          wm = send!(wm, %UserNormallogoutCmd{logout_type: 0})
+          assert {:error, :closed} = TestClient.recv_raw(wm)
+
+          client = t |> token_login(otp) |> send!(%UserXtrapReq{key_length: 0, key: ""})
+          client |> recv!(@world_list) |> recv!(<<0x05, 0x0C, 1>>)
+
+          t |> token_login(String.duplicate("a", 32)) |> token_refused()
+        end)
+
+      assert log =~ "[info] WorldManager: connection closed: wrong first packet, peer 127.0.0.1:"
+      assert log =~ "[info] WorldManager: connection closed: world login refused, no matching reservation, peer 127."
+      assert log =~ "[debug] WorldManager: connection closed: client logged out, peer 127.0.0.1:"
+      assert log =~ ~s([info] Login: login accepted with a login token, account "admin", peer 127.0.0.1:)
+
+      assert log =~
+               "[info] Login: connection closed: login refused, unknown or expired login token, peer 127.0.0.1:"
+    end
+
     test "a second 0x0C0F is ignored", t do
       {key, _login} = select(t)
       client = t |> world_login("admin", key) |> alive()

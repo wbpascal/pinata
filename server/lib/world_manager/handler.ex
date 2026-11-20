@@ -54,7 +54,7 @@ defmodule WorldManager.Handler do
   def handle_packet(%__MODULE__{step: :login} = state, %UserLoginworldReq{user_name: name, validate: validate}),
     do: {state, [{:perform, {:take_login, state.worlds, name, validate}}]}
 
-  def handle_packet(%__MODULE__{step: :login} = state, _packet), do: {state, [:close]}
+  def handle_packet(%__MODULE__{step: :login} = state, _packet), do: {state, [{:close, :info, "wrong first packet"}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, %UserAvatarListReq{}),
     do: {state, [{:perform, {:list_characters, state.world_no, state.user_no}}]}
@@ -73,7 +73,9 @@ defmodule WorldManager.Handler do
       when is_integer(user_no),
       do: {state, [{:perform, {:delete_character, state.world_no, user_no, slot}}]}
 
-  def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}), do: {state, [:close]}
+  def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}),
+    do: {state, [{:close, :debug, "client logged out"}]}
+
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
   @impl Net.Handler
@@ -88,7 +90,10 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:token_created, {:error, :pending}}),
     do: {state, [{:send, %UserWillWorldSelectAck{error: 0x1E5B, otp: ""}}]}
 
-  def handle_info(state, {:login_taken, :error}), do: {state, [{:send, %UserLoginworldfailAck{error: 0x44}}, :close]}
+  def handle_info(state, {:login_taken, :error}),
+    do:
+      {state,
+       [{:send, %UserLoginworldfailAck{error: 0x44}}, {:close, :info, "world login refused, no matching reservation"}]}
 
   def handle_info(state, {:characters, {:ok, characters}}),
     do:
@@ -103,7 +108,9 @@ defmodule WorldManager.Handler do
 
   # W05-B10 fixed: one close
   def handle_info(state, {:characters, {:error, :database}}),
-    do: {state, [{:send, %UserLoginworldfailAck{error: 0x46}}, :close]}
+    do:
+      {state,
+       [{:send, %UserLoginworldfailAck{error: 0x46}}, {:close, :warning, "character list failed, database failure"}]}
 
   def handle_info(state, {:character_created, {:ok, character}}),
     do: {state, [{:send, %AvatarCreatesuccAck{avatars: [WorldManager.Avatar.created(character)]}}]}
@@ -120,7 +127,7 @@ defmodule WorldManager.Handler do
     do: {state, [{:send, %MiscGametimeAck{hour: hour, minute: minute, second: second}}]}
 
   def handle_info(state, {:cluster, :session_replaced}),
-    do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, :close]}
+    do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, {:close, :info, "session replaced"}]}
 
   @impl Net.Handler
   def perform({:create_token, user_no, user_name}),

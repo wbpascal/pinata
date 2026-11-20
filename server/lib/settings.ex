@@ -21,6 +21,7 @@ defmodule Settings do
           database: %{url: String.t()},
           cluster: %{nodes: [String.t()]},
           connection: %{max_packets_per_second: pos_integer(), max_unsent_bytes: pos_integer()},
+          log: %{level: :debug | :info | :warning | :error},
           data: %{strict_references: boolean()}
         }
 

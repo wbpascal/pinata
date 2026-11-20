@@ -22,6 +22,10 @@ The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs
 
 A part reaches another part only through a facade module of `Cluster` (never a direct call). `Cluster.WorldManager.expect_login/2` is a `GenServer.call` of `{:expect_login, request}` to the `WorldManager.World` of the world; the process answers `:ok` and stores the reservation. It exits when the world is not registered. Flow: [`flows/world-select.md`](flows/world-select.md). `Cluster.Login.create_token/2` is a `GenServer.call` of `{:create_token, user_no, user_name}` to `Login.Tokens`; it returns `{:ok, token}` or `{:error, :pending}` and exits when Login is not registered. Flow: [`flows/return-to-world-list.md`](flows/return-to-world-list.md).
 
+## Node log
+
+`Cluster.NodeLog` (registered under its module name) runs on every node in multi-node mode and is not started in single-node mode; `Cluster.Root` starts it. It monitors node connections (`:net_kernel.monitor_nodes/1`) and logs `Cluster: node <node> connected` (info) on `nodeup` and `Cluster: node <node> lost` (warning) on `nodedown`. The world lines are written by `Login.WorldWatch` (see `processes.md`).
+
 ## Data directory digest
 
 `Cluster.DataDigest` (registered under its module name) runs on every node in multi-node mode and is not started in single-node mode (ADR 0006; `Pinata.Application` computes `GameData.digest/1` and passes it with `authority?: true` when the node runs the WorldManager part). It monitors node connections (`:net_kernel.monitor_nodes/1`) and sends the cast `{:digest, node, digest, authority?}` to the process of the same name on every node that is connected when it starts and on every `nodeup`. The receiver decides:

@@ -24,8 +24,19 @@ defmodule SettingsTest do
              database: %{url: "sqlite:./data/pinata.db"},
              cluster: %{nodes: []},
              connection: %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576},
+             log: %{level: :info},
              data: %{strict_references: true}
            }
+  end
+
+  test "log.level takes the four names", %{tmp_dir: tmp_dir} do
+    for {name, level} <- [debug: :debug, info: :info, warning: :warning, error: :error] do
+      assert {:ok, %{log: %{level: ^level}}} = load(tmp_dir, "[log]\nlevel = \"#{name}\"\n")
+    end
+  end
+
+  test "an unknown log.level is a problem", %{tmp_dir: tmp_dir} do
+    assert {:error, [<<"log.level: ", _::binary>>]} = load(tmp_dir, "[log]\nlevel = \"loud\"\n")
   end
 
   test "a valid file", %{tmp_dir: dir} do
