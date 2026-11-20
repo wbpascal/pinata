@@ -103,15 +103,23 @@ jobs:
         run: mix release
 
       - name: Pack
+        if: runner.os != 'Windows'
         run: |
           mkdir "$RUNNER_TEMP/stage"
           cp -R _build/prod/rel/pinata "$RUNNER_TEMP/stage/pinata-$V"
           cd "$RUNNER_TEMP/stage"
-          if [ "$RUNNER_OS" = Windows ]; then
-            7z a -tzip "../$ARCHIVE" "pinata-$V"
-          else
-            tar -czf "../$ARCHIVE" "pinata-$V"
-          fi
+          tar -czf "../$ARCHIVE" "pinata-$V"
+
+      # Git Bash cp failed on erl next to erl.exe ("File exists", run 44778990138), so Windows copies with PowerShell.
+      - name: Pack (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/stage" | Out-Null
+          Copy-Item -Recurse -Path _build/prod/rel/pinata -Destination "$env:RUNNER_TEMP/stage/pinata-$env:V"
+          Set-Location "$env:RUNNER_TEMP/stage"
+          7z a -tzip "../$env:ARCHIVE" "pinata-$env:V"
 
       - uses: actions/upload-artifact@v4
         with:
