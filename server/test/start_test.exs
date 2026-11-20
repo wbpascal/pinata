@@ -41,6 +41,10 @@ defmodule Pinata.StartTest do
     System.put_env("PINATA_CONFIG", path)
   end
 
+  # The job environment chooses the database (CI runs the suite against Postgres too), so the expected name follows it.
+  defp database,
+    do: if(String.starts_with?(System.fetch_env!("DATABASE_URL"), "sqlite:"), do: "sqlite", else: "postgres")
+
   test "with only data_dir set every supervisor starts", %{tmp_dir: tmp_dir} do
     use_file(tmp_dir, "")
     log = TestLog.capture(fn -> assert :ok = Application.start(:pinata) end)
@@ -54,7 +58,7 @@ defmodule Pinata.StartTest do
     assert log =~ "[info] Zone: listening on 0.0.0.0:9210\n"
 
     assert log =~
-             "[info] Pinata: node started, parts login, world_manager, zone, single-node mode, database sqlite\n"
+             "[info] Pinata: node started, parts login, world_manager, zone, single-node mode, database #{database()}\n"
 
     refute log =~ System.fetch_env!("DATABASE_URL")
     refute log =~ "test.db"
@@ -120,7 +124,7 @@ defmodule Pinata.StartTest do
     assert is_pid(Process.whereis(Cluster.DataDigest))
     assert is_pid(Process.whereis(Cluster.NodeLog))
     assert is_pid(Process.whereis(Login.WorldWatch))
-    assert log =~ "[info] Pinata: node started, parts login, multi-node mode, database sqlite\n"
+    assert log =~ "[info] Pinata: node started, parts login, multi-node mode, database #{database()}\n"
     connect(9010)
     assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", 9110, [:binary, active: false])
   end
