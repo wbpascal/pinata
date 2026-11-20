@@ -30,6 +30,7 @@ with no file the node starts in single-node mode on the data directory `./data`,
 | `cluster.nodes` | list of strings | `[]` | Names of the other nodes (`name@host`). Empty means single-node mode. |
 | `connection.max_packets_per_second` | integer, 1 or more | `100` | A client that sends more packets than this within one second is disconnected. |
 | `connection.max_unsent_bytes` | integer, 1 or more | `1048576` | A client with more than this many bytes of unsent outbound data is disconnected. |
+| `log.level` | `"debug"`, `"info"`, `"warning"` or `"error"` | `"info"` | The lowest level the server log prints (see operation.md). |
 | `data.strict_references` | boolean | `true` | Refuse to start when a data table refers to a row that does not exist. |
 
 A key with a dot is written inside a table: `login.port` is `port` under `[login]`. Each world is one `[[world]]` table.

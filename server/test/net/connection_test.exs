@@ -56,14 +56,58 @@ defmodule Net.ConnectionTest do
 
     @impl Net.Handler
     def handle_packet(state, _packet),
-      do: {state, [{:send, %MiscSeedAck{seed: 1}}, {:perform, :ask}, :close, {:send, %MiscSeedAck{seed: 3}}]}
+      do:
+        {state,
+         [{:send, %MiscSeedAck{seed: 1}}, {:perform, :ask}, {:close, :info, "test"}, {:send, %MiscSeedAck{seed: 3}}]}
 
     @impl Net.Handler
     def handle_info(state, :answer), do: {state, [{:send, %MiscSeedAck{seed: 2}}]}
-    def handle_info(state, {:cluster, :x}), do: {state, [{:send, %MiscSeedAck{seed: 4}}, :close]}
+    def handle_info(state, {:cluster, :x}), do: {state, [{:send, %MiscSeedAck{seed: 4}}, {:close, :info, "test"}]}
 
     @impl Net.Handler
     def perform(:ask), do: :answer
+  end
+
+  defmodule SlowHandler do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    alias Proto.Packets.MiscSeedAck
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, _packet), do: {state, [{:perform, :wait}]}
+
+    @impl Net.Handler
+    def handle_info(state, :done), do: {state, List.duplicate({:send, %MiscSeedAck{seed: 1}}, 5)}
+
+    @impl Net.Handler
+    def perform(:wait) do
+      Process.sleep(100)
+      :done
+    end
+  end
+
+  defmodule LogHandler do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, _packet), do: {state, [{:log, :info, "hello"}, {:perform, :meta}]}
+
+    @impl Net.Handler
+    def handle_info(state, _message), do: {state, []}
+
+    @impl Net.Handler
+    def perform(:meta) do
+      send(:connection_test, {:metadata, Logger.metadata()})
+      :ok
+    end
   end
 
   @limits %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576}
@@ -82,9 +126,15 @@ defmodule Net.ConnectionTest do
 
   defp listen(handler, limits \\ %{}) do
     settings = %{connection: Map.merge(@limits, limits)}
-    pid = start_supervised!({Net.Listener, {handler, 0, settings}})
+    pid = start_supervised!({Net.Listener, {"Net", handler, 0, settings}})
     {:ok, {_address, port}} = ThousandIsland.listener_info(pid)
     {pid, port}
+  end
+
+  # The line a close writes comes before the socket is closed, so after `closed/1` it is in the capture.
+  defp one_close(log, line) do
+    assert log =~ line
+    assert length(String.split(log, "connection closed:")) == 2
   end
 
   defp connect(port, options \\ []) do
@@ -150,8 +200,14 @@ defmodule Net.ConnectionTest do
     check(listener)
     nothing(socket)
     set_now(210_000)
-    check(listener, false)
-    closed(socket)
+
+    log =
+      TestLog.capture(fn ->
+        check(listener, false)
+        closed(socket)
+      end)
+
+    one_close(log, "[info] Net: connection closed: heartbeat timeout, peer 127.0.0.1:")
   end
 
   test "client heartbeat request in the first state" do
@@ -166,8 +222,14 @@ defmodule Net.ConnectionTest do
     {listener, port} = listen(QuietHandler)
     {socket, cipher} = connect(port)
     {unknown, _cipher} = frame(cipher, <<0xFF, 0xFF, 1, 2, 3>>)
-    :ok = :gen_tcp.send(socket, unknown)
-    closed(socket)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, unknown)
+        closed(socket)
+      end)
+
+    one_close(log, "[info] Net: connection closed: unknown opcode 0xFFFF, peer 127.0.0.1:")
 
     assert Process.alive?(listener)
     connect(port)
@@ -180,8 +242,15 @@ defmodule Net.ConnectionTest do
     # a seed packet with one byte too few, then a body shorter than an opcode
     {short, cipher} = frame(cipher, <<0x07, 0x08, 1>>)
     {tiny, cipher} = frame(cipher, <<0x07>>)
-    :ok = :gen_tcp.send(socket, [short, tiny])
-    :sys.get_state(conn_pid(listener))
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, [short, tiny])
+        :sys.get_state(conn_pid(listener))
+      end)
+
+    assert log =~ "[debug] Net: dropped a packet of the wrong size (\"\\a\\b\", 3 bytes), peer 127.0.0.1:"
+    assert log =~ "[debug] Net: dropped a packet of the wrong size (\"\\a\", 1 bytes), peer 127.0.0.1:"
     nothing(socket)
 
     # the heartbeat timer was not reset by them
@@ -197,8 +266,14 @@ defmodule Net.ConnectionTest do
   test "oversized frame closes the socket" do
     {listener, port} = listen(QuietHandler)
     {socket, _cipher} = connect(port)
-    :ok = :gen_tcp.send(socket, <<0, 0xFE, 0x1F>>)
-    closed(socket)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, <<0, 0xFE, 0x1F>>)
+        closed(socket)
+      end)
+
+    one_close(log, "[info] Net: connection closed: oversized frame, peer 127.0.0.1:")
     assert Process.alive?(listener)
 
     {socket, _cipher} = connect(port)
@@ -222,8 +297,14 @@ defmodule Net.ConnectionTest do
     assert {:ok, answers} = :gen_tcp.recv(socket, 300, 2000)
     assert answers == :binary.copy(<<2, 5, 8>>, 100)
     {more, _cipher} = heartbeats(cipher, 1)
-    :ok = :gen_tcp.send(socket, more)
-    closed(socket)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, more)
+        closed(socket)
+      end)
+
+    one_close(log, "[warning] Net: connection closed: packet rate exceeded, peer 127.0.0.1:")
 
     {socket, cipher} = connect(port)
     {data, cipher} = heartbeats(cipher, 100)
@@ -241,9 +322,15 @@ defmodule Net.ConnectionTest do
     {_listener, port} = listen(FloodHandler, %{max_unsent_bytes: 100_000})
     {socket, cipher} = connect(port, recbuf: 8192)
     {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
-    :ok = :gen_tcp.send(socket, req)
-    Process.sleep(500)
-    assert drain(socket, 0) < 4000 * 8003
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, req)
+        Process.sleep(500)
+        assert drain(socket, 0) < 4000 * 8003
+      end)
+
+    one_close(log, "[warning] Net: connection closed: unsent bytes exceeded, peer 127.0.0.1:")
   end
 
   defp drain(socket, sum) do
@@ -257,10 +344,85 @@ defmodule Net.ConnectionTest do
     {_listener, port} = listen(EffectHandler)
     {socket, cipher} = connect(port)
     {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
-    :ok = :gen_tcp.send(socket, req)
-    assert {:ok, <<4, 0x07, 0x08, 1, 0>>} = :gen_tcp.recv(socket, 5, 1000)
-    assert {:ok, <<4, 0x07, 0x08, 2, 0>>} = :gen_tcp.recv(socket, 5, 1000)
-    closed(socket)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, req)
+        assert {:ok, <<4, 0x07, 0x08, 1, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+        assert {:ok, <<4, 0x07, 0x08, 2, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+        closed(socket)
+      end)
+
+    one_close(log, "[info] Net: connection closed: test, peer 127.0.0.1:")
+  end
+
+  test "a log effect writes a line with part and peer, and the connection has the metadata" do
+    Process.register(self(), :connection_test)
+    {_listener, port} = listen(LogHandler)
+    {socket, cipher} = connect(port)
+    {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, req)
+        assert_receive {:metadata, metadata}, 1000
+        assert metadata[:part] == "Net"
+        assert metadata[:peer] =~ ~r/^127\.0\.0\.1:\d+$/
+      end)
+
+    assert log =~ "[info] Net: hello, peer 127.0.0.1:"
+  end
+
+  test "a connection is accepted at debug and the listener logs its address" do
+    log =
+      TestLog.capture(fn ->
+        {listener, port} = listen(QuietHandler)
+        {:ok, {address, ^port}} = ThousandIsland.listener_info(listener)
+        send(self(), {:bound, "#{:inet.ntoa(address)}:#{port}"})
+        {socket, _cipher} = connect(port)
+        :sys.get_state(conn_pid(listener))
+        :gen_tcp.close(socket)
+      end)
+
+    assert_received {:bound, bound}
+    assert log =~ "[info] Net: listening on #{bound}\n"
+    assert log =~ "[debug] Net: connection accepted, peer 127.0.0.1:"
+  end
+
+  test "a send that fails closes with one warning and no client-close line" do
+    {listener, port} = listen(SlowHandler)
+    {socket, cipher} = connect(port, linger: {true, 0})
+    {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
+    pid = conn_pid(listener)
+    ref = Process.monitor(pid)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, req)
+        :ok = :gen_tcp.close(socket)
+        assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2000
+      end)
+
+    one_close(log, "[warning] Net: connection closed: send failed, peer 127.0.0.1:")
+    refute log =~ "closed by the client"
+  end
+
+  test "a close by the client writes one debug line and nothing above" do
+    {listener, port} = listen(QuietHandler)
+    {socket, _cipher} = connect(port)
+    pid = conn_pid(listener)
+    ref = Process.monitor(pid)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.close(socket)
+        assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2000
+      end)
+
+    assert length(String.split(log, "[debug] Net: connection closed by the client, peer 127.0.0.1:")) == 2
+    refute log =~ "[info]"
+    refute log =~ "[warning]"
+    refute log =~ "[error]"
   end
 
   test "cluster message goes to handle_info" do

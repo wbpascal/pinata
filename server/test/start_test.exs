@@ -43,9 +43,22 @@ defmodule Pinata.StartTest do
 
   test "with only data_dir set every supervisor starts", %{tmp_dir: tmp_dir} do
     use_file(tmp_dir, "")
-    assert :ok = Application.start(:pinata)
+    log = TestLog.capture(fn -> assert :ok = Application.start(:pinata) end)
     assert running() == @supervisors
     assert Process.whereis(Cluster.DataDigest) == nil
+    assert Process.whereis(Cluster.NodeLog) == nil
+    assert Process.whereis(Login.WorldWatch) == nil
+
+    assert log =~ "[info] Login: listening on 0.0.0.0:9010\n"
+    assert log =~ "[info] WorldManager: listening on 0.0.0.0:9110\n"
+    assert log =~ "[info] Zone: listening on 0.0.0.0:9210\n"
+
+    assert log =~
+             "[info] Pinata: node started, parts login, world_manager, zone, single-node mode, database sqlite\n"
+
+    refute log =~ System.fetch_env!("DATABASE_URL")
+    refute log =~ "test.db"
+    refute log =~ "pinata.db"
 
     for port <- [9010, 9110, 9210] do
       {socket, cipher} = connect(port)
@@ -88,11 +101,26 @@ defmodule Pinata.StartTest do
     assert running() == []
   end
 
-  test "PINATA_PARTS=login starts only the Login part", %{tmp_dir: _tmp_dir} do
+  test "a port in use is one line on standard error and the node does not start", %{tmp_dir: tmp_dir} do
+    use_file(tmp_dir, "[login]\nport = 9013\n")
+    {:ok, listener} = :gen_tcp.listen(9013, [])
+
+    output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
+    :ok = :gen_tcp.close(listener)
+
+    assert output =~ "Login: cannot listen on port 9013: address already in use. The node does not start."
+    assert running() == []
+  end
+
+  test "PINATA_PARTS=login starts only the Login part", %{tmp_dir: tmp_dir} do
+    use_file(tmp_dir, "")
     System.put_env("PINATA_PARTS", "login")
-    assert :ok = Application.start(:pinata)
+    log = TestLog.capture(fn -> assert :ok = Application.start(:pinata) end)
     assert running() == [Persistence.Supervisor, Cluster.Root, Login.Supervisor]
     assert is_pid(Process.whereis(Cluster.DataDigest))
+    assert is_pid(Process.whereis(Cluster.NodeLog))
+    assert is_pid(Process.whereis(Login.WorldWatch))
+    assert log =~ "[info] Pinata: node started, parts login, multi-node mode, database sqlite\n"
     connect(9010)
     assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", 9110, [:binary, active: false])
   end

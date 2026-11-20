@@ -31,7 +31,7 @@ end
 dir = Path.join(System.tmp_dir!(), "pinata-test-data-#{System.pid()}")
 File.rm_rf!(dir)
 {:ok, _report} = GameData.Import.run(source, dir)
-File.write!(dir <> ".toml", "data_dir = #{inspect(dir)}\n")
+File.write!(dir <> ".toml", "data_dir = #{inspect(dir)}\n\n[log]\nlevel = \"warning\"\n")
 System.put_env("PINATA_CONFIG", dir <> ".toml")
 System.put_env("PINATA_TEST_DATA_DIR", dir)
 {:ok, _apps} = Application.ensure_all_started(:pinata)

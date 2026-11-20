@@ -10,13 +10,12 @@ defmodule Pinata.Application do
   def start(_type, _args) do
     case Settings.load(System.get_env()) do
       {:ok, settings} ->
+        Logger.configure(level: settings.log.level)
         tables = settings.parts |> Enum.flat_map(&part(&1).game_data()) |> Enum.uniq()
 
         case GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references) do
           :ok ->
-            always = [{Persistence.Supervisor, settings}, {Cluster.Root, settings}] ++ digest_check(settings)
-            parts = Enum.map(settings.parts, &{part_supervisor(&1), settings})
-            Supervisor.start_link(always ++ parts, strategy: :one_for_one, name: Pinata.Supervisor)
+            start_tree(settings)
 
           {:error, problems} ->
             IO.puts(:stderr, Enum.join(["Invalid game data, the node does not start:" | problems], "\n  "))
@@ -27,6 +26,23 @@ defmodule Pinata.Application do
         IO.puts(:stderr, Enum.join(["Invalid settings, the node does not start:" | problems], "\n  "))
         {:error, :invalid_settings}
     end
+  end
+
+  defp start_tree(settings) do
+    always = [{Persistence.Supervisor, settings}, {Cluster.Root, settings}] ++ digest_check(settings)
+    parts = Enum.map(settings.parts, &{part_supervisor(&1), settings})
+
+    with {:ok, pid} <- Supervisor.start_link(always ++ parts, strategy: :one_for_one, name: Pinata.Supervisor) do
+      started(settings)
+      {:ok, pid}
+    end
+  end
+
+  defp started(settings) do
+    mode = if Settings.single_node?(settings), do: "single-node", else: "multi-node"
+    database = if String.starts_with?(settings.database.url, "sqlite:"), do: "sqlite", else: "postgres"
+    parts = Enum.join(settings.parts, ", ")
+    Logger.info("Pinata: node started, parts #{parts}, #{mode} mode, database #{database}")
   end
 
   # Only in multi-node mode (ADR 0006): single-node mode hashes nothing.

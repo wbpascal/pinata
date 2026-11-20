@@ -68,11 +68,11 @@ defmodule Login.Handler do
       {%{state | step: :login},
        [{:send, %UserClientRightversionCheckAck{xtrap_server_key_length: 1, xtrap_server_key: ""}}]}
     else
-      {state, [{:send, %UserClientWrongversionCheckAck{unused: 0}}, :close]}
+      {state, [{:send, %UserClientWrongversionCheckAck{unused: 0}}, {:close, :info, "wrong version key"}]}
     end
   end
 
-  def handle_packet(%__MODULE__{step: :version} = state, _packet), do: {state, [:close]}
+  def handle_packet(%__MODULE__{step: :version} = state, _packet), do: {state, [{:close, :info, "wrong first packet"}]}
 
   def handle_packet(%__MODULE__{step: :login} = state, %UserUsLoginReq{user_name: name, password: password}),
     do:
@@ -82,12 +82,13 @@ defmodule Login.Handler do
   def handle_packet(%__MODULE__{step: :login} = state, %UserLoginWithOtpReq{otp: otp}),
     do: {%{state | step: :open}, [{:perform, {:take_token, otp}}]}
 
-  def handle_packet(%__MODULE__{step: :login} = state, _packet), do: {state, [:close]}
+  def handle_packet(%__MODULE__{step: :login} = state, _packet),
+    do: {state, [{:close, :info, "unexpected packet instead of the login"}]}
 
   # The key is not looked at (L00-B5 kept).
   def handle_packet(%__MODULE__{step: :open} = state, %UserXtrapReq{}) do
     ack = {:send, %UserXtrapAck{success: 1}}
-    {%{state | pending: :none}, [ack | answer(state.pending)]}
+    {%{state | pending: :none}, [ack | answer(state.pending, state.user_name)]}
   end
 
   def handle_packet(%__MODULE__{step: :open, user_no: :none} = state, %UserWorldStatusReq{}), do: {state, []}
@@ -101,28 +102,42 @@ defmodule Login.Handler do
 
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
-  defp answer(:none), do: []
-  defp answer({:ok, user_no}), do: [{:perform, {:take_over, user_no}}]
-  defp answer({:error, :unknown}), do: refuse(0x45)
-  defp answer({:error, :wrong_password}), do: refuse(0x45)
-  defp answer({:error, :blocked}), do: refuse(0x47)
-  defp answer({:error, :not_login_able}), do: refuse(0x48)
+  defp answer(:none, _name), do: []
+  defp answer({:ok, user_no}, _name), do: [{:perform, {:take_over, user_no}}]
+  defp answer({:error, :unknown}, name), do: refuse(0x45, account(name) <> ", unknown account")
+  defp answer({:error, :wrong_password}, name), do: refuse(0x45, account(name) <> ", wrong password")
+  defp answer({:error, :blocked}, name), do: refuse(0x47, account(name) <> ", blocked")
+  defp answer({:error, :not_login_able}, name), do: refuse(0x48, account(name) <> ", not login-able")
   # The original answers a failed DB call like an unknown name (D01 section 3.2: nUserNo stays -1).
-  defp answer({:error, :database}), do: refuse(0x45)
+  defp answer({:error, :database}, name), do: refuse(0x45, account(name) <> ", database failure")
 
-  defp refuse(code), do: [{:send, %UserLoginfailAck{error: code}}, :close]
+  defp refuse(code, reason),
+    do: [{:send, %UserLoginfailAck{error: code}}, {:close, :info, "login refused, " <> reason}]
+
+  # inspect/1: a typed name can never break the one-line rule.
+  defp account(name), do: "account " <> inspect(name)
 
   @impl Net.Handler
   def handle_info(state, {:login_checked, result}), do: {%{state | pending: result}, []}
 
   def handle_info(state, {:taken_over, user_no}),
-    do: {%{state | user_no: user_no}, [{:perform, {:world_list, UserLoginAck, state.worlds}}]}
+    do:
+      {%{state | user_no: user_no},
+       [
+         {:log, :info, "login accepted, " <> account(state.user_name)},
+         {:perform, {:world_list, UserLoginAck, state.worlds}}
+       ]}
 
   def handle_info(state, {:token_taken, {:ok, user_no, user_name}}),
-    do: {%{state | user_no: user_no, user_name: user_name}, [{:perform, {:world_list, UserLoginAck, state.worlds}}]}
+    do:
+      {%{state | user_no: user_no, user_name: user_name},
+       [
+         {:log, :info, "login accepted with a login token, " <> account(user_name)},
+         {:perform, {:world_list, UserLoginAck, state.worlds}}
+       ]}
 
   # No client text for 0x52 (L00-B4 kept by decision).
-  def handle_info(state, {:token_taken, :error}), do: {state, refuse(0x52)}
+  def handle_info(state, {:token_taken, :error}), do: {state, refuse(0x52, "unknown or expired login token")}
 
   def handle_info(state, {:world_list, module, infos}), do: {state, [{:send, struct!(module, worlds: infos)}]}
 
@@ -130,7 +145,7 @@ defmodule Login.Handler do
   def handle_info(state, {:world_selected, false, ack}), do: {state, [{:send, ack}]}
 
   def handle_info(state, {:cluster, :session_replaced}),
-    do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, :close]}
+    do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, {:close, :info, "session replaced"}]}
 
   @impl Net.Handler
   def perform({:check_login, name, %Login.Secret{value: password}, auto_create?}) do

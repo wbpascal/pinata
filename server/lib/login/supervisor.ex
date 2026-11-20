@@ -1,5 +1,5 @@
 defmodule Login.Supervisor do
-  @moduledoc "Root supervisor of `Login`. It starts the token process, then the client listener."
+  @moduledoc "Root supervisor of `Login`. It starts the token process, in multi-node mode the world watch, then the client listener."
 
   use Supervisor
 
@@ -7,9 +7,9 @@ defmodule Login.Supervisor do
   def start_link(settings), do: Supervisor.start_link(__MODULE__, settings, name: __MODULE__)
 
   @impl Supervisor
-  def init(settings),
-    do:
-      Supervisor.init([Login.Tokens, {Net.Listener, {Login.Handler, settings.login.port, settings}}],
-        strategy: :one_for_one
-      )
+  def init(settings) do
+    watch = if Settings.single_node?(settings), do: [], else: [{Login.WorldWatch, settings.world}]
+    listener = {Net.Listener, {"Login", Login.Handler, settings.login.port, settings}}
+    Supervisor.init([Login.Tokens] ++ watch ++ [listener], strategy: :one_for_one)
+  end
 end

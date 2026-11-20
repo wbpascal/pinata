@@ -27,6 +27,9 @@ defmodule TestPeers do
     File.write!(config, """
     data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}
 
+    [log]
+    level = "warning"
+
     [login]
     port = #{base_port}
 
@@ -59,7 +62,10 @@ defmodule TestPeers do
   @doc "Stops the three peers and deletes the settings file."
   @spec stop(t()) :: :ok
   def stop(%{login: login, wm: wm, zone: zone, config: config}) do
-    Enum.each([login, wm, zone], &:peer.stop/1)
+    # Otherwise the survivors print "node lost" for each peer that stops first.
+    peers = [login, wm, zone]
+    Enum.each(peers, &:peer.call(&1, Logger, :configure, [[level: :none]]))
+    Enum.each(peers, &:peer.stop/1)
     File.rm(config)
     :ok
   end

@@ -23,7 +23,7 @@ defmodule Login.LoginTest do
   defp listen(overrides \\ & &1) do
     {:ok, settings} = Settings.load(%{})
     settings = overrides.(settings)
-    pid = start_supervised!({Net.Listener, {Login.Handler, 0, settings}}, id: make_ref())
+    pid = start_supervised!({Net.Listener, {"Login", Login.Handler, 0, settings}}, id: make_ref())
     {:ok, {_address, port}} = ThousandIsland.listener_info(pid)
     port
   end
@@ -42,6 +42,11 @@ defmodule Login.LoginTest do
   defp recv!(client, body) do
     assert {:ok, ^body, client} = TestClient.recv_raw(client)
     client
+  end
+
+  defp one_close(log) do
+    assert length(String.split(log, "connection closed:")) == 2
+    log
   end
 
   defp closed(client), do: assert({:error, :closed} = TestClient.recv_raw(client))
@@ -78,16 +83,35 @@ defmodule Login.LoginTest do
       break_database()
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        TestLog.capture(fn ->
           client = port |> connect() |> login("ivy", @secret) |> recv!(<<0x09, 0x0C, 0x45, 0>>)
           closed(client)
         end)
 
       assert log =~ "the database failed in check_login"
+
+      assert log =~
+               ~s([info] Login: connection closed: login refused, account "ivy", database failure, peer 127.0.0.1:)
+
       refute log =~ @secret
       refute log =~ "GenServer"
       refute log =~ "terminating"
     end
+  end
+
+  test "the password is in no log line, for an accepted and for a refused login" do
+    {name, password} = account("admin", @secret)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        port |> connect() |> login(name, password) |> recv!(<<0x0A, 0x0C>> <> @world_list)
+        port |> connect() |> login(name, "x" <> @secret) |> recv!(<<0x09, 0x0C, 0x45, 0>>) |> closed()
+      end)
+
+    assert log =~ "login accepted"
+    assert log =~ "wrong password"
+    refute log =~ @secret
   end
 
   test "the password is not printed with the effect" do
@@ -100,9 +124,16 @@ defmodule Login.LoginTest do
   end
 
   test "wrong version key" do
-    client = listen() |> connect() |> version("20140101000000")
-    client = recv!(client, <<0x66, 0x0C, 0>>)
-    closed(client)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> version("20140101000000")
+        client = recv!(client, <<0x66, 0x0C, 0>>)
+        closed(client)
+      end)
+
+    assert one_close(log) =~ "[info] Login: connection closed: wrong version key, peer 127.0.0.1:"
   end
 
   test "right version key" do
@@ -110,13 +141,28 @@ defmodule Login.LoginTest do
   end
 
   test "first packet not the version check" do
-    client = listen() |> connect() |> send!(%UserWorldStatusReq{})
-    closed(client)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> send!(%UserWorldStatusReq{})
+        closed(client)
+      end)
+
+    assert one_close(log) =~ "[info] Login: connection closed: wrong first packet, peer 127.0.0.1:"
   end
 
   test "second packet not the login" do
-    client = listen() |> connect() |> version() |> recv!(<<0x67, 0x0C, 1, 0>>) |> xtrap()
-    closed(client)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> version() |> recv!(<<0x67, 0x0C, 1, 0>>) |> xtrap()
+        closed(client)
+      end)
+
+    assert one_close(log) =~
+             "[info] Login: connection closed: unexpected packet instead of the login, peer 127.0.0.1:"
   end
 
   test "login of the wrong length: dropped, the next login is handled" do
@@ -131,29 +177,61 @@ defmodule Login.LoginTest do
 
   test "wrong password" do
     {name, _} = account()
-    client = listen() |> connect() |> login(name, "other")
-    client = recv!(client, <<0x09, 0x0C, 0x45, 0>>)
-    closed(client)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> login(name, "other")
+        client = recv!(client, <<0x09, 0x0C, 0x45, 0>>)
+        closed(client)
+      end)
+
+    assert one_close(log) =~
+             ~s([info] Login: connection closed: login refused, account "admin", wrong password, peer 127.0.0.1:)
   end
 
   test "blocked" do
     {name, password} = account()
     :ok = Persistence.set_blocked(name, true)
-    client = listen() |> connect() |> login(name, password) |> recv!(<<0x09, 0x0C, 0x47, 0>>)
-    closed(client)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> login(name, password) |> recv!(<<0x09, 0x0C, 0x47, 0>>)
+        closed(client)
+      end)
+
+    assert one_close(log) =~
+             ~s([info] Login: connection closed: login refused, account "admin", blocked, peer 127.0.0.1:)
   end
 
   test "not login-able" do
     {name, password} = account()
     :ok = Persistence.set_login_able(name, false)
-    client = listen() |> connect() |> login(name, password) |> recv!(<<0x09, 0x0C, 0x48, 0>>)
-    closed(client)
+    port = listen()
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> login(name, password) |> recv!(<<0x09, 0x0C, 0x48, 0>>)
+        closed(client)
+      end)
+
+    assert one_close(log) =~
+             ~s([info] Login: connection closed: login refused, account "admin", not login-able, peer 127.0.0.1:)
   end
 
   test "auto-create off" do
     port = listen(&put_in(&1.login.auto_create_accounts, false))
-    client = port |> connect() |> login("nobody", "pw") |> recv!(<<0x09, 0x0C, 0x45, 0>>)
-    closed(client)
+
+    log =
+      TestLog.capture(fn ->
+        client = port |> connect() |> login("nobody", "pw") |> recv!(<<0x09, 0x0C, 0x45, 0>>)
+        closed(client)
+      end)
+
+    assert one_close(log) =~
+             ~s([info] Login: connection closed: login refused, account "nobody", unknown account, peer 127.0.0.1:)
+
     assert Persistence.check_login("nobody", "pw") == {:error, :unknown}
   end
 
@@ -174,14 +252,21 @@ defmodule Login.LoginTest do
   test "success and world status" do
     {name, password} = account()
 
-    client =
-      listen()
-      |> connect()
-      |> login(name, password)
-      |> recv!(<<0x0A, 0x0C>> <> @world_list)
-      |> send!(%UserWorldStatusReq{})
+    port = listen()
 
-    recv!(client, <<0x1C, 0x0C>> <> @world_list)
+    log =
+      TestLog.capture(fn ->
+        client =
+          port
+          |> connect()
+          |> login(name, password)
+          |> recv!(<<0x0A, 0x0C>> <> @world_list)
+          |> send!(%UserWorldStatusReq{})
+
+        recv!(client, <<0x1C, 0x0C>> <> @world_list)
+      end)
+
+    assert log =~ ~s([info] Login: login accepted, account "admin", peer 127.0.0.1:)
   end
 
   test "after the login: a second xtrap is answered, other packets are ignored" do
@@ -231,9 +316,18 @@ defmodule Login.LoginTest do
     {name, password} = account()
     port = listen()
     first = port |> connect() |> login(name, password) |> recv!(<<0x0A, 0x0C>> <> @world_list)
-    second = port |> connect() |> login(name, password) |> recv!(<<0x0A, 0x0C>> <> @world_list)
-    first = recv!(first, <<0x17, 0x0C, 0x83, 0x06>>)
-    closed(first)
+
+    log =
+      TestLog.capture(fn ->
+        second = port |> connect() |> login(name, password) |> recv!(<<0x0A, 0x0C>> <> @world_list)
+        first = recv!(first, <<0x17, 0x0C, 0x83, 0x06>>)
+        closed(first)
+        send(self(), {:second, second})
+      end)
+
+    assert one_close(log) =~ "[info] Login: connection closed: session replaced, peer 127.0.0.1:"
+    assert_received {:second, second}
+
     second |> send!(%UserWorldStatusReq{}) |> recv!(<<0x1C, 0x0C>> <> @world_list)
   end
 

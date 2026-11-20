@@ -1,6 +1,6 @@
 defmodule Cluster.Root do
   @moduledoc """
-  Root supervisor of `Cluster`: the `:pg` scope of the registry and, in multi-node mode, libcluster.
+  Root supervisor of `Cluster`: the `:pg` scope of the registry and, in multi-node mode, libcluster. In multi-node mode it also starts `Cluster.NodeLog`.
 
   It is not named `Cluster.Supervisor` because libcluster owns that module name.
   """
@@ -11,7 +11,10 @@ defmodule Cluster.Root do
   def start_link(settings), do: Supervisor.start_link(__MODULE__, settings, name: __MODULE__)
 
   @impl Supervisor
-  def init(settings), do: Supervisor.init(children(settings.cluster.nodes), strategy: :one_for_one)
+  def init(settings) do
+    log = if Settings.single_node?(settings), do: [], else: [Cluster.NodeLog]
+    Supervisor.init(children(settings.cluster.nodes) ++ log, strategy: :one_for_one)
+  end
 
   @doc "The children for a node list from `cluster.nodes`. An empty list starts no topology."
   @spec children([String.t()]) :: [Supervisor.child_spec() | {module(), term()}]
