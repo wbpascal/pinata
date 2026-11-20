@@ -4,7 +4,7 @@ In multi-node mode the three parts (Login, WorldManager, Zone) run on separate n
 
 ## What you need
 
-- **PostgreSQL.** All nodes use one database, so `database.url` (or `DATABASE_URL`) must be a `postgres://` URL, the same on every node. SQLite works only in single-node mode: a node that runs only some parts, or has `cluster.nodes` set, does not start on it. Run the migrations once, before the nodes of a new version start: `bin/pinata eval 'Persistence.Release.migrate()'` (see [`operation.md`](operation.md)).
+- **PostgreSQL.** All nodes use one database, so `database.url` (or `DATABASE_URL`) must be a `postgres://` URL, the same on every node. SQLite works only in single-node mode: a node that runs only some parts, or has `cluster.nodes` set, does not start on it. Run the migrations once, before the nodes of a new version start: `bin/pinata eval "Persistence.Release.migrate()"` (see [`operation.md`](operation.md)).
 - **The same data directory on every node** (see [`install.md`](install.md)); see the check below.
 - **The release or the image** (see [`install.md`](install.md)).
 
@@ -18,7 +18,7 @@ In multi-node mode the three parts (Login, WorldManager, Zone) run on separate n
 | cookie | `RELEASE_COOKIE`; all nodes need the same one, and anyone who knows it can run code on the nodes. Change the cookie of the example and keep the nodes on a network only your machines can reach |
 | address clients use | `public_host` in the settings file, with the client ports (`login.port`, `world_manager.port`, `zone.port`) published or reachable on that address |
 
-`login.auto_create_accounts` defaults to off in multi-node mode. Create accounts with `bin/pinata eval 'Persistence.Release.create_account("<name>")'` (see [`accounts.md`](accounts.md)).
+`login.auto_create_accounts` defaults to off in multi-node mode. Create accounts with `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` (see [`accounts.md`](accounts.md)).
 
 ## Data directory check
 
@@ -129,9 +129,11 @@ Commands, in `server/`:
 ```
 mix pinata.import_data <9Data folder> data
 docker compose up -d --build
-printf 'my-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("<name>")'
+printf 'my-password\n' | docker compose exec -T login /app/bin/pinata eval "Persistence.Release.create_account(~s(<name>))"
 docker compose logs -f
 docker compose down -v
 ```
+
+On Windows (Docker Desktop, PowerShell) write the import path with forward slashes (`mix pinata.import_data C:/Fiesta/9Data data`) and start the third command with `'my-password' |` in place of `printf 'my-password\n' |`; the others are unchanged. These commands were not tried on Windows.
 
 `down -v` also deletes the database volume; `docker compose down` keeps it. The password of the example database and its cookie are for a trial on one machine only.

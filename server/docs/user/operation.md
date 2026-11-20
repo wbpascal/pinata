@@ -11,7 +11,9 @@ From a release (`MIX_ENV=prod mix release`, see [`install.md`](install.md)), in 
 | stop | `bin/pinata stop` |
 | OS process id | `bin/pinata pid` |
 | shell into the running node | `bin/pinata remote` |
-| run a command | `bin/pinata eval '<expression>'` |
+| run a command | `bin/pinata eval "<expression>"` |
+
+A string inside an expression is written `~s(...)`, not in double quotes. On Windows there is no `daemon`: `bin/pinata start` stays in the foreground of its window; stop it with `bin/pinata stop` from another window or with `Ctrl-C` twice. See [`install.md`](install.md), section "Windows", for the other differences.
 
 The settings file defaults to `./pinata.toml` and the data directory to `./data`, both relative to the working directory the command starts in, so start from the directory that holds them or set `PINATA_CONFIG` (path of the settings file) and `data_dir`. `PINATA_PARTS` chooses the parts of the node (see [`multi-node.md`](multi-node.md) and [`settings.md`](settings.md)). From a source checkout, `iex -S mix` in `server/` starts the same node.
 
@@ -38,9 +40,11 @@ Measured on 2026-11-19: the single-node release (all three parts, SQLite, 2016 `
 
 The game data is held in memory, so the size follows the data directory.
 
+On Windows the two commands are `(Get-Process -Id (bin\pinata pid)).WorkingSet64` (PowerShell, bytes) and `bin\pinata rpc "IO.inspect(:erlang.memory(:total))"`.
+
 ## Time zone
 
-The in-game clock and the stored dates shown to the client (for example the Kingdom Quest date in the character list) use the time zone of the node's operating system. Set the `TZ` environment variable to change it.
+The in-game clock and the stored dates shown to the client (for example the Kingdom Quest date in the character list) use the time zone of the node's operating system. Set the `TZ` environment variable to change it. On Windows change the time zone of Windows instead: of the `TZ` values only `UTC` has an effect there.
 
 ## Character creation
 
@@ -55,6 +59,8 @@ A database created by an earlier build must be deleted: the initial migration ga
 - `sqlite:<path>`: the default is `sqlite:./data/pinata.db`. The file and its directory are created and migrated at every start. Nothing to do.
 - `postgres://user:password@host/database`: the node refuses to start while migrations are pending. Run them once before you start the nodes of a new version:
   `bin/pinata eval "Persistence.Release.migrate()"` from a release, or `mix pinata.migrate` in `server/`.
+
+On Windows a SQLite path may use either slash: `sqlite:C:/pinata/data/pinata.db` or `sqlite:C:\pinata\data\pinata.db` (in the settings file, backslashes need a TOML literal string in single quotes).
 
 Start-up errors from the database:
 

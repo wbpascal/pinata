@@ -4,13 +4,37 @@
 
 Install the tools with `mise install` at the repository root (Erlang and Elixir, versions in `mise.toml`), then `mix deps.get` in `server/`. For the container image you need Docker instead (or as well).
 
+On Windows, install mise first (for example `winget install jdx.mise`) and activate it in your shell as its documentation describes; then the same two commands apply. No C compiler is needed: the SQLite library is downloaded prebuilt. The commands of these pages work in PowerShell and in `cmd` with the differences listed under [Windows](#windows).
+
 ## The release
 
-`MIX_ENV=prod mix release` in `server/` builds `_build/prod/rel/pinata` (add `--overwrite` to build again over an existing one). The release holds its own Erlang runtime and the compiled server, so the target machine needs no Erlang or Elixir, but it must run the same operating system and CPU architecture as the build machine. Copy the whole directory. The commands are `bin/pinata start`, `daemon`, `stop`, `remote` and `eval` (see [`operation.md`](operation.md)). The data directory is not part of the release.
+`MIX_ENV=prod mix release` in `server/` builds `_build/prod/rel/pinata` (add `--overwrite` to build again over an existing one). In PowerShell that is `$env:MIX_ENV = "prod"; mix release`, in `cmd` `set MIX_ENV=prod` and then `mix release`. The release holds its own Erlang runtime and the compiled server, so the target machine needs no Erlang or Elixir, but it must run the same operating system and CPU architecture as the build machine. Copy the whole directory. The commands are `bin/pinata start`, `daemon`, `stop`, `remote` and `eval` (see [`operation.md`](operation.md)). The data directory is not part of the release.
+
+## Windows
+
+A release built on Windows runs on Windows. It was tried on Windows 11 with PowerShell 7 and `cmd` (2026-11-20). What differs from the other pages:
+
+| Topic | On Windows |
+|---|---|
+| the command | The file is `bin\pinata.bat`. PowerShell accepts `bin/pinata` as written on the other pages; `cmd` needs backslashes: `bin\pinata`. |
+| strings in `eval` and `rpc` | Keep the form of these pages: the expression in double quotes, every string inside it as `~s(...)`. Double quotes inside the expression are lost on the way to the node, so `eval 'f("<name>")'` fails with a syntax error. |
+| paths in `eval` | Write them with forward slashes: `~s(C:/Fiesta/9Data)`. With backslashes use `~S(C:\pinata\data)` (capital `S`). |
+| the `9Data` folder of the import | Forward slashes only, also with `mix pinata.import_data`. With backslashes the import finds no files, reports `0 tables written as CSV, 0 files copied` and creates nothing. |
+| paths in `pinata.toml` | Forward slashes (`data_dir = "C:/pinata/data"`) or a TOML literal string (`data_dir = 'C:\pinata\data'`). `database.url` takes either: `sqlite:C:/pinata/data/pinata.db`. |
+| environment variables | PowerShell: `$env:PINATA_CONFIG = "C:\pinata\pinata.toml"`; `cmd`: `set PINATA_CONFIG=C:\pinata\pinata.toml`. They hold for that window. |
+| background start | There is no `daemon`. `bin\pinata start` runs in the foreground of its window. `bin\pinata install` registers the release as a Windows service; this was not tried. |
+| time zone | The node uses the time zone of Windows. Of the `TZ` values only `UTC` has an effect. |
+| piped password | `'my-password' \| bin\pinata eval "Persistence.Release.create_account(~s(<name>))"` in PowerShell |
+
+The import from a release, in `server\`:
+
+```
+_build\prod\rel\pinata\bin\pinata eval "GameData.Release.import_data(~s(C:/Fiesta/9Data), ~s(./data))"
+```
 
 ## The container image
 
-`docker build -t pinata server/` builds an image with the release, started with `bin/pinata start` as an unprivileged user. It holds no data directory: mount one (for example at `/data`) and tell the node with `PINATA_CONFIG` or `data_dir`. [`multi-node.md`](multi-node.md) uses it in a Docker Compose example.
+`docker build -t pinata server/` builds an image with the release, started with `bin/pinata start` as an unprivileged user. On Windows the same command works with Docker Desktop and Linux containers; the image holds the Linux release whatever the host. It holds no data directory: mount one (for example at `/data`) and tell the node with `PINATA_CONFIG` or `data_dir`. [`multi-node.md`](multi-node.md) uses it in a Docker Compose example.
 
 ## The data directory
 
@@ -20,7 +44,7 @@ The server reads the game's data tables from one directory, the data directory. 
 mix pinata.import_data <9Data folder> <new data directory>
 ```
 
-From a release, which has no `mix`, the same import is `bin/pinata eval 'GameData.Release.import_data("<9Data folder>", "<new data directory>")'`.
+From a release, which has no `mix`, the same import is `bin/pinata eval "GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))"`. On Windows write the `9Data` path with forward slashes in both forms (see [Windows](#windows)).
 
 The command copies the SHN tables, scripts and map geometry unchanged and converts the TXT tables to CSV files. It prints how many tables it wrote, how many files it copied and how many it left out, and a warning for each file it could not convert as a table. On a problem it prints all of them and writes nothing. The target must not exist or must be empty; to bring an original data set in again, import it into a new directory and point `data_dir` at that.
 

@@ -6,10 +6,12 @@ The server cannot be played on yet. You build a release (or the container image)
 
 ## Tasks
 
-Release commands (`bin/pinata eval '<expression>'`, in place of the mix tasks where there is no `mix`):
+Release commands (`bin/pinata eval "<expression>"`, in place of the mix tasks where there is no `mix`):
 
-- `GameData.Release.import_data("<9Data folder>", "<new data directory>")` for `mix pinata.import_data`.
-- `Persistence.Release.migrate()`, `Persistence.Release.create_account("<name>")`, `Persistence.Release.block("<name>")` and `Persistence.Release.unblock("<name>")` for the database and account tasks below.
+- `GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))` for `mix pinata.import_data`.
+- `Persistence.Release.migrate()`, `Persistence.Release.create_account(~s(<name>))`, `Persistence.Release.block(~s(<name>))` and `Persistence.Release.unblock(~s(<name>))` for the database and account tasks below.
+
+A string inside the expression is written `~s(...)`, not in double quotes: that form works in every shell, also on Windows. [`install.md`](install.md), section "Windows", lists what differs on Windows. The `mix` tasks are the same there.
 
 `mix pinata.import_data <9Data folder> <new data directory>` (in `server/`) creates the data directory from an original `9Data` folder; see [`install.md`](install.md).
 
@@ -26,7 +28,7 @@ Database and accounts (see [`operation.md`](operation.md) and [`accounts.md`](ac
 | Page | Content |
 |---|---|
 | [`quick-start.md`](quick-start.md) | single-node start with no configuration, pointing the client at it, logging in |
-| [`install.md`](install.md) | the release, the container image, the data directory and its import, start-up errors |
+| [`install.md`](install.md) | the release, what differs on Windows, the container image, the data directory and its import, start-up errors |
 | [`settings.md`](settings.md) | every setting |
 | [`accounts.md`](accounts.md) | creating, blocking and unblocking accounts |
 | [`operation.md`](operation.md) | start, stop, logs, start-up failures, memory, time zone, database and migrations |

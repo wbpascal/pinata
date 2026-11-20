@@ -12,7 +12,7 @@ defmodule Pinata.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      releases: [pinata: [include_executables_for: [:unix]]],
+      releases: [pinata: [include_executables_for: [:unix, :windows]]],
       dialyzer: [
         flags: [:unmatched_returns, :extra_return, :missing_return],
         plt_local_path: "plts",

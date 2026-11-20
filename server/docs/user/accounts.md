@@ -28,9 +28,9 @@ Run them in `server/` with `mix`, or from a release with `bin/pinata eval`. They
 
 | Action | From source | From a release |
 |---|---|---|
-| create | `mix pinata.account.create <name>` | `bin/pinata eval 'Persistence.Release.create_account("<name>")'` |
-| block | `mix pinata.account.block <name>` | `bin/pinata eval 'Persistence.Release.block("<name>")'` |
-| unblock | `mix pinata.account.unblock <name>` | `bin/pinata eval 'Persistence.Release.unblock("<name>")'` |
+| create | `mix pinata.account.create <name>` | `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` |
+| block | `mix pinata.account.block <name>` | `bin/pinata eval "Persistence.Release.block(~s(<name>))"` |
+| unblock | `mix pinata.account.unblock <name>` | `bin/pinata eval "Persistence.Release.unblock(~s(<name>))"` |
 
 Create asks `Password: `. The password is echoed while you type it. The game client sends the MD5 of the typed password, so the server stores the hash of that MD5; that the client's MD5 covers only the typed password is not yet verified against a capture.
 
