@@ -62,6 +62,17 @@ _Avoid_: config, server info
 One running copy of a map with everything on it: players, monsters, NPCs, drops. A field map has one for the life of its Zone node; instance content (Kingdom Quest, instance dungeon, mini-house) gets one per run.
 _Avoid_: map (alone, when the running copy is meant), field, room, channel
 
+**Map change**:
+A player leaving one map instance and entering another; the client reconnects.
+_Avoid_: link (alone), zone change, teleport
+
+**Reservation**:
+What WorldManager holds for a player between leaving a map instance and arriving on the next: the destination, the map-login ticket and the player.
+_Avoid_: pending link, link reserve
+
+**Map-login ticket**:
+The single-use permission for one character to enter one map instance, issued by WorldManager at character select and at every map change.
+
 **Handle**:
 The 16-bit number by which the client knows an object on its map. Unique within one map instance; its range tells the object type.
 _Avoid_: object id, entity id
