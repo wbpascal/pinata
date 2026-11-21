@@ -91,6 +91,26 @@ _Avoid_: main layer, layer (reserved for the tutorial's separate copy of a map)
 **Sub-layer**:
 The visibility class of an object, which says one way at a time who may see whom; a hidden GM sees players who do not see the GM.
 
+**Normal chat**:
+A chat line that reaches the players in sight of the speaker.
+_Avoid_: say, local chat
+
+**Shout**:
+A chat line that reaches every player of the speaker's map instance.
+_Avoid_: yell, map chat
+
+**Whisper**:
+A chat line that reaches one player of the same world, named by the sender, wherever that player is.
+_Avoid_: private message, tell
+
+**GM command**:
+A normal chat line starting with `&` that the server runs instead of showing it as chat.
+_Avoid_: admin command, ampersand command
+
+**Admin level**:
+A number from 0 to 255 on a character. A GM command runs when it is at least the command's level; 0 is an ordinary player.
+_Avoid_: GM level, rank
+
 **Tick**:
 One step of a map instance's time, in which movement, monster behaviour, combat and expiry advance.
 _Avoid_: frame, pass, loop
