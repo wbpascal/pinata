@@ -12,8 +12,8 @@ One version per milestone of the [roadmap](docs/roadmap.md).
 
 | # | Milestone | State |
 |---|---|---|
-| 1 | Login to character select | [in progress](https://github.com/wbpascal/pinata/milestone/1) |
-| 2 | Enter the world | planned |
+| 1 | Login to character select | [in version 0.1.0](https://github.com/wbpascal/pinata/releases/tag/v0.1.0) |
+| 2 | Enter the world | [in progress](https://github.com/wbpascal/pinata/milestone/2) |
 | 3 | Items and NPC economy | planned |
 | 4 | Combat | planned |
 | 5 | Quests, class change, upgrades | planned |
