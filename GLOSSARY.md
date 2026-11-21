@@ -44,6 +44,10 @@ _Avoid_: old server, legacy server
 An SHN table the unmodified client also holds, kept byte-identical as the source of truth.
 _Avoid_: game data, resource file
 
+**Client data check**:
+The comparison, at every map entry, of the hashes the client sends for 49 of its client data tables with the server's own; one difference refuses the entry.
+_Avoid_: integrity check, checksum check, anti-cheat
+
 **Server data table**:
 Game data only the server reads, free to be stored in a new format.
 _Avoid_: server-only configuration, TXT config
