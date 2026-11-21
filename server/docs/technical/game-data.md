@@ -13,6 +13,19 @@ The boundary `GameData` reads the data directory when a node starts and keeps ea
 | `LuaScript/`, `Script/`, `ScenarioBookShelf/` | scripts, copied |
 | `BlockInfo/`, `AreaBMP/` | geometry, copied (not loaded with the tables) |
 
+## Geometry files (`BlockInfo/`)
+
+One set of files per map, named after the map. All integers are little-endian `u32`. A cell is 6.25 units wide (8 cells per 50 units); a map is `bytesPerRow × 50` units wide and `rows × 6.25` units high.
+
+| File | Maps (2016 data) | Content | Used by |
+|---|---|---|---|
+| `<map>.shbd` | 158, every map | Move block bitmap: `bytesPerRow, rows`, then `rows × bytesPerRow` bytes. A set bit is a cell a player cannot stand on. A position outside the map counts as blocked. | The move, stop and pull-back checks of a map instance. Required: a map without it stops the start-up. |
+| `<map>.shab` | 8 | Attack block bitmap, same format. Cells that also block attacks and monster paths. | OR-ed into the move block bitmap at load. Read on its own by monster path finding and fear (milestone 4). |
+| `<map>.aid` | 23 | Named areas, no blocking: `n` (at most 256), then per area `char name[32], type`; type 0 is a circle (3 more values), type 1 a rectangle (5 more values, the last an angle in degrees). | Map scripts only. Not read yet. |
+| `<map>.sbi` | 32 | Door blocks: `n` (at most 31), then per door `char name[32], x0, y0, x1, y1` (cells; the width is a multiple of 8), `len, offset`; then for every door two images of `len` bytes at `offset`, the closed one first, the open one second. | Closing a door ORs its closed image into that rectangle of the move block bitmap, opening copies the open image over it. Not read yet. |
+
+The shipped `.shbd` files hold every door open: 107 of the 128 door rectangles equal the open image and none equals the closed one. The original server closes all doors when a map loads. Until doors are built, the server leaves them open, because the client is not told about a door either.
+
 ## Import (`mix pinata.import_data <9Data folder> <new data directory>`)
 
 `GameData.Import.run/2` walks every file under `<9Data folder>/Shine` and applies the first rule that matches. Nothing outside `Shine/` is read. All TXT files are converted in memory first; on any error nothing is written. The target must not exist or must be empty (the default database file lives in the data directory, so overwriting is never allowed).
