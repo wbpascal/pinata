@@ -10,7 +10,7 @@ References between tables are checked at load too, strict by default. The settin
 
 Text columns stay raw bytes in the client's legacy code page and are never converted to UTF-8 at load: the client must get the original bytes back. Code that logs or compares such text converts at that point.
 
-Geometry (`BlockInfo/`, `AreaBMP/`) is not loaded with the tables. It is read when a map starts on a Zone node, held as one binary per map, and follows the map's lifetime; loading all of it would cost up to 190 MB for an offline player who visits three maps.
+Geometry (`BlockInfo/`, `AreaBMP/`) is not loaded with the tables. A field map's process starts with its Zone node, but its geometry is read when the first player enters, held as one binary per map, and kept until the node stops; the node only checks at start that the file exists; loading all of it would cost up to 190 MB for an offline player who visits three maps.
 
 ## Consequences
 
