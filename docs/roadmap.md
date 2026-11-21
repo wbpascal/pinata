@@ -27,7 +27,11 @@ The order in which the Elixir server is built. Terms (Milestone, Capture checkpo
   game-log milestone.
 - **Mobs:** maps show NPCs but no mobs until milestone 4. Mob packets in the milestone 2 captures are left out of
   the replay comparison until then.
-- **Load:** checked from milestone 4 on with many instances of the TCP test client. Bots arrive at milestone 7.
+- **Load:** a manual load run with many instances of the TCP test client, in two scenarios (World: 2500 players
+  over the maps; Crowd: 1500 on one map instance). First Crowd run at the end of milestone 2, as information only.
+  From milestone 4 on, each milestone's capture checkpoint needs both scenarios to pass in both modes (single-node
+  on SQLite, multi-node on Docker Compose with PostgreSQL). CI runs only a small smoke run. Bots arrive at
+  milestone 7 and are never the load tool.
 
 ## Milestones
 
