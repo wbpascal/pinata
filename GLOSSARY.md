@@ -144,12 +144,20 @@ _Avoid_: simulated client, fake client, bot (a bot is a player without a connect
 A named packet field that a replay test does not compare because its value cannot match the capture.
 _Avoid_: ignore list, wildcard
 
+**Deferral**:
+A packet or packet field that a replay test does not compare yet because the milestone that builds its data has not landed. It names that milestone, which removes it.
+_Avoid_: mask (a mask never goes away), skip, placeholder (that is what the server sends meanwhile)
+
 **Handle map**:
 The pairing a replay test builds between identifiers the original server handed out and the ones the new server hands out, which must stay consistent for the whole replay.
 
 **Load run**:
 A manual run in which many test clients play a fixed script against a server to check the capacity targets. It is part of a milestone's capture checkpoint.
 _Avoid_: load test (alone), stress test, benchmark
+
+**Capacity figure**:
+One of the two measured values a load run passes or fails on: packet handling time and tick duration.
+_Avoid_: metric, KPI, latency
 
 **World scenario**:
 The load run that spreads the full player count of one world over its maps.
