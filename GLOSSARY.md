@@ -66,6 +66,20 @@ _Avoid_: map (alone, when the running copy is meant), field, room, channel
 The 16-bit number by which the client knows an object on its map. Unique within one map instance; its range tells the object type.
 _Avoid_: object id, entity id
 
+**Sight radius**:
+The distance, set per map, within which objects of one map instance are told about each other.
+_Avoid_: area of interest, view range
+
+**In sight**:
+Two objects are in sight of each other when they are within the sight radius and allowed to see each other.
+
+**Dimension**:
+A number on every object of a map instance; objects with different numbers are not in sight of each other. Everyone is in dimension 0 unless a GM moves.
+_Avoid_: main layer, layer (reserved for the tutorial's separate copy of a map)
+
+**Sub-layer**:
+The visibility class of an object, which says one way at a time who may see whom; a hidden GM sees players who do not see the GM.
+
 **Tick**:
 One step of a map instance's time, in which movement, monster behaviour, combat and expiry advance.
 _Avoid_: frame, pass, loop
