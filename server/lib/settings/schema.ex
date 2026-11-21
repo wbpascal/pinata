@@ -52,7 +52,8 @@ defmodule Settings.Schema do
               type: {:custom, Settings.Schema, :world_name, []},
               type_doc: "string, at most 15 bytes",
               default: "INITIO",
-              doc: "World name."
+              doc:
+                "World name, sent to the client in the world list. The 2016 client does not show it: each row of its world list is a picture from the client's own files, picked by the row (the first world shows \"Enid\"). The client only writes the name to its log `%APPDATA%\\FiestaOnline\\ConnectWorldInfo.txt` when the world is selected."
             ]
           ]}},
       default: [[number: 0, name: "INITIO"]],

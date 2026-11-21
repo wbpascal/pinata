@@ -8,7 +8,7 @@ From a clean machine to the client's world list, in single-node mode (all three 
 4. Start the server, in the same directory: `pinata-<version>/bin/pinata start`. The Login part listens on port 9010, WorldManager on 9110, Zone on 9210. The database `./data/pinata.db` is created.
 5. Point the client at the address of this machine and port 9010. How a client install is told the address depends on the client install. If the client is on another machine, set `public_host` to this machine's address (see [`settings.md`](settings.md)).
 6. Log in with any new name and password. In single-node mode `login.auto_create_accounts` is on, so the account is created at the first login with the password you typed (see [`accounts.md`](accounts.md)).
-7. The client shows the world list with the world `INITIO`. Selecting it works and the client shows the character list. Entering the game does not work yet: the Zone part is a stub.
+7. The client shows the world list with one world. The 2016 client shows it as "Enid", not with the name set in the settings (`INITIO`): it draws the world names from its own files (see `[[world]] name` in [`settings.md`](settings.md)). Selecting it works and the client shows the character list. Entering the game does not work yet: the Zone part is a stub.
 
 Stop the server with `Ctrl-C` twice, or with `pinata-<version>/bin/pinata stop` from another terminal (see [`operation.md`](operation.md)).
 

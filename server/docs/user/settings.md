@@ -25,7 +25,7 @@ with no file the node starts in single-node mode on the data directory `./data`,
 | `world_manager.port` | integer 1 to 65535 | `9110` | Client listener of the WorldManager part. |
 | `zone.port` | integer 1 to 65535 | `9210` | Client listener of the Zone part, one per Zone node. |
 | `[[world]] number` | integer 0 to 255 | `0` | World number. |
-| `[[world]] name` | string, at most 15 bytes | `"INITIO"` | World name. |
+| `[[world]] name` | string, at most 15 bytes | `"INITIO"` | World name, sent to the client in the world list. The 2016 client does not show it: each row of its world list is a picture from the client's own files, picked by the row (the first world shows "Enid"). The client only writes the name to its log `%APPDATA%\FiestaOnline\ConnectWorldInfo.txt` when the world is selected. |
 | `database.url` | string | see description | Database URL: `sqlite:<path>` or `postgres://user:password@host/database`. Default: the SQLite file `pinata.db` in `data_dir`. SQLite works only in single-node mode; in multi-node mode the node does not start without a `postgres://` URL. The environment variable `DATABASE_URL` overrides it. |
 | `cluster.nodes` | list of strings | `[]` | Names of the other nodes (`name@host`). Empty means single-node mode. |
 | `connection.max_packets_per_second` | integer, 1 or more | `100` | A client that sends more packets than this within one second is disconnected. |

@@ -55,6 +55,10 @@ A wrong `client_version_key` gets `0x0C66` (one byte, 0) and the socket is close
 
 A packet of the wrong size, for example a `0x0C5A` that is not 0x13E bytes long, never reaches the handler: `Net.Connection` drops it and the step stays, as in the original. An opcode without a packet definition closes the socket ([`processes.md`](../processes.md)).
 
+## World name
+
+Each world of `0x0C0A` / `0x0C1C` carries `settings.world` `name`, but the 2016 client does not show it. Its world list draws every row as a cell of the texture `\Account\LoginServerList.nif`, picked by the row's position (`WorldSelectWin::UpdatePageState` @ FUN_00475970), so the first world reads "Enid" whatever the name is. The client uses the name only when the world is selected: it writes `WorldName [ <name> ]` to `%APPDATA%\FiestaOnline\ConnectWorldInfo.txt`. Evidence: `docs/protocol/capture-validation.md` §3.2 (`0x0C0A` row).
+
 ## World status
 
 The status byte of a world: 0 when its `WorldManager.World` process is not registered under `{:global, {:world_manager, n}}`; else from the player count (size of the `:pg` group `{:players, world_id}`) against 2500 (`Login.WorldStatus`).
