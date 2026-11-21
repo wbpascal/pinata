@@ -14,6 +14,7 @@ Geometry (`BlockInfo/`, `AreaBMP/`) is not loaded with the tables. A field map's
 
 ## Consequences
 
+- Every lookup of a data file by a name taken from a table, a script or the code ignores letter case. The original runs on Windows and its data relies on that: the map `Linkfield01` has the geometry file `linkfield01.shbd`, and the zone asks for `UpGradeInfo.shn` while the file is `UpgradeInfo.shn`.
 - A typo in a data file stops the node at start, not a player hours later. In return, every data change costs a restart; hot reloading is a separate investigation ([issue 23](https://github.com/wbpascal/pinata/issues/23)).
 - The loader computes the MD5 of each of the 49 checksummed client data tables from the raw file. The 14 `View/` tables are hashed and never parsed. Whether a client mismatch is enforced is not decided here.
 - In multi-node mode every node hashes its whole data directory, and WorldManager refuses a Zone node whose digest differs. Single-node mode skips this.
