@@ -73,6 +73,30 @@ _Avoid_: pending link, link reserve
 **Map-login ticket**:
 The single-use permission for one character to enter one map instance, issued by WorldManager at character select and at every map change.
 
+**Session**:
+An account's connection to a world, from world login until it ends. One account has at most one.
+_Avoid_: connection (alone), client, login
+
+**In the world**:
+The state of a session whose character is on a map instance or between two. A session on the character list is not in the world.
+_Avoid_: in game, online, playing
+
+**Leave**:
+The one way a character stops being in the world, whatever the cause: it is saved and removed from its map instance.
+_Avoid_: logout (for the general case), disconnect, exit
+
+**Session loss**:
+A session that ends without the client asking for it: connection cut, client killed, part lost.
+_Avoid_: disconnect, timeout, drop
+
+**Kick**:
+A leave the server forces on a session: by a GM command, a second login of the account, or a failed check.
+_Avoid_: ban, cut, kickoff
+
+**Auto-save**:
+The save of a character in the world that happens on a fixed period, without any action of the player.
+_Avoid_: periodic save, whole save
+
 **Handle**:
 The 16-bit number by which the client knows an object on its map. Unique within one map instance; its range tells the object type.
 _Avoid_: object id, entity id
