@@ -73,6 +73,13 @@ defmodule Proto.RoundtripTest.Fixtures.AvatarEraseReq do
   field :slot, :u8
 end
 
+defmodule Proto.RoundtripTest.Fixtures.Wide do
+  use Proto.Packet
+  field :big, :u64
+  field :small, :i8
+  field :text, {:counted, :u8}
+end
+
 defmodule Proto.RoundtripTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
@@ -145,8 +152,19 @@ defmodule Proto.RoundtripTest do
     end
   end
 
+  test "u64, i8 and counted bytes" do
+    p = %F.Wide{big: 0x0102030405060708, small: -2, text: "From"}
+    bytes = <<8, 7, 6, 5, 4, 3, 2, 1, 0xFE, 4, "From">>
+    assert F.Wide.encode(p) == bytes
+    assert F.Wide.decode(bytes) == {:ok, p}
+    assert F.Wide.decode(<<0::64, 0, 5, "From">>) == {:error, :bad_size}
+    assert F.Wide.decode(<<0::64, 0, 0>>) == {:ok, %F.Wide{big: 0, small: 0, text: ""}}
+    assert F.Wide.__packet__().fields == [big: "u64", small: "i8", text: "bytes[count: u8]"]
+  end
+
   property "decode of random binaries never raises" do
-    check all mod <- StreamData.member_of([F.World, F.Avatar | Map.values(@modules)]), bin <- StreamData.binary() do
+    check all mod <- StreamData.member_of([F.World, F.Avatar, F.Wide | Map.values(@modules)]),
+              bin <- StreamData.binary() do
       result = mod.decode(bin)
       assert match?({:ok, %^mod{}}, result) or result == {:error, :bad_size}
     end

@@ -101,10 +101,18 @@ defmodule EnterWorldTest do
     {TestClient.recv_raw(zone), zone}
   end
 
-  # sends 0x0804 and expects 0x0805 as the next packet: no 0x1804 came and the connection is open
+  # sends 0x0804 and reads the map-entry burst up to the 0x0805: no 0x1804 came and the connection is open
   defp accepted(body) do
     zone = TestPorts.endpoint(:zone) |> connect() |> send!(body) |> send!(<<0x04, 0x08>>)
-    recv!(zone, <<0x05, 0x08>>)
+    until_heartbeat(zone)
+  end
+
+  defp until_heartbeat(zone) do
+    case TestClient.recv_raw(zone) do
+      {:ok, <<0x05, 0x08>>, zone} -> zone
+      {:ok, <<0x04, 0x18, _::binary>> = body, _zone} -> flunk("map login refused: #{inspect(body)}")
+      {:ok, _body, zone} -> until_heartbeat(zone)
+    end
   end
 
   defp refused(body, code) do

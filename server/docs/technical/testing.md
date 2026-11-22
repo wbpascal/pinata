@@ -129,21 +129,22 @@ Only the tick of a map instance is scheduled through `Clock.send_after/3`; heart
 
 **Two clients.** Connections named `zone#1` and `zone#2` are two clients on the Zone listener; they share the handle scope of a map (see Handle map).
 
-**Stop point.** Packets with an index above `stop:` are not played. Each Replay test plays everything of its capture that milestone 1 covers:
+**Stop point.** Packets with an index above `stop:` are not played. Each Replay test plays everything of its capture that the milestones built so far cover:
 
 | Capture | Played | Not played yet |
 |---|---|---|
-| `login-logout` | `:end` | – |
+| `login-logout` | `:end` (the capture never enters the world: no map entry) | – |
 | `login-errors` | `:end`, with the second login that cuts the first (`0x0C17`) | – |
 | `create-char` | `:end`, creation and delete included | – |
 | `37_login-heartbeat-refusals-delete` | 1 to 70: both creations (indices 31/32 and 39/40), the delete between them and the way back to the world list. Then one connection per test: `login#3` (71 to 90) with the world closed, `login#4` (91 to 108) with the world full, `login#5` (109 to 115) with account B blocked, `login#6` (116 to 122) with account B not login-able | – |
 | `37b_char-select-rename-refusals` | 1 to 26: the character list, the refused create (`0x1404 {0x181}`) and five heartbeats | from 27 on: rename (`0x140F`), character login and the Zone connections, milestone 2 |
+| `idle_in_world` (`milestone2_test.exs`) | 1 to 140: login, character login, the map login `0x1801`, both map-entry bursts, the WorldManager burst and the login-time requests up to `0x3021` | from 141: mob moves (milestone 4), the reset of abstate 291 with its `0x1035` at 145 and 146 (milestone 4), the expiry of the pick-up mini-mon at 161 to 168 (milestones 3 and 9), the logout from 174 (issue 111) |
 
 `milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay). The world is closed by stopping its WorldManager process and full with 2375 players in the `:pg` group; the flags of account B are set through `before:`. The `37b` test adds three masks of its own: the rename-right fields of `0x0C14` (`need_change_id`, `change_id_init`, `change_id_row_no`), because the rename right of `Test2` belongs to milestone 2.
 
 `0x140F` and `0xB409` of `37b` are not replayed (the fixed P02-B42 and the deferred rename right change the answers). `test/world_manager/character_rename_test.exs` covers them with the request bytes of the transcript.
 
-**Timer-driven opcodes.** `0x0804` (heartbeat) and `0x080E` (game time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent, so the `0x080E` answer to the client's `0x080D` is not compared by a replay; `test/world_manager/character_list_test.exs` checks its bytes.
+**Timer-driven opcodes.** `0x0804` (heartbeat), `0x080E` (game time) and `0x0849` (server time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent, so the `0x080E` answer to the client's `0x080D` is not compared by a replay; `test/world_manager/character_list_test.exs` checks its bytes. The original sends `0x0849` every full minute; the capture shows it 4 ms before the minute, so no injected clock can place it. The rebuild sends only its first-join copy in the WorldManager burst, which `test/map_entry_test.exs` and `test/world_manager/server_time_test.exs` check.
 
 **Extra packets.** At the end the harness sends a client heartbeat on every open connection and reads until the `0x0805` answer. Anything else read before it is an extra packet. A connection the server closed has no extras.
 
@@ -161,7 +162,7 @@ The opcode name comes from `docs/protocol/opcodes.json`. The field lines need a 
 
 ## Masks
 
-A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, the payload byte of `0x0C66` L00-B1, the `ip` of `0x0C0C`, and `delinfo` (P02-B1) and `kq_date_unused` (P02-B7) of the AVATAR in `0x0C14`, `kq_date_unused` of the AVATAR in `0x1406`); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
+A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, the payload byte of `0x0C66` L00-B1, the `ip` of `0x0C0C`, and `delinfo` (P02-B1) and `kq_date_unused` (P02-B7) of the AVATAR in `0x0C14`, `kq_date_unused` of the AVATAR in `0x1406`, the `chrregnum` of `0x10E4`, `0x10E7` and `0x10EA` (Z18-B19), the `slot` of `0x1C05` (Z18-B10), the byte of `0x182A` (P02-B2), the `stray` byte of `0x302D` (P02-B3) and the first byte of `0x2011` (Z09-B54)); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
 
 Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name, offset, size, sub}` per field (offset in the payload; for an array the offset of its count and size `nil`). A `bits` field masks its whole byte.
 
@@ -178,6 +179,31 @@ A Deferral is a part of a capture the rebuild does not reproduce yet; the replay
 
 The global list is `Replay.Deferrals.global/0` (empty until the issue that defines a packet adds its entry); a test adds its own with `deferrals:`. Packet indices stay as they are, so failures name the line of the Transcript file.
 
+**Deferrals of `idle_in_world`** (`test/replay/milestone2_test.exs`; packets nobody defines yet get stand-in modules with `opcode/0` at the top of the file):
+
+| Entry | Milestone | Reason |
+|---|---|---|
+| `{:absent, …}` `0x7032`, `0x7033`, `0x7034` | 2 | the option pushes after `0x1003`: issue 132 decides |
+| `{:payload, CharClientBaseCmd, :fame}`, `:stat_distribute` | 4 | no column yet |
+| `{:payload, CharClientBaseCmd, :admin_level}` | 2 | the admin level column is issue 116 |
+| `{:payload, …, :all}` `0x10CE`, `0x441E` | 5 | quests |
+| `{:payload, …, :all}` `0x103D`, `0x103E` | 4 | skills, passives |
+| `{:payload, CharClientItemCmd, :all}` | 3 | items |
+| `{:payload, CharClientChartitleCmd, :all}` | 6 | titles |
+| `{:payload, CharClientChargedbuffCmd, :all}` | 9 | charged buffs |
+| `{:payload, MapLoginAck, :param}` | 4 | parameters |
+| `{:unsent, 44, [46]}` (`0x7C06`) | 2 | order race of the original: its `0x7C07` came between `0x7005` and `0x700D`; checked by `test/map_entry_test.exs`. No milestone removes it |
+| `{:payload, …, :all}` `0x7005`, `0x700D` | 6 | options |
+| `{:unsent, 52, [127, 128, 129, 130]}` (`0x581B`) | 10 | order race (the original's `0x581C` came after the WorldManager burst) and the Kingdom Quest list `0x581D`; `0x581C` is checked by `test/map_entry_test.exs` |
+| `{:absent, …}` `0x1C09` | 2 | sight: issue 109 (NPCs), then milestone 4 (mobs) |
+| `{:absent, …}` `0x242A`, `0x2429`, `0x1C18` | 4 | abstates |
+| `{:payload, CharStatRemainpointCmd, :remain}` | 4 | stat points |
+| `{:absent, ActNoticeCmd}`, `{:absent, CharAdminLevelInformCmd}` | 2 | the "From" notice and `0x10C6` need an admin level; "Admin level is 100" answers `&adminlevel`: issue 116 |
+| `{:absent, …}` `0x10BD` | 9 | auto-pick |
+| `{:payload, CharChangeparamchangeCmd, [:params, :value]}` | 4 | parameters |
+| `{:payload, KqJoiningAlarmList, :all}` | 10 | Kingdom Quest |
+| `{:payload, CharClientNewbieGuideViewListCmd, :all}` | 11 | newbie guide |
+
 **Monsters.** `appear` (`{module, handle_path, mob_id_path}`, `0x1C08`) names the packets that show an object: its mob id (little-endian) goes to `npc?.(map_name, mob_id)`; an NPC stays, anything else is taken out and its handle is excluded. `lists` (`{module, array, handle_field, mob_id_field}`, `0x1C09`) does the same per element: the NPC elements stay and the count is rewritten; a list left with no element is taken out. `gone` (`0x1C0E`) of an excluded handle is taken out and ends the exclusion. `about` (`{module, handle_path}`) names the packets of either direction that carry a handle: one with an excluded handle is taken out. The excluded handles are kept per connection (each client gets its own appear and `gone`) and are cleared when the map of the connection changes.
 
 ## Replay cuts
@@ -186,13 +212,13 @@ The global list is `Replay.Deferrals.global/0` (empty until the issue that defin
 
 ## Handle map
 
-A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list: the login token (`:login_token`, `0x0C34` and `0x0C37`), the world key (`:world_key`: `validate` of `0x0C0C` and of the client's `0x0C0F`, so the client logs in to WorldManager with the key of this run; on a refusal the rebuild's zero key is bound to the uninitialised bytes of the capture, P02-B23) the `worldmanager` session handle of `0x0C14` (`:wm_session`) and the `chrregnum` of the AVATAR in `0x1406` (`:character`, the id comes from the database sequence). `TestClock.local_time/1` is UTC+1, the zone of all captures. `TestClock` also keeps timers: `Clock.send_after/3` stores one, and `TestClock.set/1` fires those that fall due, in due order, each one handled by its receiver before the next (a receiver that schedules a new timer while handling one is seen by the same loop).
+A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list: the login token (`:login_token`, `0x0C34` and `0x0C37`), the world key (`:world_key`: `validate` of `0x0C0C` and of the client's `0x0C0F`, so the client logs in to WorldManager with the key of this run; on a refusal the rebuild's zero key is bound to the uninitialised bytes of the capture, P02-B23) the `worldmanager` session handle of `0x0C14` and the `wm_handle` the client sends back in `0x1801` (`:wm_session`), the object handle of `0x1802` and of the briefs `0x1C02` to `0x1C05` (`:object`) and the `chrregnum` of the AVATAR in `0x1406` (`:character`, the id comes from the database sequence). `TestClock.local_time/1` is UTC+1, the zone of all captures. `TestClock` also keeps timers: `Clock.send_after/3` stores one, and `TestClock.set/1` fires those that fall due, in due order, each one handled by its receiver before the next (a receiver that schedules a new timer while handling one is seen by the same loop).
 
-The namespace `:object` is bound per map: the map of a connection is the captured value of a map name field (`Replay.Masks.map_names/0` plus `map_names:`; a trailing NUL is trimmed; `nil` before the first one), and every other namespace is global. Connections on the same map share one scope (two clients in sight of each other see the same objects), connections on different maps do not. `0xFFFF` in a 2-byte `:object` field means "no object": it is not bound on either side, a captured `ffff` must be received as `ffff` (else a `:handle` failure), and a client `ffff` is sent as it is.
+The namespace `:object` is bound per map: the map of a connection is the captured value of a map name field (`Replay.Masks.map_names/0`, which holds the `map` of `0x1038`, plus `map_names:`; a trailing NUL is trimmed; `nil` before the first one), and every other namespace is global. Connections on the same map share one scope (two clients in sight of each other see the same objects), connections on different maps do not. `0xFFFF` in a 2-byte `:object` field means "no object": it is not bound on either side, a captured `ffff` must be received as `ffff` (else a `:handle` failure), and a client `ffff` is sent as it is.
 
 ## Setup functions
 
-`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture, `login_heartbeat_refusals_delete/0` the characters "Test1235" and "Test2" (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`); later issues add more.
+`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture, `login_heartbeat_refusals_delete/0` the characters "Test1235" and "Test2" (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`), `idle_in_world/0` "Test1235" with the stored values of the captured `0x1038`; later issues add more.
 
 ## Topology
 

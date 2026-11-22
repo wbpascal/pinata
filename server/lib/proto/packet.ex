@@ -3,19 +3,20 @@ defmodule Proto.Packet do
   Declarative packet definitions (ADR 0007): a small DSL that expands to struct + codec.
 
       use Proto.Packet, opcode: 0x0C0A            # opcode is omitted for nested structs
-      field :seed, :u16                           # :u8 :u16 :u32 :i16 :i32
+      field :seed, :u16                           # :u8 :u16 :u32 :u64 :i8 :i16 :i32
       field :name, {:char, 20}                    # decoded up to the first NUL, encoded zero-padded
       field :raw, {:bytes, 5}                     # untouched binary
       field :equip, {:u16s, 20}                   # list of integers
+      field :text, {:counted, :u8}                # u8 length, then that many bytes; must be the last entry
       field :avatar, MyApp.Avatar                 # nested struct (any module using this DSL)
       bits [gender: 1, chrclass: 5, race: 2]      # one byte, most significant bit first
       array :worlds, MyApp.World, count: :u8      # must be the last entry
 
   Rules: a char field is cut at its first NUL and zero-padded on encode; lengths are strict, any other size
-  gives `{:error, :bad_size}`; an array count is not a struct field.
+  gives `{:error, :bad_size}`; an array count and the length of a counted field are not struct fields.
 
   `__packet__/0` has `layout`: `{name, offset, size, sub}` per key (byte offset in the payload; `size` nil and `offset`
-  of the count for an array; `sub` is nil, a nested module or `{:array, module, count_bytes}`), used by the replay masks.
+  of the count for an array or a counted field; `sub` is nil, a nested module or `{:array, module, count_bytes}`), used by the replay masks.
 
   The decode is one function head with a literal binary pattern.
   """
@@ -35,7 +36,7 @@ defmodule Proto.Packet do
   defmacro array(name, mod, opts),
     do: quote(do: @proto_fields({:array, unquote(name), unquote(mod), unquote(opts[:count])}))
 
-  @ints %{u8: {8, :u}, u16: {16, :u}, u32: {32, :u}, i16: {16, :s}, i32: {32, :s}}
+  @ints %{u8: {8, :u}, u16: {16, :u}, u32: {32, :u}, u64: {64, :u}, i8: {8, :s}, i16: {16, :s}, i32: {32, :s}}
 
   # an int segment: `var::little-16` or `var::little-signed-16`
   defp int_seg(v, w, :u), do: {:"::", [], [v, quote(do: little - unquote(w))]}
@@ -105,6 +106,23 @@ defmodule Proto.Packet do
       size: n * 2,
       sub: nil,
       doc: [{name, "u16[#{n}]"}]
+    }
+  end
+
+  defp entry({:field, name, {:counted, count_type}}) do
+    {w, :u} = Map.fetch!(@ints, count_type)
+    n = Macro.var(name, :count)
+    v = Macro.var(name, nil)
+
+    %{
+      keys: [{name, quote(do: binary())}],
+      pat: [int_seg(n, w, :u), {:"::", [], [v, quote(do: binary - size(unquote(n)))]}],
+      pre: [],
+      vals: [{name, v}],
+      enc: [int_seg(quote(do: byte_size(unquote(v))), w, :u), bin_seg(v)],
+      size: nil,
+      sub: nil,
+      doc: [{name, "bytes[count: #{count_type}]"}]
     }
   end
 

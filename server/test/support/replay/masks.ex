@@ -40,7 +40,29 @@ defmodule Replay.Masks do
            "uninitialised memory (P02-B7): the two bits above the Kingdom Quest date keep old buffer bits, the rebuild sends 0; the mask covers the whole byte, so the seconds are not compared"},
           {Proto.Packets.AvatarCreatesuccAck, [:avatars, :kq_date_unused],
            "uninitialised memory (P02-B7): the two bits above the creation date keep old buffer bits, the rebuild sends 0; the mask covers the whole byte, so the seconds are not compared (the original stores the database time, in capture 37 one second after the request)"}
+        ] ++
+        card_collection_masks() ++
+        [
+          {Proto.Packets.BriefinfoChangeweaponCmd, :slot,
+           "uninitialised memory (Z18-B10): the original never writes the slot of 0x1C05, the rebuild sends the slot"},
+          {Proto.Packets.MapLinkendClientCmd, :unused,
+           "uninitialised memory (P02-B2): the original never writes this byte, the rebuild sends 0"},
+          {Proto.Packets.ItemRewardinvenopenAck, :stray,
+           "uninitialised memory (P02-B3): the original adds one unwritten byte, the rebuild sends 0"},
+          {Proto.Packets.ActNoticeCmd, :unused,
+           "uninitialised memory (Z09-B54): the original never writes the first byte, the rebuild sends 0"}
         ]
+
+  defp card_collection_masks do
+    for mod <- [
+          Proto.Packets.CharClientCardcollectCmd,
+          Proto.Packets.CharClientCardcollectBookmarkCmd,
+          Proto.Packets.CharClientCardcollectRewardCmd
+        ] do
+      {mod, :chrregnum,
+       "uninitialised memory (Z18-B19): the original never writes the character number of the card packets, the rebuild sends 0"}
+    end
+  end
 
   defp delinfo_masks do
     for field <- [:month, :day, :hour, :min] do
@@ -54,24 +76,38 @@ defmodule Replay.Masks do
   @doc "Handles that apply to every replay."
   @spec handles() :: [handle()]
   def handles,
-    do: [
-      {Proto.Packets.UserWillWorldSelectAck, :otp, :login_token,
-       "session value: the login token is drawn at random per request"},
-      {Proto.Packets.UserWorldselectAck, :validate, :world_key,
-       "session value: the key is drawn at random per select and the client sends it back in 0x0C0F; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"},
-      {Proto.Packets.UserLoginworldReq, :validate, :world_key, "session value: the key of 0x0C0C"},
-      {Proto.Packets.UserLoginWithOtpReq, :otp, :login_token,
-       "session value: the client sends back the token of 0x0C34"},
-      {Proto.Packets.UserLoginworldAck, :worldmanager, :wm_session,
-       "session handle: the original takes it from its session pool, the rebuild counts per world"},
-      {Proto.Packets.AvatarCreatesuccAck, [:avatars, :chrregnum], :character,
-       "identifier: the character number comes from the database sequence"}
-    ]
+    do:
+      [
+        {Proto.Packets.UserWillWorldSelectAck, :otp, :login_token,
+         "session value: the login token is drawn at random per request"},
+        {Proto.Packets.UserWorldselectAck, :validate, :world_key,
+         "session value: the key is drawn at random per select and the client sends it back in 0x0C0F; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"},
+        {Proto.Packets.UserLoginworldReq, :validate, :world_key, "session value: the key of 0x0C0C"},
+        {Proto.Packets.UserLoginWithOtpReq, :otp, :login_token,
+         "session value: the client sends back the token of 0x0C34"},
+        {Proto.Packets.UserLoginworldAck, :worldmanager, :wm_session,
+         "session handle: the original takes it from its session pool, the rebuild counts per world"},
+        {Proto.Packets.AvatarCreatesuccAck, [:avatars, :chrregnum], :character,
+         "identifier: the character number comes from the database sequence"},
+        {Proto.Packets.MapLoginReq, :wm_handle, :wm_session,
+         "session handle: the client sends back the handle of 0x0C14"},
+        {Proto.Packets.MapLoginAck, :handle, :object, "object handle: the map instance gives the next free handle"}
+      ] ++ brief_handles()
 
-  # The Zone entry packet with the captured map name is added by the issue that defines it.
+  defp brief_handles do
+    for mod <- [
+          Proto.Packets.BriefinfoUnequipCmd,
+          Proto.Packets.BriefinfoChangedecorateCmd,
+          Proto.Packets.BriefinfoChangeupgradeCmd,
+          Proto.Packets.BriefinfoChangeweaponCmd
+        ] do
+      {mod, :handle, :object, "object handle: the player's own handle of 0x1802"}
+    end
+  end
+
   @doc "The server packets whose field is the map name a connection is on."
   @spec map_names() :: [{module(), path()}]
-  def map_names, do: []
+  def map_names, do: [{Proto.Packets.CharClientBaseCmd, :map}]
 
   @doc "Raises `ArgumentError` for an empty reason or a first path element that is not a field of the packet."
   @spec validate!([mask() | handle()]) :: :ok

@@ -20,6 +20,12 @@ defmodule WorldManager.Handler do
   ticket with `handle_call/2` on `0x1801`; from then on the session monitors the Zone connection (flow:
   `docs/technical/flows/enter-world.md`).
 
+  After a map login the client asks for its options and prison state: `0x7004`, `0x700C` and `0x7C06` get the empty
+  answers of `WorldManager.Placeholders`; the first `0x581B` gets `0x581C` with the server time (the Kingdom Quest
+  list `0x581D` is milestone 10), later ones nothing. When the Zone reports `0x1803` (`{:cluster, :map_login_done}`)
+  the session sends its burst: `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9` (placeholders), `0x0849` and `0x182A`
+  (flow: `docs/technical/flows/map-entry.md`).
+
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
   `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
   with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
@@ -38,10 +44,17 @@ defmodule WorldManager.Handler do
   alias Proto.Packets.CharLoginAck
   alias Proto.Packets.CharLoginfailAck
   alias Proto.Packets.CharLoginReq
+  alias Proto.Packets.CharOptionGetShortcutsizeReq
+  alias Proto.Packets.CharOptionGetWindowposReq
   alias Proto.Packets.CharTutorialPopupAck
   alias Proto.Packets.CharTutorialPopupReq
   alias Proto.Packets.MiscGametimeAck
+  alias Proto.Packets.KqListRefreshReq
+  alias Proto.Packets.KqListTimeAck
+  alias Proto.Packets.MapLinkendClientCmd
   alias Proto.Packets.MiscGametimeReq
+  alias Proto.Packets.MiscServerTimeNotifyCmd
+  alias Proto.Packets.PrisonGetReq
   alias Proto.Packets.UserAvatarListReq
   alias Proto.Packets.UserConnectcutCmd
   alias Proto.Packets.UserConnectionChangeCharIdAck
@@ -55,7 +68,8 @@ defmodule WorldManager.Handler do
 
   @enforce_keys [:worlds]
   defstruct [:worlds, :world_no, :handle] ++
-              [step: :login, user_no: :none, user_name: :none, tutorial: :none, reservation: :none, zone: :none]
+              [step: :login, user_no: :none, user_name: :none, tutorial: :none, reservation: :none, zone: :none] ++
+              [kq_time_sent?: false]
 
   @type reservation :: %{character_id: pos_integer(), name: binary(), map: String.t(), node: node()}
 
@@ -68,7 +82,8 @@ defmodule WorldManager.Handler do
           user_name: :none | String.t(),
           tutorial: :none | Persistence.character(),
           reservation: :none | reservation(),
-          zone: :none | pid()
+          zone: :none | pid(),
+          kq_time_sent?: boolean()
         }
 
   @impl Net.Handler
@@ -129,6 +144,21 @@ defmodule WorldManager.Handler do
   def handle_packet(%__MODULE__{step: :open, user_no: user_no, tutorial: %{} = c} = state, %CharTutorialPopupAck{})
       when is_integer(user_no),
       do: {%{state | tutorial: :none}, [{:perform, {:skip_tutorial, state.world_no, user_no, c}}]}
+
+  def handle_packet(%__MODULE__{step: :open} = state, %CharOptionGetShortcutsizeReq{}),
+    do: {state, [{:send, WorldManager.Placeholders.shortcut_size()}]}
+
+  def handle_packet(%__MODULE__{step: :open} = state, %CharOptionGetWindowposReq{}),
+    do: {state, [{:send, WorldManager.Placeholders.window_pos()}]}
+
+  def handle_packet(%__MODULE__{step: :open} = state, %PrisonGetReq{}),
+    do: {state, [{:send, WorldManager.Placeholders.prison()}]}
+
+  # Only the first 0x581B of a session gets the server time; the Kingdom Quest list 0x581D is milestone 10.
+  def handle_packet(%__MODULE__{step: :open, kq_time_sent?: false} = state, %KqListRefreshReq{}),
+    do: {%{state | kq_time_sent?: true}, [{:perform, :kq_list_time}]}
+
+  def handle_packet(%__MODULE__{step: :open} = state, %KqListRefreshReq{}), do: {state, []}
 
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
@@ -228,6 +258,29 @@ defmodule WorldManager.Handler do
   def handle_info(%__MODULE__{zone: pid} = state, {:down, pid}), do: {%{state | zone: :none}, []}
   def handle_info(state, {:down, _other}), do: {state, []}
 
+  def handle_info(state, {:cluster, :map_login_done}), do: {state, [{:perform, :map_login_done}]}
+
+  def handle_info(state, {:kq_list_time, unix, local}),
+    do: {state, [{:send, %KqListTimeAck{server_time: unix, tm: WorldManager.ServerTime.tm(local)}}]}
+
+  # A map change (issue 112) repeats only 0x5826 and 0x182A.
+  def handle_info(state, {:map_login_done, unix, local}),
+    do:
+      {state,
+       [
+         {:send, WorldManager.Placeholders.guild_academy()},
+         {:send, WorldManager.Placeholders.guild()},
+         {:send, WorldManager.Placeholders.holy_promise()},
+         {:send, WorldManager.Placeholders.kq_joining_alarm()},
+         {:send, WorldManager.Placeholders.newbie_guide()},
+         {:send,
+          %MiscServerTimeNotifyCmd{
+            tm: WorldManager.ServerTime.tm(local),
+            time_zone: WorldManager.ServerTime.time_zone(unix, local)
+          }},
+         {:send, %MapLinkendClientCmd{unused: 0}}
+       ]}
+
   def handle_info(state, {:cluster, :session_replaced}),
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, {:close, :info, "session replaced"}]}
 
@@ -318,6 +371,16 @@ defmodule WorldManager.Handler do
   def perform({:watch_zone, pid}) do
     _ = Process.monitor(pid)
     {:zone_connected, pid}
+  end
+
+  def perform(:kq_list_time) do
+    unix = Clock.system_time(:second)
+    {:kq_list_time, unix, Clock.local_time(unix)}
+  end
+
+  def perform(:map_login_done) do
+    unix = Clock.system_time(:second)
+    {:map_login_done, unix, Clock.local_time(unix)}
   end
 
   def perform(:game_time) do

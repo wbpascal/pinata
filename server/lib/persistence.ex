@@ -88,6 +88,32 @@ defmodule Persistence do
     :tutorial_step
   ]
 
+  @type loaded_character :: %{
+          id: pos_integer(),
+          slot: 0..5,
+          name: binary(),
+          level: pos_integer(),
+          exp: non_neg_integer(),
+          login_map: String.t(),
+          login_x: non_neg_integer(),
+          login_y: non_neg_integer(),
+          hp: non_neg_integer(),
+          sp: non_neg_integer(),
+          money: non_neg_integer(),
+          hp_stones: non_neg_integer(),
+          sp_stones: non_neg_integer(),
+          race: non_neg_integer(),
+          class: non_neg_integer(),
+          gender: 0..1,
+          hair: non_neg_integer(),
+          hair_color: non_neg_integer(),
+          face: non_neg_integer(),
+          equipment: [equipped()]
+        }
+
+  @loaded_keys [:id, :slot, :name, :level, :exp, :login_map, :login_x, :login_y, :hp, :sp, :money] ++
+                 [:hp_stones, :sp_stones, :race, :class, :gender, :hair, :hair_color, :face]
+
   @doc "The characters of an account in a world, ordered by slot, each with its equipped items."
   @spec list_characters(non_neg_integer(), pos_integer()) :: {:ok, [character()]} | {:error, :database}
   def list_characters(world_id, user_no) do
@@ -108,6 +134,30 @@ defmodule Persistence do
         |> Enum.group_by(& &1.character_id, &Map.take(&1, [:slot, :item_id, :upgrade]))
 
       {:ok, Enum.map(characters, &(&1 |> Map.take(@character_keys) |> Map.put(:equipment, Map.get(items, &1.id, []))))}
+    end)
+  end
+
+  @doc "The character of the map login (Zone): its stored state and its equipped items, ordered by slot."
+  @spec load_character(non_neg_integer(), pos_integer(), pos_integer()) ::
+          {:ok, loaded_character()} | {:error, :not_found | :database}
+  def load_character(world_id, account_id, id) do
+    repo = Repo.active()
+
+    transact(repo, "load_character", fn ->
+      query = from(c in Character, where: c.world_id == ^world_id and c.account_id == ^account_id and c.id == ^id)
+
+      case repo.one(query) do
+        nil ->
+          {:error, :not_found}
+
+        character ->
+          equipment =
+            from(i in Item, where: i.character_id == ^id and i.storage == @equipped, order_by: i.slot)
+            |> repo.all()
+            |> Enum.map(&Map.take(&1, [:slot, :item_id, :upgrade]))
+
+          {:ok, character |> Map.take(@loaded_keys) |> Map.put(:equipment, equipment)}
+      end
     end)
   end
 

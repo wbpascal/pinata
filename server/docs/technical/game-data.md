@@ -126,11 +126,13 @@ Map tables, declared by `Zone` and read by the map instances, NPCs, gates, town 
 | `SpamerPenalty` | `shn/SpamerPenalty.shn` | `penalty_lv` | none |
 | `SpamerPenaltyRule` | `shn/SpamerPenaltyRule.shn` | row | none |
 
+`Zone` also reads `ItemInfo` (the schema above): the map entry shows each worn item by its `Class` (`Zone.MapEntry`, [`flows/map-entry.md`](flows/map-entry.md)). `ChrCommon` gives the move speeds (`WalkSpeed`, `RunSpeed`) and `FieldList.KQ` the map type of `0x1827`.
+
 `FieldList`, `ShineNPC` and `LinkTable` are keyed by row because no column is unique. None of the eight has references; `ShineNPC.Map` is deliberately not one (rows on maps that do not run exist). `GameData.plain_field_maps/0` returns the `FieldList` rows with `KQ = 0` and no sub-map range (`SubFrom` and `SubTo` are `-`), in file order: 88 of 153 rows in the 2016 data. `GameData.count/1` returns the number of rows of a table.
 
 ## Loading
 
-`GameData.load(data_dir, schemas, strict_references: boolean)` is called by `Pinata.Application` after the settings and before any supervisor. A part declares its tables in `game_data/0` (`Login` none, `WorldManager` the twelve above, `Zone` the eight map tables below); the application loads the union and the schemas they refer to. A missing data directory returns the error that names `mix pinata.import_data`. `GameData.Loader.parse/3` (pure) reads every table and returns **all** problems together; any problem stops the start:
+`GameData.load(data_dir, schemas, strict_references: boolean)` is called by `Pinata.Application` after the settings and before any supervisor. A part declares its tables in `game_data/0` (`Login` none, `WorldManager` the twelve above, `Zone` the eight map tables below and `ItemInfo`); the application loads the union and the schemas they refer to. A missing data directory returns the error that names `mix pinata.import_data`. `GameData.Loader.parse/3` (pure) reads every table and returns **all** problems together; any problem stops the start:
 
 | Problem | Message (starts with the file) |
 |---|---|

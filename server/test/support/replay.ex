@@ -40,8 +40,10 @@ defmodule Replay do
   alias Replay.Masks
   alias Replay.Transcript
 
-  # ADR 0008: heartbeat (0x0804) and game time (0x080E) are sent by timers, not by the replayed actions.
-  @timer_driven [0x0804, 0x080E]
+  # ADR 0008: heartbeat (0x0804) and game time (0x080E) are sent by timers, not by the replayed actions. The server
+  # time 0x0849 is sent every full minute; the capture shows it 4 ms before the minute, so no injected clock can place
+  # it. Its first-join copy in the WorldManager burst is checked by test/map_entry_test.exs.
+  @timer_driven [0x0804, 0x080E, 0x0849]
 
   @opcodes_path Path.expand("../../../docs/protocol/opcodes.json", __DIR__)
 
