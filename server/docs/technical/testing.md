@@ -40,7 +40,7 @@ python3 -I tools/protocol-re/pcap_decode.py --transcript server/test/replay/tran
 
 Converting an unchanged capture rewrites the file identically. A capture is refused (message on stderr, exit 1, no file written) when a client-facing stream has a gap, a brute-forced (unseeded) decrypt or a framing problem other than ignored retransmits.
 
-Before committing a transcript, review it for sensitive data: account names, password hashes, IP addresses, anything that looks like a real person, mail address or public host. The accounts in the five transcripts are `admin` and `testaccountB` (MD5 hashes of the test passwords), IPs are the private LAN addresses `172.16.42.214` and `172.16.42.15`.
+Before committing a transcript, review it for sensitive data: account names, password hashes, IP addresses, anything that looks like a real person, mail address or public host. The accounts in the eleven transcripts are `admin` and `testaccountB` (MD5 hashes of the test passwords), IPs are the private LAN addresses `172.16.42.214` (server) and `172.16.42.231`, `172.16.42.15`, `172.16.42.239`, `172.16.42.174` (clients).
 
 ### Transcripts in the repository
 
@@ -51,6 +51,14 @@ Before committing a transcript, review it for sensitive data: account names, pas
 | `26_11_15_create-char` | 30 | login 1, wm 1 | create a character, then delete it |
 | `26_11_15_37_login-heartbeat-refusals-delete` | 122 | login 6, wm 1 | login side: idle heartbeat, refusals, character delete |
 | `26_11_16_37b_char-select-rename-refusals` | 495 | login 3, wm 3, zone 5 | character-select paths: create error, rename, character login error, rename right |
+| `26_11_15_idle_in_world` | 208 | login 2, wm 1, zone 1 | enter the world and stand idle |
+| `26_11_15_walk-run-portals` | 1057 | login 1, wm 1, zone 6 | walk, run, town portal to other maps |
+| `26_11_15_14_second-client-in-sight` | 10954 | login 2, wm 2, zone 2 | two clients: B enters and leaves A's sight |
+| `26_11_16_38_session-loss-kicks-char-select` | 2271 | login 15, wm 12, zone 10 | session loss, kicks, back to character select |
+| `26_11_21_45_walk-sit-emote-stop-shout-whisper-cast-abort` | 1980 | login 2, wm 2, zone 2 | two clients: walk, sit, emote, stop, shout, whisper, cast abort |
+| `26_11_21_52_stale-tutorial-rename-kickout-shn` | 1149 | login 8, wm 8, zone 6 | stale tutorial state, rename, `&kickout`, changed `MapViewInfo.shn`; bytes for hand-written tests |
+
+In the two-client captures (scenarios 14, 45, 52) the connections are numbered in order of first appearance; in scenario 14 `login#1` / `wm#1` / `zone#1` are client A (`admin`) and `login#2` / `wm#2` / `zone#2` client B (`testaccountB`).
 
 ## Test code layout
 

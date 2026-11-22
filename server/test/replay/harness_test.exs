@@ -231,11 +231,15 @@ defmodule Replay.HarnessTest do
 
     counts =
       for name <- ~w(26_11_15_login-logout 26_11_15_login-errors 26_11_15_create-char
-                     26_11_15_37_login-heartbeat-refusals-delete 26_11_16_37b_char-select-rename-refusals) do
+                     26_11_15_37_login-heartbeat-refusals-delete 26_11_16_37b_char-select-rename-refusals
+                     26_11_15_idle_in_world 26_11_15_walk-run-portals 26_11_15_14_second-client-in-sight
+                     26_11_16_38_session-loss-kicks-char-select
+                     26_11_21_45_walk-sit-emote-stop-shout-whisper-cast-abort
+                     26_11_21_52_stale-tutorial-rename-kickout-shn) do
         "transcripts/#{name}.txt" |> Path.expand(__DIR__) |> Transcript.read!() |> Map.fetch!(:packets) |> length()
       end
 
-    assert counts == [26, 44, 30, 122, 495]
+    assert counts == [26, 44, 30, 122, 495, 208, 1057, 10_954, 2271, 1980, 1149]
   end
 
   test "test client" do
