@@ -12,12 +12,20 @@ defmodule ClockTest do
 
     @impl Clock.Source
     def local_time(_seconds), do: {{2026, 1, 1}, {0, 0, 0}}
+
+    @impl Clock.Source
+    def send_after(_pid, _message, _ms), do: :ok
   end
 
   test "reads the system clock by default" do
     assert is_integer(Clock.system_time(:millisecond))
     assert is_integer(Clock.monotonic_time(:millisecond))
     assert {{_, _, _}, {_, _, _}} = Clock.local_time(0)
+  end
+
+  test "the system source delivers a timer" do
+    assert :ok = Clock.send_after(self(), :ping, 0)
+    assert_receive :ping
   end
 
   test "reads the injected source" do

@@ -16,10 +16,10 @@ defmodule Pinata.Application do
         _ = :logger.update_handler_config(:default, :formatter, Logger.default_formatter())
         tables = settings.parts |> Enum.flat_map(&part(&1).game_data()) |> Enum.uniq()
 
-        case GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references) do
-          :ok ->
-            start_tree(settings)
-
+        with :ok <- GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references),
+             :ok <- check_maps(settings) do
+          start_tree(settings)
+        else
           {:error, problems} ->
             IO.puts(:stderr, Enum.join(["Invalid game data, the node does not start:" | problems], "\n  "))
             {:error, :invalid_game_data}
@@ -30,6 +30,8 @@ defmodule Pinata.Application do
         {:error, :invalid_settings}
     end
   end
+
+  defp check_maps(settings), do: if(:zone in settings.parts, do: Zone.check_maps(settings.data_dir), else: :ok)
 
   defp start_tree(settings) do
     always = [{Persistence.Supervisor, settings}, {Cluster.Root, settings}] ++ digest_check(settings)

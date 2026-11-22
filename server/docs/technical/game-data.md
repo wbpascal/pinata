@@ -21,7 +21,7 @@ One set of files per map, named after the map. All integers are little-endian `u
 
 | File | Maps (2016 data) | Content | Used by |
 |---|---|---|---|
-| `<map>.shbd` | 158, every map | Move block bitmap: `bytesPerRow, rows`, then `rows × bytesPerRow` bytes. A set bit is a cell a player cannot stand on. A position outside the map counts as blocked. | The move, stop and pull-back checks of a map instance. Required: a map without it stops the start-up (the map instance calls `BlockData.check/2`). |
+| `<map>.shbd` | 158, every map | Move block bitmap: `bytesPerRow, rows`, then `rows × bytesPerRow` bytes. A set bit is a cell a player cannot stand on. A position outside the map counts as blocked. | The move, stop and pull-back checks of a map instance. Required: a map without it stops the start-up (`Zone.check_maps/1` calls `BlockData.check/2` for every plain field map). |
 | `<map>.shab` | 8 | Attack block bitmap, same format. Cells that also block attacks and monster paths. | OR-ed into the move block bitmap at load. Read on its own by monster path finding and fear (milestone 4). |
 | `<map>.aid` | 23 | Named areas, no blocking: `n` (at most 256), then per area `char name[32], type`; type 0 is a circle (3 more values), type 1 a rectangle (5 more values, the last an angle in degrees). | Map scripts only. Not read yet. |
 | `<map>.sbi` | 32 | Door blocks: `n` (at most 31), then per door `char name[32], x0, y0, x1, y1` (cells; the width is a multiple of 8), `len, offset`; then for every door two images of `len` bytes at `offset`, the closed one first, the open one second. | Closing a door ORs its closed image into that rectangle of the move block bitmap, opening copies the open image over it. Not read yet. |
@@ -45,7 +45,7 @@ The shipped `.shbd` files hold every door open: 107 of the 128 door rectangles e
 | `<shab>: damaged block data (header <a> x <b>, <shbd> has <c> x <d>)` | `.shab` of other dimensions |
 
 - Queries (Z02 §2, Z09 §9.2): `blocked?/3` (`mbi_IsMoveBlock`, FUN_0049df70), `free_cell?/3` (`mbi_OccupCellCheck`, FUN_0049e230, radius 1: any of the 3 × 3 cells inside the map and free), `line_blocked?/4` (`sp_MovePathBlockCheck`, FUN_00456a70: `need` consecutive blocked inner steps, default 2, end points never tested). The cell of a coordinate is `div(band(v × 8, 0xFFFFFFFF), 50)` (the `u32` arithmetic of the original), so a negative coordinate is outside the map and outside counts as blocked. The original interpolates with x87 floats; the rebuild uses floats and `round/1`, which differ only on an exact .5 tie, by one unit.
-- No map instance calls it yet.
+- `Zone.MapInstance` loads the block data of its map at the first entry; `Zone.check_maps/1` checks the header of every plain field map at start-up.
 
 ## Import (`mix pinata.import_data <9Data folder> <new data directory>`)
 
@@ -122,7 +122,7 @@ Map tables, declared by `Zone` and read by the map instances, NPCs, gates, town 
 | `SpamerPenalty` | `shn/SpamerPenalty.shn` | `penalty_lv` | none |
 | `SpamerPenaltyRule` | `shn/SpamerPenaltyRule.shn` | row | none |
 
-`FieldList`, `ShineNPC` and `LinkTable` are keyed by row because no column is unique. None of the eight has references; `ShineNPC.Map` is deliberately not one (rows on maps that do not run exist). `GameData.plain_field_maps/0` returns the `FieldList` rows with `KQ = 0` and no sub-map range (`SubFrom` and `SubTo` are `-`), in file order: 88 of 153 rows in the 2016 data.
+`FieldList`, `ShineNPC` and `LinkTable` are keyed by row because no column is unique. None of the eight has references; `ShineNPC.Map` is deliberately not one (rows on maps that do not run exist). `GameData.plain_field_maps/0` returns the `FieldList` rows with `KQ = 0` and no sub-map range (`SubFrom` and `SubTo` are `-`), in file order: 88 of 153 rows in the 2016 data. `GameData.count/1` returns the number of rows of a table.
 
 ## Loading
 

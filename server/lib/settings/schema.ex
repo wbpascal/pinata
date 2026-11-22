@@ -15,7 +15,7 @@ defmodule Settings.Schema do
       type_doc: "string, at most 15 bytes",
       default: "127.0.0.1",
       doc:
-        "The address the client is told to connect to. Login sends it together with its own `world_manager.port` when a world is selected, so in multi-node mode set both on the Login node to where the WorldManager node is reached."
+        "The address the client is told to connect to. Login sends it together with its own `world_manager.port` when a world is selected, so in multi-node mode set both on the Login node to where the WorldManager node is reached. On a node with the Zone part it must be an IPv4 address in text form (`203.0.113.7`), not a host name: the Zone node reports it to WorldManager, which sends it to the client in a 16-byte field."
     ],
     client_version_key: [
       type: :string,

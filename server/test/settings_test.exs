@@ -9,6 +9,13 @@ defmodule SettingsTest do
     Settings.load(Map.merge(%{"PINATA_CONFIG" => path}, env))
   end
 
+  test "public_host must be an IPv4 address on a node with the Zone part", %{tmp_dir: tmp_dir} do
+    host = "public_host = \"example.org\"\n"
+    assert {:error, [<<"public_host: ", _::binary>>]} = load(tmp_dir, host)
+    assert {:ok, _} = load(tmp_dir, host, %{"PINATA_PARTS" => "login"})
+    assert {:ok, _} = load(tmp_dir, "public_host = \"203.0.113.7\"\n")
+  end
+
   test "defaults" do
     assert {:ok, settings} = Settings.load(%{})
 

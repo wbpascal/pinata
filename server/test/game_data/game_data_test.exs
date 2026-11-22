@@ -112,6 +112,7 @@ defmodule GameDataTest do
     maps = GameData.plain_field_maps()
     names = Enum.map(maps, & &1.map_id_client)
     assert length(maps) == 88
+    assert GameData.count(GameData.FieldList) == 153
     assert Enum.uniq(names) == names
     for name <- ["Linkfield01", "Linkfield02", "Wedding", "RouN"], do: assert(name in names)
     refute "GuildT01" in names

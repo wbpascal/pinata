@@ -11,4 +11,10 @@ defmodule Clock.System do
 
   @impl Clock.Source
   def local_time(seconds), do: :calendar.system_time_to_local_time(seconds, :second)
+
+  @impl Clock.Source
+  def send_after(pid, message, ms) do
+    _ = Process.send_after(pid, message, ms)
+    :ok
+  end
 end
