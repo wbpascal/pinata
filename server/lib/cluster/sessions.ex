@@ -57,6 +57,13 @@ defmodule Cluster.Sessions do
     end
   end
 
+  @doc "Tells the session process that its character has loaded the map (`0x1803`): it sends the WorldManager burst."
+  @spec map_login_done(pid()) :: :ok
+  def map_login_done(pid) do
+    send(pid, {:cluster, :map_login_done})
+    :ok
+  end
+
   defp ask(pid, request) do
     GenServer.call(pid, request)
   catch

@@ -27,6 +27,8 @@ When a Zone node is lost (monitor), each of its maps goes to the remaining Zone 
 
 `Cluster.Sessions.register_handle/1` puts the calling WorldManager session into the group `{:wm_handle, handle}` at world login. `Cluster.Sessions.redeem/2` is called by a Zone connection on `0x1801`: it calls every member with `{:cluster, {:redeem, name, node(), self()}}` (`handle_call/2` of the handler; an exit counts as no session). The first success returns `{:ok, session_pid, entry}`; otherwise the first refusal that is not `:no_session`, else `{:error, :no_session}`. A handle repeats after 65536 logins; the character name and the node decide. Flow: [`flows/enter-world.md`](flows/enter-world.md).
 
+`Cluster.Sessions.map_login_done/1` is sent by the Zone connection to the session after `0x1803` (`{:cluster, :map_login_done}`, a message, no reply); the session answers it with the WorldManager burst ([`flows/map-entry.md`](flows/map-entry.md)).
+
 ## Facades
 
 A part reaches another part only through a facade module of `Cluster` (never a direct call). `Cluster.WorldManager.join_zone/4` is a `GenServer.call` of `{:join_zone, zone, address, offered}`, described under "Map table". `Cluster.WorldManager.expect_login/2` is a `GenServer.call` of `{:expect_login, request}` to the `WorldManager.World` of the world; the process answers `:ok` and stores the reservation. It exits when the world is not registered. Flow: [`flows/world-select.md`](flows/world-select.md). `Cluster.Login.create_token/2` is a `GenServer.call` of `{:create_token, user_no, user_name}` to `Login.Tokens`; it returns `{:ok, token}` or `{:error, :pending}` and exits when Login is not registered. Flow: [`flows/return-to-world-list.md`](flows/return-to-world-list.md).

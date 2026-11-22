@@ -2,8 +2,10 @@ defmodule Net.Connection do
   @moduledoc """
   One process per client socket. It sends the seed, cuts frames, decrypts and decodes them, answers heartbeats,
   hands every other packet to the part handler and carries out the effects it returns (send, perform, log, close). A
-  packet of the wrong size is dropped. It closes the socket, without an error packet, on an unknown opcode, on
-  oversized frames and when a limit is exceeded. It knows its part (the label of the server log) and the peer address:
+  packet of the wrong size is dropped, and so is a packet whose opcode the original Zone or WorldManager knows
+  (`Proto.Opcodes`) but that has no packet module yet (one `debug` line; neither is a sign of life for the
+  heartbeat). It closes the socket, without an error packet, on any other unknown opcode, on oversized frames and
+  when a limit is exceeded. It knows its part (the label of the server log) and the peer address:
   every line it writes carries both, and both are Logger metadata (`part`, `peer`) of the process. Every close it
   decides on writes one line with the reason; a close by the client writes one `debug` line. The handling of each
   decoded packet is the telemetry span `[:pinata, :packet]` (`docs/technical/telemetry.md`).
@@ -140,10 +142,11 @@ defmodule Net.Connection do
       state = %{state | cipher: cipher}
 
       case Proto.decode(plain) do
-        # As the original: all three servers disconnect a client that sends an unregistered opcode.
+        # As the original: all three servers disconnect a client that sends an unregistered opcode. An opcode the
+        # original Zone or WorldManager registers but we do not build yet is dropped like a packet of the wrong size.
         {:error, :unknown_opcode} ->
           <<opcode::little-16, _::binary>> = plain
-          close(state, :info, "unknown opcode 0x" <> Integer.to_string(opcode, 16))
+          unknown_opcode(socket, opcode, state)
 
         # As the original's length checks (0x0C5A, 0x0C37): the packet is dropped, the connection goes on.
         # It counted for the packet rate and does not count as a sign of life for the heartbeat.
@@ -171,6 +174,17 @@ defmodule Net.Connection do
       {:close, state} -> {:close, state}
     end
   end
+
+  defp unknown_opcode(socket, opcode, state) do
+    if Proto.Opcodes.client?(state.part, opcode) do
+      log(state, :debug, "dropped a known but unbuilt packet 0x" <> hex4(opcode))
+      frames(socket, state)
+    else
+      close(state, :info, "unknown opcode 0x" <> Integer.to_string(opcode, 16))
+    end
+  end
+
+  defp hex4(opcode), do: opcode |> Integer.to_string(16) |> String.pad_leading(4, "0")
 
   defp count(state) do
     now = Clock.monotonic_time(:millisecond)

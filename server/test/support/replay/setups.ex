@@ -64,6 +64,28 @@ defmodule Replay.Setups do
     :ok
   end
 
+  @doc """
+  Setup of `re-data/captures/26_11_15_idle_in_world.md`. The account `admin` and the character `Test1235` with the
+  stored values the capture's 0x1038 shows (experience, position, HP, SP, money, stones).
+  """
+  @spec idle_in_world() :: :ok
+  def idle_in_world do
+    accounts()
+    |> test1235(%{
+      kq_x: 6477,
+      kq_y: 9844,
+      kq_date: ~U[2026-11-13 11:57:15Z],
+      exp: 10,
+      login_x: 6477,
+      login_y: 9844,
+      hp: 3043,
+      sp: 2851,
+      money: 99_999_634_524,
+      hp_stones: 386,
+      sp_stones: 364
+    })
+  end
+
   defp test2(account_id, attrs) do
     character =
       Factory.character(

@@ -92,7 +92,7 @@ defmodule GameDataTest do
 
   test "the tables of the Zone part load without warnings" do
     assert {:ok, tables, []} = GameData.Loader.parse(@dir, Zone.game_data(), true)
-    assert map_size(tables) == 8
+    assert map_size(tables) == 9
 
     counts = %{
       GameData.FieldList => 153,

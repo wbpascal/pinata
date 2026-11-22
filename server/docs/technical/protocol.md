@@ -21,12 +21,13 @@ Client to server only, over the whole body (opcode and payload), not the length 
 
 `use Proto.Packet, opcode: 0x....` (no opcode for a nested struct), then:
 
-- `field :name, :u8 | :u16 | :u32 | :i16 | :i32`
+- `field :name, :u8 | :u16 | :u32 | :u64 | :i8 | :i16 | :i32`
 - `field :name, {:char, n}`, `{:bytes, n}`, `{:u16s, n}`, or a nested struct module
+- `field :name, {:counted, :u8}`: a byte string after its u8 length; the last entry
 - `bits [a: 1, b: 5, c: 2]`: one byte, most significant bit first
 - `array :name, Module, count: :u8`: the last entry
 
-Rules: a `char[n]` is cut at its first NUL on decode and zero-padded on encode (bytes after the NUL are lost); lengths are strict, any other size is `:bad_size`; an array count is not a struct field. Field names are hand-picked snake_case, with the official name in a comment when it differs.
+Rules: a `char[n]` is cut at its first NUL on decode and zero-padded on encode (bytes after the NUL are lost); lengths are strict, any other size is `:bad_size`; an array count and the length of a counted field are not struct fields. Field names are hand-picked snake_case, with the official name in a comment when it differs.
 
 ## Adding a packet
 
@@ -38,3 +39,14 @@ Rules: a `char[n]` is cut at its first NUL on decode and zero-padded on encode (
 ## Results of `Proto.decode/1`
 
 `{:ok, struct}`, `{:error, :unknown_opcode}`, or `{:error, :bad_size}` (payload of the wrong size, or fewer than 2 bytes).
+
+## Known but unbuilt opcodes
+
+`Proto.Opcodes` lists the client opcodes of the protocol per part: the 245 that the original Zone registers a handler for and the 167 of the original WorldManager. `Net.Connection` drops a client packet whose opcode is in the list of its part but has no packet module (`:unknown_opcode`), with one `debug` line, and closes on any other unknown opcode; Login has no list. The lists are literal (the Docker build copies only `server/`) and were generated from the repository root with
+
+```bash
+jq -c '[.[] | select(any(.received_by[]?; startswith("zone:ShineObjectClass::ShinePlayer:"))) | .dept*1024+.cmd] | sort' docs/protocol/opcodes.json
+jq -c '[.[] | select(any(.received_by[]?; startswith("wm:CParserClient:"))) | .dept*1024+.cmd] | sort' docs/protocol/opcodes.json
+```
+
+`test/proto/opcodes_test.exs` checks them against the file.

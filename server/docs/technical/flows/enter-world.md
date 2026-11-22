@@ -55,7 +55,7 @@ sequenceDiagram
         else
             M-->>Z: entry (first entry); the ticket is used up
             Note over M,Z: monitor each other: the end of the Zone connection frees the session for a new 0x1001, the end of the session closes the Zone connection
-            Note over Z,I: hand-over to the map instance and the map-entry burst: issue 108
+            Note over Z,I: hand-over to the map instance and the map-entry burst: map-entry.md
         end
     end
 ```
@@ -107,7 +107,7 @@ The three WorldManager lines are written before their `0x1002` is sent. Telemetr
 
 ## Differences from the original
 
-No `0x104B` / `0x101C` round trip to the Character server and no `0x0C1A`. No `0x111D` (tutorial map). The WorldManager option pushes `0x7032` to `0x7034` after `0x1003` are not sent yet. An accepted `0x1801` sends nothing yet (issue 108).
+No `0x104B` / `0x101C` round trip to the Character server and no `0x0C1A`. No `0x111D` (tutorial map). The WorldManager option pushes `0x7032` to `0x7034` after `0x1003` are not sent yet. What an accepted `0x1801` sends: [`map-entry.md`](map-entry.md).
 
 ## Not checked
 

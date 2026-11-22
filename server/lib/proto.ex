@@ -6,7 +6,7 @@ defmodule Proto do
   `decode/1`. Send: `encode/1`, then `Proto.Framing.frame/1`.
   """
 
-  use Boundary, deps: [Clock, Random], exports: [Cipher, Framing, {Packets, []}]
+  use Boundary, deps: [Clock, Random], exports: [Cipher, Framing, Opcodes, {Packets, []}]
 
   @doc "Decodes one decrypted body: opcode u16 LE, then the payload."
   @spec decode(binary()) :: {:ok, struct()} | {:error, :unknown_opcode | :bad_size}

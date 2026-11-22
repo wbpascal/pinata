@@ -209,6 +209,72 @@ defmodule Persistence.CharactersTest do
     end
   end
 
+  describe "load_character/3" do
+    test "the stored values and the equipment in slot order", %{id: id} do
+      c =
+        Factory.character(id, %{
+          slot: 1,
+          name: "Load",
+          level: 7,
+          exp: 10,
+          login_x: 6477,
+          login_y: 9844,
+          hp: 52,
+          sp: 10,
+          money: 99_999_634_524,
+          hp_stones: 3,
+          sp_stones: 4,
+          race: 2,
+          class: 11,
+          gender: 1,
+          hair: 4,
+          hair_color: 5,
+          face: 6
+        })
+
+      Factory.item(c.id, 25, 30_817)
+      Factory.item(c.id, 10, 1250, 3)
+
+      assert {:ok, loaded} = Persistence.load_character(0, id, c.id)
+
+      assert loaded == %{
+               id: c.id,
+               slot: 1,
+               name: "Load",
+               level: 7,
+               exp: 10,
+               login_map: "RouN",
+               login_x: 6477,
+               login_y: 9844,
+               hp: 52,
+               sp: 10,
+               money: 99_999_634_524,
+               hp_stones: 3,
+               sp_stones: 4,
+               race: 2,
+               class: 11,
+               gender: 1,
+               hair: 4,
+               hair_color: 5,
+               face: 6,
+               equipment: [%{slot: 10, item_id: 1250, upgrade: 3}, %{slot: 25, item_id: 30_817, upgrade: 0}]
+             }
+    end
+
+    test "another account's character and another world are not found", %{id: id} do
+      {:ok, other} = Persistence.create_account("other", "pw")
+      c = Factory.character(other, %{name: "Theirs"})
+      assert {:error, :not_found} = Persistence.load_character(0, id, c.id)
+      assert {:error, :not_found} = Persistence.load_character(1, other, c.id)
+    end
+
+    test "a database failure is an error value", %{id: id} do
+      Persistence.Repo.active().query!("ALTER TABLE characters RENAME TO characters_off")
+      on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
+      assert {:error, :database} = Persistence.load_character(0, id, 1)
+    end
+  end
+
   describe "skip_tutorial/3" do
     test "sets tutorial state 0 to 2", %{id: id} do
       Factory.character(id, %{slot: 1, name: "Tut", tutorial_state: 0})

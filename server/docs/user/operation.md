@@ -49,7 +49,7 @@ Timestamps are UTC whatever the machine's time zone. `Part` is `Login`, `WorldMa
 | `error` | the server failed, an administrator must act | database failure, digest mismatch |
 | `warning` | the server is degraded or defended itself | limit exceeded, send failed, node lost, world unavailable |
 | `info` | normal events worth a line | node started, listening, login accepted or refused, client protocol violations (unknown opcode, wrong first packet, wrong version key) |
-| `debug` | per-packet and per-connection detail | dropped wrong-size packet, connection accepted, close initiated by the client |
+| `debug` | per-packet and per-connection detail | dropped wrong-size packet, dropped known but unbuilt packet, connection accepted, close initiated by the client |
 
 A password, a login token, a world key or the database URL is never printed. An account name is printed in double quotes, as it was typed. A peer is the address and port of the client, for example `127.0.0.1:51234`.
 
@@ -70,6 +70,7 @@ Lines an administrator acts on:
 | `Zone: map instance <name> of world <n> crashed (<reason>), started again empty` | error | a map process crashed; it runs again with nobody on it. Report the reason |
 | `<Part>: connection closed: oversized frame, peer <peer>` | info | the client sent a frame larger than the protocol allows; the server cut it off |
 | `<Part>: connection closed: unknown opcode 0x<opcode>, peer <peer>` | info | the client sent a packet the server does not know; it was cut off |
+| `<Part>: dropped a known but unbuilt packet 0x<opcode>, peer <peer>` | debug | Zone or WorldManager: the client sent a packet of the protocol this version does not handle yet; it was ignored and the connection goes on |
 | `<Part>: connection closed: wrong first packet, peer <peer>` | info | the first packet was not the one the part expects (`0x0C65` at Login, `0x0C0F` at WorldManager) |
 | `Login: connection closed: unexpected packet instead of the login, peer <peer>` | info | after the version check the client did not send a login |
 | `Login: connection closed: wrong version key, peer <peer>` | info | the client's version key differs from `client_version_key`; the client needs the other build or the setting needs changing |
@@ -94,6 +95,8 @@ Lines an administrator acts on:
 | `Zone: connection closed: Client data check failed: character "<name>", table <table>, server <hash>, client "<hash>", peer <peer>` | warning | the client's copy of a table differs from the server's (see "Client data check" below) |
 | `Zone: map login accepted: character <id>, map <map>, peer <peer>` | info | the client entered the Zone node |
 | `Zone: connection closed: map login refused: <reason>, peer <peer>` | info | `no session for the handle`, `no map-login ticket`, `reserved for another Zone node` or `not the reserved character`: the client came to the Zone without a fresh character login |
+| `Zone: connection closed: map entry failed: <reason>, peer <peer>` | warning | the character could not be placed on its map after the map login (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`); the client is told `0x142`. For a database failure or unreadable block data look for the `Persistence` or `Zone: map` line before it |
+| `Zone: connection closed: map login complete failed: not on the map, peer <peer>` | warning | the client reported the map loaded for a player the map does not hold; report it |
 | `Zone: connection closed: session ended, peer <peer>` | info | the WorldManager connection of the player ended, so the Zone connection was closed |
 | `Cluster: node <node> connected` | info | multi-node mode: another node joined |
 | `Cluster: node <node> lost` | warning | multi-node mode: a node went away |

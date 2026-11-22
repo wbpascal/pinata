@@ -28,6 +28,7 @@ defmodule Zone do
       GameData.ShineNpc,
       GameData.LinkTable,
       GameData.ChrCommon,
+      GameData.ItemInfo,
       GameData.MobInfo,
       GameData.TownPortal,
       GameData.SpamerPenalty,

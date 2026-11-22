@@ -156,9 +156,9 @@ defmodule Net.ConnectionTest do
 
   defp set_now(ms), do: :persistent_term.put({FakeClock, :now}, ms)
 
-  defp listen(handler, limits \\ %{}) do
+  defp listen(handler, limits \\ %{}, part \\ "Net") do
     settings = %{connection: Map.merge(@limits, limits)}
-    pid = start_supervised!({Net.Listener, {"Net", handler, 0, settings}})
+    pid = start_supervised!({Net.Listener, {part, handler, 0, settings}})
     {:ok, {_address, port}} = ThousandIsland.listener_info(pid)
     {pid, port}
   end
@@ -308,6 +308,41 @@ defmodule Net.ConnectionTest do
 
     assert Process.alive?(listener)
     connect(port)
+  end
+
+  test "a known but unbuilt opcode on a Zone connection is dropped with one debug line" do
+    {listener, port} = listen(QuietHandler, %{}, "Zone")
+    {socket, cipher} = connect(port)
+    {chat, cipher} = frame(cipher, <<0x01, 0x20, 0, 0>>)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, chat)
+        await(listener, &(&1.window_count == 1))
+      end)
+
+    assert log =~ "[debug] Zone: dropped a known but unbuilt packet 0x2001, peer 127.0.0.1:"
+    assert length(String.split(log, "dropped a known")) == 2
+    refute log =~ "connection closed"
+    nothing(socket)
+
+    {req, _cipher} = frame(cipher, <<0x04, 0x08>>)
+    :ok = :gen_tcp.send(socket, req)
+    assert {:ok, <<2, 5, 8>>} = :gen_tcp.recv(socket, 3, 1000)
+  end
+
+  test "a Login connection closes on an opcode another part knows" do
+    {_listener, port} = listen(QuietHandler, %{}, "Login")
+    {socket, cipher} = connect(port)
+    {chat, _cipher} = frame(cipher, <<0x01, 0x20, 0, 0>>)
+
+    log =
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.send(socket, chat)
+        closed(socket)
+      end)
+
+    one_close(log, "[info] Login: connection closed: unknown opcode 0x2001, peer 127.0.0.1:")
   end
 
   test "a packet of the wrong size is dropped and is no sign of life" do

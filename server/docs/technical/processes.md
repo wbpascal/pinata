@@ -36,17 +36,19 @@ The login flow is in [`flows/login.md`](flows/login.md).
 
 **A packet of the wrong size** (`Proto.decode/1` returns `:bad_size`: a known opcode with a payload of another length, or a body shorter than an opcode) is dropped and logged at debug level; the connection goes on in the same state. The original drops a `0x0C5A` and a `0x0C37` of the wrong length in the same way. The line carries the part and the peer address. A dropped packet counts for the packet rate and does not reset the heartbeat timer.
 
+**A known but unbuilt packet** (`:unknown_opcode` for an opcode that `Proto.Opcodes.client?/2` lists for the part of the connection: a client packet the original Zone or WorldManager registers but that has no packet module yet) is dropped the same way, with one `debug` line `dropped a known but unbuilt packet 0x<op>`; it is no sign of life for the heartbeat either, so a client cannot keep a connection open with it. A Login connection has no such list and closes on every opcode without a module.
+
 **What closes a socket.** Never with an error packet. Every close the server decides on writes exactly one line `<Part>: connection closed: <reason>, peer <peer>` at the level in the table; a close by the client writes one `debug` line (`connection closed by the client`) through `handle_close/2`, and `closed?` in the state tells the two apart.
 
 | Cause | Level, reason | Rule |
 |---|---|---|
-| Unknown opcode | info, `unknown opcode 0x<op>` | `Proto.decode/1` returns `:unknown_opcode`. The original does the same on all three servers |
+| Unknown opcode | info, `unknown opcode 0x<op>` | `Proto.decode/1` returns `:unknown_opcode` for an opcode outside the client packets of the part (`Proto.Opcodes`). The original does the same on all three servers |
 | Oversized frame | info, `oversized frame` | long header `00 len_lo len_hi` with `len` above 0x1FFD, closed once the 3 header bytes are in |
 | Heartbeat timeout | info, `heartbeat timeout` | 210 s without a decoded packet |
 | `connection.max_packets_per_second` | warning, `packet rate exceeded` | more frames than this in a fixed 1 s window; heartbeats count |
 | `connection.max_unsent_bytes` | warning, `unsent bytes exceeded` | the VM send queue (`send_pend` of `:inet.getstat/1`), read after every send; the listener sets `high_watermark` to twice the limit so a send never blocks before the check |
 | Failed send | warning, `send failed` | the socket send returns an error |
-| `{:close, level, reason}` of a handler | its own | wrong first packet, wrong version key, refused login, session replaced, world login refused, character list failed, client logged out (debug), Client data check failed (warning), map login refused (info), session ended (info) |
+| `{:close, level, reason}` of a handler | its own | wrong first packet, wrong version key, refused login, session replaced, world login refused, character list failed, client logged out (debug), Client data check failed (warning), map login refused (info), session ended (info), map entry failed (warning), map login complete failed (warning) |
 | Closed by the client | debug, `connection closed by the client` | not a server decision |
 
 ## World process
@@ -57,11 +59,11 @@ The world process also keeps the map table (ADR 0002): `zones` (Zone `pid` to ho
 
 ## Map instance
 
-`Zone.MapInstance` is one process per map instance (ADR 0009), registered in `Zone.MapRegistry` under `{world number, map name}`; `Zone.MapInstance.whereis/2` looks it up. The map name is `FieldList.map_id_client`, which is also the name of the `.shbd` file and of `ShineNPC.Map`. The state holds `npcs`, `block_data`, `players`, `ticks`, `tick_ref` and `next_tick`.
+`Zone.MapInstance` is one process per map instance (ADR 0009), registered in `Zone.MapRegistry` under `{world number, map name}`; `Zone.MapInstance.whereis/2` looks it up. The map name is `FieldList.map_id_client`, which is also the name of the `.shbd` file and of `ShineNPC.Map`. The state holds `npcs`, `block_data`, `players`, `next_handle`, `ticks`, `tick_ref` and `next_tick`.
 
 - **NPCs.** At `init/1` the rows of `ShineNPC` with this map are placed in file order with the handles 17084, 17085, ... (the range 17084 to 17339 of `docs/knowledge/Z01.md` §3). Their mob id is not resolved yet.
 - **Block data** is read at the first `enter/2` with `GameData.BlockData.load/2` and logged (`Zone: map <name>: block data loaded, <n> bytes`). When the read fails (file removed or damaged after the start) the entry is refused with `{:error, :no_block_data}`, one `error` line is written and the instance keeps running. It is never unloaded.
-- **Players** are opaque ids (`enter/2`, `leave/2`) until map entry is built (issue 108).
+- **Players** are `Zone.Player` structs by object handle (`players`). `enter/2` gives the next free handle from 8000 to 9499, counting on from `next_handle` and wrapping from 9499 to 8000, so a freed handle is not reused before the wrap; with 1500 players the entry is refused with `{:error, :full}`. A player enters in mode 0 (receives nothing, shown to nobody); `login_complete/2` sets mode 1 and returns the second map-entry burst (`{:error, :not_entered}` for an unknown handle or a player already in mode 1). The instance monitors the connection process of each player and removes its player when it ends, as `leave/2` does. Flow: [`flows/map-entry.md`](flows/map-entry.md).
 - **Tick.** Every 100 ms through `Clock.send_after/3`, only while the map has players. The first entry starts the chain; the last `leave/2` ends it by clearing `tick_ref`. Each tick message carries the ref of its chain, so a leave and a new entry inside 100 ms cannot run two chains; a message with another ref is ignored. The schedule is absolute (`next_tick` += 100, the delay is the difference to the clock), so a slow tick does not shift the following ones. A tick only counts (`ticks`); movement comes with issue 110. Each tick is the telemetry span `[:pinata, :tick]` ([`telemetry.md`](telemetry.md)).
 
 ## Map supervisor and `Zone.Maps`
