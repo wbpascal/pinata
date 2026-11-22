@@ -93,7 +93,7 @@ The client sends the MD5 (lower-case hex text) of 49 of its tables, each over th
 | `warning` | Zone | `connection closed: Client data check failed: character "<name>", table <table>, server <hash>, client "<hash>"` |
 | `info` | Zone | `connection closed: map login refused: <reason>`, `map login accepted: character <id>, map <map>`, `connection closed: session ended` |
 
-Slot above 5, empty slot, "yes" and "already in the world" write no line: they are refusals with an answer, like the rename refusals.
+Slot above 5, empty slot, "yes", a skip whose character changed in the meantime and "already in the world" write no line: they are refusals with an answer, like the rename refusals.
 
 ## Original-server bugs
 

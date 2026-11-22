@@ -3,7 +3,6 @@ defmodule EnterWorldTest do
 
   @moduletag capture_log: true
 
-  alias Proto.Packets.CharLoginfailAck
   alias Proto.Packets.MapLoginfailAck
   alias Proto.Packets.UserAvatarListReq
   alias Proto.Packets.UserClientVersionCheckReq
@@ -188,6 +187,36 @@ defmodule EnterWorldTest do
     assert {:ok, <<0x0E, 0x08, _::binary>>, _client} = TestClient.recv_raw(client)
   end
 
+  test "a skip whose character changed in the meantime answers 0x145", %{id: id} do
+    Factory.character(id, %{slot: 3, name: "Tut", tutorial_state: 0})
+    {client, _handle} = world_login()
+    {<<0x10, 0x11, 0>>, client} = char_login(client, 3)
+    Persistence.Repo.active().query!("UPDATE characters SET tutorial_state = 1")
+    client |> send!(<<0x11, 0x11, 1>>) |> recv!(<<0x02, 0x10, 0x45, 0x01>>)
+  end
+
+  defp tables_off do
+    Persistence.Repo.active().query!("ALTER TABLE characters RENAME TO characters_off")
+    on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
+  end
+
+  test "a database failure on 0x1001 answers 0x145 with a warning", %{id: id} do
+    Factory.character(id, %{slot: 0})
+    {client, _handle} = world_login()
+    tables_off()
+    log = TestLog.capture(fn -> recv!(send!(client, <<0x01, 0x10, 0>>), <<0x02, 0x10, 0x45, 0x01>>) end)
+    assert log =~ "[warning] WorldManager: character login failed, database failure"
+  end
+
+  test "a database failure on a skip answers 0x145 with a warning", %{id: id} do
+    Factory.character(id, %{slot: 3, name: "Tut", tutorial_state: 0})
+    {client, _handle} = world_login()
+    {<<0x10, 0x11, 0>>, client} = char_login(client, 3)
+    tables_off()
+    log = TestLog.capture(fn -> recv!(send!(client, <<0x11, 0x11, 1>>), <<0x02, 0x10, 0x45, 0x01>>) end)
+    assert log =~ "[warning] WorldManager: tutorial skip failed, database failure"
+  end
+
   test "an accepted map login keeps the Zone connection open with an info line", %{id: id} do
     {_client, handle} = entered(id)
     log = TestLog.capture(fn -> accepted(map_login(handle)) end)
@@ -286,17 +315,6 @@ defmodule EnterWorldTest do
                 {:send, %MapLoginfailAck{error: 0x141, wrong_data_file_index: 0xFF}},
                 {:close, :info, "map login refused: reserved for another Zone node"}
               ]} = Zone.Handler.handle_info(state, {:redeemed, {:error, :wrong_node}})
-    end
-
-    test "database failures answer 0x145 with a warning" do
-      state = wm_state(%{})
-
-      assert {_,
-              [{:send, %CharLoginfailAck{error: 0x145}}, {:log, :warning, "character login failed, database failure"}]} =
-               WorldManager.Handler.handle_info(state, {:character_selected, {:error, :database}})
-
-      assert {_, [{:send, %CharLoginfailAck{error: 0x145}}, {:log, :warning, "tutorial skip failed, database failure"}]} =
-               WorldManager.Handler.handle_info(state, {:tutorial_skipped, %{slot: 0}, {:error, :database}})
     end
   end
 end
