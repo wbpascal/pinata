@@ -70,6 +70,33 @@ defmodule Net.ConnectionTest do
     def perform(:ask), do: :answer
   end
 
+  defmodule CallHandler do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    alias Proto.Packets.MiscSeedAck
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, _packet), do: {state, []}
+
+    @impl Net.Handler
+    def handle_call(state, :q), do: {:answer, state, [{:send, %MiscSeedAck{seed: 5}}]}
+
+    @impl Net.Handler
+    def handle_info(state, {:cluster, {:watch, pid}}), do: {state, [{:perform, {:watch, pid}}]}
+    def handle_info(state, :watching), do: {state, [{:send, %MiscSeedAck{seed: 7}}]}
+    def handle_info(state, {:down, _pid}), do: {state, [{:send, %MiscSeedAck{seed: 6}}]}
+
+    @impl Net.Handler
+    def perform({:watch, pid}) do
+      _ = Process.monitor(pid)
+      :watching
+    end
+  end
+
   defmodule SlowHandler do
     @moduledoc false
     @behaviour Net.Handler
@@ -481,5 +508,22 @@ defmodule Net.ConnectionTest do
     send(conn_pid(listener), {:cluster, :x})
     assert {:ok, <<4, 0x07, 0x08, 4, 0>>} = :gen_tcp.recv(socket, 5, 1000)
     closed(socket)
+  end
+
+  test "a cluster call goes to handle_call: its reply comes back and its effects run" do
+    {listener, port} = listen(CallHandler)
+    {socket, _cipher} = connect(port)
+    assert GenServer.call(conn_pid(listener), {:cluster, :q}) == :answer
+    assert {:ok, <<4, 0x07, 0x08, 5, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+  end
+
+  test "the end of a process monitored in perform reaches handle_info as {:down, pid}" do
+    {listener, port} = listen(CallHandler)
+    {socket, _cipher} = connect(port)
+    pid = spawn(fn -> receive do: (:stop -> :ok) end)
+    send(conn_pid(listener), {:cluster, {:watch, pid}})
+    assert {:ok, <<4, 0x07, 0x08, 7, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+    send(pid, :stop)
+    assert {:ok, <<4, 0x07, 0x08, 6, 0>>} = :gen_tcp.recv(socket, 5, 1000)
   end
 end

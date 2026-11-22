@@ -71,7 +71,7 @@ defmodule WorldManager.World do
         logins = Map.delete(state.logins, validate)
 
         if now() - at < @login_ttl_ms do
-          # shortcut: a counter, a handle of a live session can repeat after 65536 logins; make it a unique key when 0x1801 looks sessions up by it (milestone 2)
+          # A counter: the handle of a live session can repeat after 65536 logins. Harmless: Cluster.Sessions.redeem/2 asks every session with the handle and the character name decides.
           handle = state.next_handle
           {:reply, {:ok, user_no, handle}, %{state | logins: logins, next_handle: rem(handle + 1, 0x10000)}}
         else

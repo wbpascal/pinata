@@ -33,6 +33,11 @@ defmodule Proto.Packets do
     0x0C65 => Proto.Packets.UserClientVersionCheckReq,
     0x0C66 => Proto.Packets.UserClientWrongversionCheckAck,
     0x0C67 => Proto.Packets.UserClientRightversionCheckAck,
+    0x1001 => Proto.Packets.CharLoginReq,
+    0x1002 => Proto.Packets.CharLoginfailAck,
+    0x1003 => Proto.Packets.CharLoginAck,
+    0x1110 => Proto.Packets.CharTutorialPopupReq,
+    0x1111 => Proto.Packets.CharTutorialPopupAck,
     0x1401 => Proto.Packets.AvatarCreateReq,
     0x1404 => Proto.Packets.AvatarCreatefailAck,
     0x1406 => Proto.Packets.AvatarCreatesuccAck,
@@ -41,6 +46,8 @@ defmodule Proto.Packets do
     0x140C => Proto.Packets.AvatarErasesuccAck,
     0x140F => Proto.Packets.AvatarRenameReq,
     0x1410 => Proto.Packets.AvatarRenameAck,
+    0x1801 => Proto.Packets.MapLoginReq,
+    0x1804 => Proto.Packets.MapLoginfailAck,
     0xB409 => Proto.Packets.UserConnectionChangeCharIdReq,
     0xB40C => Proto.Packets.UserConnectionChangeCharIdAck
   }

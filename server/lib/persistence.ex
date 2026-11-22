@@ -210,6 +210,27 @@ defmodule Persistence do
     with {:ok, :deleted} <- result, do: :ok
   end
 
+  @doc "Sets the tutorial state of the character in a slot from 0 to 2 (skipped)."
+  @spec skip_tutorial(non_neg_integer(), pos_integer(), non_neg_integer()) :: :ok | {:error, :not_found | :database}
+  def skip_tutorial(world_id, account_id, slot) do
+    repo = Repo.active()
+
+    result =
+      transact(repo, "skip_tutorial", fn ->
+        query =
+          from(c in Character,
+            where: c.world_id == ^world_id and c.account_id == ^account_id and c.slot == ^slot and c.tutorial_state == 0
+          )
+
+        case repo.update_all(query, set: [tutorial_state: 2]) do
+          {1, _} -> {:ok, :skipped}
+          {0, _} -> {:error, :not_found}
+        end
+      end)
+
+    with {:ok, :skipped} <- result, do: :ok
+  end
+
   @doc """
   Renames the character in a slot of an account and world. The name is unique per world without regard to ASCII
   letter case (P02-B42 fixed).

@@ -5,7 +5,7 @@ defmodule GameData do
   Text columns are raw bytes in the client's legacy code page. They are never converted to UTF-8 and are not valid
   UTF-8 in general; code that logs or compares such text converts at that point.
 
-  This module is the only one that touches `persistent_term` (the key is `{GameData, schema}`).
+  This module is the only one that touches `persistent_term` (the keys are `{GameData, schema}` and `{GameData, :client_checksums}`).
   """
 
   use Boundary,
@@ -33,7 +33,8 @@ defmodule GameData do
       SpamerPenalty,
       SpamerPenaltyRule,
       BlockData,
-      DataFile
+      DataFile,
+      ClientData
     ]
 
   require Logger
@@ -136,6 +137,22 @@ defmodule GameData do
   def plain_field_maps do
     for {_row, %{kq: 0, sub_from: "-", sub_to: "-"} = field} <- Enum.sort(table(GameData.FieldList).rows), do: field
   end
+
+  @doc "Hashes the 49 tables of the Client data check (`GameData.ClientData`) and keeps the result for `client_checksums/0`."
+  @spec load_client_checksums(Path.t()) :: :ok | {:error, [String.t(), ...]}
+  def load_client_checksums(data_dir) do
+    started = Clock.monotonic_time(:millisecond)
+
+    with {:ok, checksums} <- GameData.ClientData.checksums(data_dir) do
+      :persistent_term.put({GameData, :client_checksums}, checksums)
+      took = Clock.monotonic_time(:millisecond) - started
+      Logger.info("GameData: Client data check: #{length(checksums)} tables hashed, #{took} ms")
+    end
+  end
+
+  @doc "The checksums of the Client data check. Raises when they were not loaded (the node runs no Zone part)."
+  @spec client_checksums() :: [GameData.ClientData.checksum()]
+  def client_checksums, do: :persistent_term.get({GameData, :client_checksums})
 
   defp table(schema), do: :persistent_term.get({GameData, schema})
 end

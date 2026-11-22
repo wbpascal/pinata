@@ -41,7 +41,7 @@ defmodule WorldManager.Avatar do
       name: c.name,
       level: c.level,
       slot: c.slot,
-      # P02-B33 kept: a character that has not started the tutorial is sent to "RouT" (milestone 2)
+      # The list still says "RouT" for tutorial state 0; a skip enters on the stored map (P02-B33 fixed narrowly).
       loginmap: if(c.tutorial_state == 0, do: "RouT", else: c.login_map),
       delinfo: %AvatarDeleteInfo{year: 0, month: 0, day: 0, hour: 0, min: 0},
       gender: c.gender,

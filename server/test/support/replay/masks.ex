@@ -15,8 +15,8 @@ defmodule Replay.Masks do
   @type mask :: {module(), path(), reason :: String.t()}
   @type handle :: {module(), path(), namespace :: atom(), reason :: String.t()}
 
-  # The other entries of ADR 0008 (addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
-  # are added by the issue that defines each packet; the 0x0C0C address and the 0x0C14 entries are masks.
+  # The other entries of ADR 0008 (the address in 0x180A, uninitialised memory with its bug id) are added by the
+  # issue that defines each packet; the 0x0C0C and 0x1003 addresses and the 0x0C14 and 0x1110 entries are masks.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
   def global,
@@ -26,7 +26,13 @@ defmodule Replay.Masks do
         {Proto.Packets.UserClientWrongversionCheckAck, :unused,
          "uninitialised memory (L00-B1): the original never writes this byte, the rebuild sends 0"},
         {Proto.Packets.UserWorldselectAck, :ip,
-         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"}
+         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"},
+        {Proto.Packets.CharLoginAck, :zone_ip,
+         "server address: the capture has the LAN address of the original Zone, the rebuild sends the public_host of the Zone node"},
+        {Proto.Packets.CharLoginAck, :zone_port,
+         "server address: the Zone node of this topology listens on another port than the capture's"},
+        {Proto.Packets.CharTutorialPopupReq, :unused,
+         "uninitialised memory (P02-B28): the original never writes this byte, the rebuild sends 0"}
       ] ++
         delinfo_masks() ++
         [

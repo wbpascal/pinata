@@ -59,14 +59,14 @@ Items in any other slot are not sent.
 
 ## Session handle
 
-`worldmanager` is a counter per `WorldManager.World`: 0, 1, 2, ... wrapping at 0xFFFF, taken with the reservation. Nothing looks a session up by it yet (milestone 2). In a replay it goes through the handle map (`:wm_session`).
+`worldmanager` is a counter per `WorldManager.World`: 0, 1, 2, ... wrapping at 0xFFFF, taken with the reservation. The session joins the `:pg` group `{:wm_handle, handle}`, and the Zone looks the session up by it on `0x1801` ([`enter-world.md`](enter-world.md)). In a replay it goes through the handle map (`:wm_session`).
 
 ## Original-server bugs
 
 - P02-B1 (only the first `delinfo` byte is written): fixed, `delinfo` is zero; masked in the replay.
 - P02-B7 (two uninitialised bits above the seconds of the Kingdom Quest date): fixed, 0; masked in the replay.
 - W05-B10 (a failed list closes twice): fixed, one close.
-- P02-B33 (`"RouT"` for a character with `tutorial_state` 0): kept, milestone 2.
+- P02-B33 (`"RouT"` for a character with `tutorial_state` 0): fixed narrowly, the list still says `"RouT"` and a tutorial skip enters on the stored map ([`enter-world.md`](enter-world.md)).
 
 ## Differences from the original
 

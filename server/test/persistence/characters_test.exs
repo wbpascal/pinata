@@ -209,6 +209,28 @@ defmodule Persistence.CharactersTest do
     end
   end
 
+  describe "skip_tutorial/3" do
+    test "sets tutorial state 0 to 2", %{id: id} do
+      Factory.character(id, %{slot: 1, name: "Tut", tutorial_state: 0})
+      assert :ok = Persistence.skip_tutorial(0, id, 1)
+      assert {:ok, [%{tutorial_state: 2}]} = Persistence.list_characters(0, id)
+      refute Persistence.Repo.active().in_transaction?()
+    end
+
+    test "a state other than 0 and an empty slot are not found", %{id: id} do
+      Factory.character(id, %{slot: 0, name: "Done", tutorial_state: 1})
+      assert {:error, :not_found} = Persistence.skip_tutorial(0, id, 0)
+      assert {:error, :not_found} = Persistence.skip_tutorial(0, id, 2)
+      assert {:ok, [%{tutorial_state: 1}]} = Persistence.list_characters(0, id)
+    end
+
+    test "a database failure is an error value", %{id: id} do
+      Persistence.Repo.active().query!("ALTER TABLE characters RENAME TO characters_off")
+      on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
+      assert {:error, :database} = Persistence.skip_tutorial(0, id, 0)
+    end
+  end
+
   describe "rename_character/4" do
     test "renames, and the list shows the new name", %{id: id} do
       {:ok, _} = Persistence.create_character(attrs(id))
