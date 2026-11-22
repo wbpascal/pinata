@@ -221,6 +221,10 @@ _Avoid_: ignore list, wildcard
 A packet, packet field, client packet or object (a mob) that a replay test leaves out for now because the milestone that builds it has not landed: a server packet or field is not compared, a client packet is not sent, an object's packets are taken out. It names that milestone, which removes it.
 _Avoid_: mask (a mask never goes away), skip, placeholder (that is what the server sends meanwhile)
 
+**Replay cut**:
+The point in a transcript where a replay test ends before the capture does, with its reason: behind it the new server cannot match the capture, by decision or because the capture needs an operator action.
+_Avoid_: stop point (that one moves forward as milestones land; a replay cut stays), truncation
+
 **Handle map**:
 The pairing a replay test builds between identifiers the original server handed out and the ones the new server hands out, which must stay consistent for the whole replay.
 
