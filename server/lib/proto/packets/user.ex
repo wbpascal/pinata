@@ -179,6 +179,46 @@ defmodule Proto.Packets.AvatarErasesuccAck do
   field :slot, :u8
 end
 
+defmodule Proto.Packets.AvatarRenameReq do
+  @moduledoc "0x140F NC_AVATAR_RENAME_REQ, client to server (sent to WorldManager): the slot and the new name."
+  use Proto.Packet, opcode: 0x140F
+  # official: SlotNo
+  field :slot, :u8
+  # official: NewName
+  field :name, {:char, 20}
+end
+
+defmodule Proto.Packets.AvatarRenameAck do
+  @moduledoc "0x1410 NC_AVATAR_RENAME_ACK, server to client: slot and name of the 0x140F; error 0xD0 renamed, 0xD1 refused."
+  use Proto.Packet, opcode: 0x1410
+  # official: SlotNo
+  field :slot, :u8
+  # official: NewName
+  field :name, {:char, 20}
+  # official: Error
+  field :error, :u16
+end
+
+defmodule Proto.Packets.UserConnectionChangeCharIdReq do
+  @moduledoc "0xB409 NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ, client to server (sent to WorldManager): rename by item right."
+  use Proto.Packet, opcode: 0xB409
+  # official: nSlotNo
+  field :slot, :u8
+  # official: sNewID
+  field :name, {:char, 20}
+end
+
+defmodule Proto.Packets.UserConnectionChangeCharIdAck do
+  @moduledoc "0xB40C NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK, server to client: the error comes first."
+  use Proto.Packet, opcode: 0xB40C
+  # official: nError
+  field :error, :u16
+  # official: nSlotNo
+  field :slot, :u8
+  # official: sNewID
+  field :name, {:char, 20}
+end
+
 defmodule Proto.Packets.UserLoginworldfailAck do
   @moduledoc "0x0C15 NC_USER_LOGINWORLDFAIL_ACK, server to client."
   use Proto.Packet, opcode: 0x0C15

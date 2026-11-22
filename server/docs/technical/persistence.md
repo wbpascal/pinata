@@ -6,7 +6,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `create_character/1`, `delete_character/3`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `create_character/1`, `delete_character/3`, `rename_character/4`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
@@ -94,6 +94,10 @@ Unique index `(character_id, storage, slot)`. Storage 9 is the inventory; only c
 ## Create
 
 `create_character/1` is one transaction of guarded statements: a check that the slot is free (`{:error, :slot_in_use}`), the insert of the character (a unique-index violation on the name is `{:error, :name_taken}`, on the slot `{:error, :slot_in_use}`, so the slot is reported before the name), then one `insert_all` for the items, the skills and the shortcuts, each matched against its row count. Any other failure is `{:error, :database}` with a logged line. A refusal leaves the transaction, so on PostgreSQL the next statement of the connection works (D02-B2 fixed). The name key is `Persistence.Character.name_key/1`; the same name is allowed in another world. `kq_date` is the creation time.
+
+## Rename
+
+`rename_character/4` is one transaction: it reads the character by `(world_id, account_id, slot)` and updates `name` and `name_key` by id. No row is `{:error, :not_found}`; a violation of the unique index on `(world_id, name_key)` is `{:error, :name_taken}` (the name is unique per world, ASCII letter case ignored; P02-B42 fixed); anything else is `{:error, :database}` with a logged line. Flow: [`flows/character-rename.md`](flows/character-rename.md).
 
 ## Delete
 

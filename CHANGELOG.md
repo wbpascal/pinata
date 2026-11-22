@@ -4,6 +4,15 @@
 
 A character enters the world: the client loads the map, walks and runs, takes gates and town portals to other maps, sees other players and the standing NPCs, and chats (normal, shout, whisper). Logging out, a lost connection and a second login of the account save the character, and a character can be renamed on the character list. Maps have no mobs yet, and items and skills do not work.
 
+### New
+
+- Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
+
+### Differences from the original server
+
+- A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
+- The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
+
 ## 0.1.0 – Login to character select (2026-11-21)
 
 The first version: the unmodified 2016 client logs in, sees the world list, selects a world and lists, creates and deletes its characters; entering the game does not work yet. The server runs as one node with SQLite, on Linux, macOS and Windows, or as one node per part with PostgreSQL. It comes as release archives for four platforms and as a container image, and is set up with one settings file and a data directory imported from an original `9Data` folder.

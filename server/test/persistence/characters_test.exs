@@ -208,4 +208,28 @@ defmodule Persistence.CharactersTest do
       assert {:error, :database} = Persistence.delete_character(0, id, 0)
     end
   end
+
+  describe "rename_character/4" do
+    test "renames, and the list shows the new name", %{id: id} do
+      {:ok, _} = Persistence.create_character(attrs(id))
+      assert :ok = Persistence.rename_character(0, id, 0, "Newer")
+      assert {:ok, [%{name: "Newer"}]} = Persistence.list_characters(0, id)
+    end
+
+    test "an empty slot and another account's slot are not found", %{id: id} do
+      {:ok, other} = Persistence.create_account("other", "pw")
+      {:ok, _} = Persistence.create_character(attrs(id))
+      assert {:error, :not_found} = Persistence.rename_character(0, id, 1, "Free")
+      assert {:error, :not_found} = Persistence.rename_character(0, other, 0, "Free")
+    end
+
+    test "a name of another character in another letter case is taken, and nothing changes", %{id: id} do
+      {:ok, _} = Persistence.create_character(attrs(id))
+      {:ok, _} = Persistence.create_character(attrs(id, %{slot: 1, name: "Keep"}))
+      assert {:error, :name_taken} = Persistence.rename_character(0, id, 0, "KEEP")
+      assert {:ok, [%{name: "New"}, %{name: "Keep"}]} = Persistence.list_characters(0, id)
+      assert :ok = Persistence.rename_character(0, id, 0, "Free")
+      refute Persistence.Repo.active().in_transaction?()
+    end
+  end
 end
