@@ -7,6 +7,12 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 ### New
 
 - A node with the Zone part reads the map and NPC tables of the data directory at start-up (`FieldList`, `ShineNPC`, `LinkTable`, `Common` of `ChrCommon`, `MobInfo.shn`, `TownPortal.shn`, `SpamerPenalty.shn`, `SpamerPenaltyRule.shn`) and does not start when one is missing or damaged. Files of the data directory are found whatever the letter case of their names (#105).
+- Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
+
+### Differences from the original server
+
+- A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
+- The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 
 ### Moving from the previous version
 

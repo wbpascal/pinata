@@ -210,6 +210,45 @@ defmodule Persistence do
     with {:ok, :deleted} <- result, do: :ok
   end
 
+  @doc """
+  Renames the character in a slot of an account and world. The name is unique per world without regard to ASCII
+  letter case (P02-B42 fixed).
+  """
+  @spec rename_character(non_neg_integer(), pos_integer(), non_neg_integer(), binary()) ::
+          :ok | {:error, :not_found | :name_taken | :database}
+  def rename_character(world_id, account_id, slot, name) do
+    repo = Repo.active()
+
+    result =
+      transact(repo, "rename_character", fn ->
+        query = from(c in Character, where: c.world_id == ^world_id and c.account_id == ^account_id and c.slot == ^slot)
+
+        case repo.one(query) do
+          nil -> {:error, :not_found}
+          character -> update_name(repo, character, name)
+        end
+      end)
+
+    with {:ok, :renamed} <- result, do: :ok
+  end
+
+  defp update_name(repo, character, name) do
+    changeset =
+      character
+      |> Ecto.Changeset.change(name: name, name_key: Character.name_key(name))
+      |> Ecto.Changeset.unique_constraint(:name_key, name: :characters_world_id_name_key_index)
+
+    # stale_error_field: a row deleted since the read is a refusal, not a crash
+    case repo.update(changeset, stale_error_field: :id) do
+      {:ok, _character} ->
+        {:ok, :renamed}
+
+      # Leaves the transaction: on PostgreSQL a failed statement aborts it.
+      {:error, %{errors: errors}} ->
+        {:error, if(Keyword.has_key?(errors, :name_key), do: :name_taken, else: :not_found)}
+    end
+  end
+
   @spec create_account(binary(), binary()) :: {:ok, pos_integer()} | {:error, :invalid_name | :name_taken | :database}
   def create_account(name, password) do
     with true <- Account.valid_name?(name),

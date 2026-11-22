@@ -16,7 +16,7 @@ defmodule WorldManager.CharacterCreate do
           {:ok, Persistence.character()} | {:error, refusal()}
   def run(world_id, user_no, %AvatarCreateReq{} = req) do
     with :ok <- check(req.slot < @max_slot, :slot),
-         :ok <- check(valid_name?(req.name), :name),
+         :ok <- check(valid_name?(req.name, 20), :name),
          :ok <- sentinel_allowed(world_id, user_no, req.chrclass),
          :ok <- look_allowed(req),
          {:ok, default} <- fetch(GameData.CharDefault, req.chrclass, :class),
@@ -66,10 +66,10 @@ defmodule WorldManager.CharacterCreate do
   def code(:name_taken), do: 0x181
   def code(:failed), do: 0x82
 
-  @doc "1 to 20 bytes, no space, not in `BadNameFilter.shn` (`Type 0`: equal; `Type 1`: contained)."
-  @spec valid_name?(binary()) :: boolean()
-  def valid_name?(name) do
-    byte_size(name) in 1..20 and not String.contains?(name, " ") and not bad?(upcase(name))
+  @doc "1 to `max` bytes (create 20, rename 16), no space, not in `BadNameFilter.shn` (`Type 0`: equal; `Type 1`: contained)."
+  @spec valid_name?(binary(), pos_integer()) :: boolean()
+  def valid_name?(name, max) do
+    byte_size(name) in 1..max and not String.contains?(name, " ") and not bad?(upcase(name))
   end
 
   defp bad?(upper) do
