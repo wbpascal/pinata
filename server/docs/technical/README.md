@@ -77,7 +77,7 @@ Two Ecto repos (PostgreSQL, SQLite) sit behind `Persistence`; the adapter follow
 
 ## Time and randomness
 
-Server code reads time through `Clock` and random numbers through `Random`, never directly ([ADR 0008](../../../docs/adr/0008-byte-compatibility-proven-by-capture-replay.md)). Each forwards to a source module taken from the application environment (`:clock_source`, `:random_source`), so a test can put its own source in place. `Clock.local_time/1` turns a Unix time into local wall-clock time (the system source uses the time zone of the operating system).
+Server code reads time through `Clock` and random numbers through `Random`, never directly ([ADR 0008](../../../docs/adr/0008-byte-compatibility-proven-by-capture-replay.md)). Each forwards to a source module taken from the application environment (`:clock_source`, `:random_source`), so a test can put its own source in place. `Clock.local_time/1` turns a Unix time into local wall-clock time (the system source uses the time zone of the operating system). `Clock.send_after/3` schedules the tick of a map instance, so a replay test can fire it at a captured time; other timers are real ones.
 
 ## Testing
 
