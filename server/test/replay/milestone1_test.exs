@@ -39,6 +39,8 @@ defmodule Replay.Milestone1Test do
 
     on_exit(fn ->
       {:ok, _} = Replay.Topology.call(:wm, Supervisor, :restart_child, [WorldManager.Supervisor, child])
+      # the new World has an empty map table until Zone.Maps joins again by its 1 s retry; the next test needs it
+      wait_until(fn -> Replay.Topology.call(:wm, WorldManager.World, :zone_of, [0, "Rou"]) != :error end, 250)
     end)
 
     # the Login node must see it
