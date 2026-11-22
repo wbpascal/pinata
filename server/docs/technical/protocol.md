@@ -23,11 +23,12 @@ Client to server only, over the whole body (opcode and payload), not the length 
 
 - `field :name, :u8 | :u16 | :u32 | :u64 | :i8 | :i16 | :i32`
 - `field :name, {:char, n}`, `{:bytes, n}`, `{:u16s, n}`, or a nested struct module
-- `field :name, {:counted, :u8}`: a byte string after its u8 length; the last entry
+- `field :name, {:counted, :u8}`: a byte string after its u8 length; the last entry, or followed only by a `:records` field
+- `field :name, {:records, :count, n}`: `count × n` opaque bytes, where `count` is an earlier integer field of the same packet; the last entry
 - `bits [a: 1, b: 5, c: 2]`: one byte, most significant bit first
 - `array :name, Module, count: :u8`: the last entry
 
-Rules: a `char[n]` is cut at its first NUL on decode and zero-padded on encode (bytes after the NUL are lost); lengths are strict, any other size is `:bad_size`; an array count and the length of a counted field are not struct fields. Field names are hand-picked snake_case, with the official name in a comment when it differs.
+Rules: a `char[n]` is cut at its first NUL on decode and zero-padded on encode (bytes after the NUL are lost); lengths are strict, any other size is `:bad_size`; an array count and the length of a counted field are not struct fields. The count of a `:records` field is an ordinary struct field which the encoder writes as given (the caller keeps both consistent). Fields after a variable-sized entry have no usable `layout` offset. Field names are hand-picked snake_case, with the official name in a comment when it differs.
 
 ## Adding a packet
 

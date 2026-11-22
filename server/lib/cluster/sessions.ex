@@ -2,7 +2,9 @@ defmodule Cluster.Sessions do
   @moduledoc """
   Which process is the session of an account (`:pg` group `{:session, user_no}`), and which sessions have a session
   handle (`:pg` group `{:wm_handle, handle}`): the Zone finds the session of a map login by it (flow:
-  `docs/technical/flows/enter-world.md`).
+  `docs/technical/flows/enter-world.md`). A session whose character is in the world is a member of the `:pg` group
+  `{:character, world_no, key}` (`key` = the name with ASCII letters lower-cased): a whisper finds its receiver by it
+  and the sessions pass the whisper on in messages (flow: `docs/technical/flows/whisper.md`).
   """
 
   @type entry :: %{
@@ -12,6 +14,13 @@ defmodule Cluster.Sessions do
           character_id: pos_integer(),
           name: binary(),
           map: String.t()
+        }
+  @type whisper :: %{
+          talker: binary(),
+          receiver: binary(),
+          item_link_count: 0..255,
+          content: binary(),
+          links: binary()
         }
   @type refusal :: :no_session | :no_ticket | :wrong_character | :wrong_node
 
@@ -63,6 +72,50 @@ defmodule Cluster.Sessions do
     send(pid, {:cluster, :map_login_done})
     :ok
   end
+
+  @doc "The character of the calling session process is in the world: `find_character/2` finds the process by its name."
+  @spec enter_world(Cluster.Registry.world_id(), binary()) :: :ok
+  def enter_world(world_no, name), do: :pg.join(Cluster.Registry.scope(), {:character, world_no, key(name)}, self())
+
+  @doc "The character of the calling session process is no longer in the world."
+  @spec leave_world(Cluster.Registry.world_id(), binary()) :: :ok
+  def leave_world(world_no, name) do
+    _ = :pg.leave(Cluster.Registry.scope(), {:character, world_no, key(name)}, self())
+    :ok
+  end
+
+  @doc "The session process whose character of this name is in the world, on any node; ASCII letter case is ignored."
+  @spec find_character(Cluster.Registry.world_id(), binary()) :: {:ok, pid()} | :error
+  def find_character(world_no, name) do
+    case :pg.get_members(Cluster.Registry.scope(), {:character, world_no, key(name)}) do
+      [pid | _] -> {:ok, pid}
+      [] -> :error
+    end
+  end
+
+  @doc "Passes a whisper from the calling session process to the receiver's session process."
+  @spec whisper(pid(), whisper()) :: :ok
+  def whisper(pid, whisper) do
+    send(pid, {:cluster, {:whisper, self(), whisper}})
+    :ok
+  end
+
+  @doc "Tells the talker's session process that the whisper reached the receiver (with the receiver's stored spelling)."
+  @spec whisper_delivered(pid(), whisper()) :: :ok
+  def whisper_delivered(pid, whisper) do
+    send(pid, {:cluster, {:whisper_delivered, whisper}})
+    :ok
+  end
+
+  @doc "Tells the talker's session process that the receiver was no longer in the world."
+  @spec whisper_refused(pid(), binary()) :: :ok
+  def whisper_refused(pid, receiver) do
+    send(pid, {:cluster, {:whisper_refused, receiver}})
+    :ok
+  end
+
+  # the rule of Persistence.Character.name_key/1 (Cluster may not depend on Persistence)
+  defp key(name), do: for(<<b <- name>>, into: <<>>, do: <<if(b in ?A..?Z, do: b + 32, else: b)>>)
 
   defp ask(pid, request) do
     GenServer.call(pid, request)

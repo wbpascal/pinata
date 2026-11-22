@@ -75,6 +75,32 @@ defmodule ClusterTest do
     refute_receive {:cluster, _}, 50
   end
 
+  test "find_character" do
+    me = self()
+    assert Cluster.Sessions.find_character(907, "Test1235") == :error
+    assert Cluster.Sessions.enter_world(907, "Test1235") == :ok
+    assert Cluster.Sessions.find_character(907, "Test1235") == {:ok, me}
+    assert Cluster.Sessions.find_character(907, "tEST1235") == {:ok, me}
+    assert Cluster.Sessions.find_character(907, "Test1236") == :error
+    assert Cluster.Sessions.find_character(908, "Test1235") == :error
+
+    test = self()
+
+    other =
+      spawn_link(fn ->
+        :ok = Cluster.Sessions.enter_world(907, "X14B")
+        send(test, :entered)
+        Process.sleep(:infinity)
+      end)
+
+    assert_receive :entered, 1000
+    assert Cluster.Sessions.find_character(907, "x14b") == {:ok, other}
+
+    assert Cluster.Sessions.leave_world(907, "TEST1235") == :ok
+    assert Cluster.Sessions.leave_world(907, "Test1235") == :ok
+    assert Cluster.Sessions.find_character(907, "Test1235") == :error
+  end
+
   test "expect_login" do
     {:ok, _} = GenServer.start_link(ClusterTest.FakeWorld, self(), name: Registry.world_manager(905))
     request = %{user_no: 1, user_name: "a", validate: [1]}
