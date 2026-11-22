@@ -171,15 +171,31 @@ defmodule Replay do
   defp round_trip(state, packet, ctx, strict?) do
     client = Map.fetch!(state.clients, packet.conn)
 
-    with {:ok, client} <- TestClient.send_raw(client, <<0x04, 0x08>>),
-         {:ok, client, bodies} <- collect(client, [], ctx.timeout) do
-      state = put_client(state, packet.conn, client)
-      {:ok, %{state | pending: Map.update(state.pending, packet.conn, bodies, &(&1 ++ bodies))}}
-    else
-      {:error, :timeout} -> {:error, failure(:missing, ctx, packet, "no answer to the heartbeat", [])}
-      {:error, :closed} when strict? -> {:error, failure(:missing, ctx, packet, "the server closed the connection", [])}
-      {:error, :closed} -> {:ok, state}
+    result =
+      case TestClient.send_raw(client, <<0x04, 0x08>>) do
+        {:ok, client} -> collect(client, [], ctx.timeout)
+        {:error, :closed} -> {:closed, client, []}
+      end
+
+    case result do
+      {:ok, client, bodies} ->
+        {:ok, buffer(state, packet.conn, client, bodies)}
+
+      {:closed, _client, _bodies} when strict? ->
+        {:error, failure(:missing, ctx, packet, "the server closed the connection", [])}
+
+      # bodies read before the close (an answer, then a refusal) stay for the transcript lines
+      {:closed, client, bodies} ->
+        {:ok, buffer(state, packet.conn, client, bodies)}
+
+      {:error, :timeout} ->
+        {:error, failure(:missing, ctx, packet, "no answer to the heartbeat", [])}
     end
+  end
+
+  defp buffer(state, conn, client, bodies) do
+    state = put_client(state, conn, client)
+    %{state | pending: Map.update(state.pending, conn, bodies, &(&1 ++ bodies))}
   end
 
   # reads up to the heartbeat answer; timer-driven bodies are dropped, the others are returned in order
@@ -188,6 +204,7 @@ defmodule Replay do
       {:ok, <<0x05, 0x08>>, client} -> {:ok, client, Enum.reverse(bodies)}
       {:ok, <<opcode::little-16, _::binary>>, client} when opcode in @timer_driven -> collect(client, bodies, timeout)
       {:ok, body, client} -> collect(client, [body | bodies], timeout)
+      {:error, :closed} -> {:closed, client, Enum.reverse(bodies)}
       {:error, reason} -> {:error, reason}
     end
   end

@@ -131,6 +131,19 @@ defmodule Replay.HarnessTest do
       do: {state, [{:send, %Reply{code: 1, token: rem(Clock.system_time(:millisecond), 4_294_967_296), handle: 7}}]}
   end
 
+  # answers, then closes the connection
+  defmodule Refuser do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, %MiscSeedAck{seed: 1}),
+      do: {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}, {:close, :info, "bye"}]}
+  end
+
   # a seed of 10, 11 or 12 enters a map; the handle of a later reply depends on the map entered
   defmodule Maps do
     @moduledoc false
@@ -289,6 +302,11 @@ defmodule Replay.HarnessTest do
       # 100 500 ms = 0x00018894 little-endian
       lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 010094880100" <> "0700"
       assert run(Tokener, lines, conns: ["zone#1"]) == :ok
+    end
+
+    test "an answer followed by a close by the server is still a transcript line" do
+      lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 0100000000000700"
+      assert run(Refuser, lines, conns: ["zone#1"]) == :ok
     end
 
     test "a buffered answer nobody expects is an extra packet at the end" do
