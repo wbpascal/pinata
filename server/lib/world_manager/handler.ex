@@ -11,6 +11,9 @@ defmodule WorldManager.Handler do
 
   `0x1407` deletes the character of a slot and answers `0x140C` or `0x140A` (flow: `docs/technical/flows/character-delete.md`).
 
+  `0x140F` renames the character of a slot and answers `0x1410` (`0xD0` or `0xD1`); `0xB409` always answers `0xB40C`
+  with `0x20C3`, no rename right (flow: `docs/technical/flows/character-rename.md`).
+
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
   `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
   with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
@@ -24,10 +27,14 @@ defmodule WorldManager.Handler do
   alias Proto.Packets.AvatarEraseReq
   alias Proto.Packets.AvatarErasefailAck
   alias Proto.Packets.AvatarErasesuccAck
+  alias Proto.Packets.AvatarRenameAck
+  alias Proto.Packets.AvatarRenameReq
   alias Proto.Packets.MiscGametimeAck
   alias Proto.Packets.MiscGametimeReq
   alias Proto.Packets.UserAvatarListReq
   alias Proto.Packets.UserConnectcutCmd
+  alias Proto.Packets.UserConnectionChangeCharIdAck
+  alias Proto.Packets.UserConnectionChangeCharIdReq
   alias Proto.Packets.UserLoginworldAck
   alias Proto.Packets.UserLoginworldReq
   alias Proto.Packets.UserLoginworldfailAck
@@ -72,6 +79,14 @@ defmodule WorldManager.Handler do
   def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %AvatarEraseReq{slot: slot})
       when is_integer(user_no),
       do: {state, [{:perform, {:delete_character, state.world_no, user_no, slot}}]}
+
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %AvatarRenameReq{slot: slot, name: name})
+      when is_integer(user_no),
+      do: {state, [{:perform, {:rename_character, state.world_no, user_no, slot, name}}]}
+
+  # A deferral until the item milestone grants rename rights; P02-B34 fixed: the slot of the request.
+  def handle_packet(%__MODULE__{step: :open} = state, %UserConnectionChangeCharIdReq{slot: slot, name: name}),
+    do: {state, [{:send, %UserConnectionChangeCharIdAck{error: 0x20C3, slot: slot, name: name}}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}),
     do: {state, [{:close, :debug, "client logged out"}]}
@@ -123,6 +138,14 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:character_deleted, _slot, {:error, reason}}),
     do: {state, [{:send, %AvatarErasefailAck{error: erase_code(reason)}}]}
 
+  def handle_info(state, {:character_renamed, slot, name, :ok}),
+    do: {state, [{:send, %AvatarRenameAck{slot: slot, name: name, error: 0xD0}}]}
+
+  # One code for every refusal: the client has one text ("The name cannot be used."). P02-B42 fixed: a taken name is refused.
+  def handle_info(state, {:character_renamed, slot, name, {:error, reason}})
+      when reason in [:name, :not_found, :name_taken, :database],
+      do: {state, [{:send, %AvatarRenameAck{slot: slot, name: name, error: 0xD1}}]}
+
   def handle_info(state, {:game_time, {hour, minute, second}}),
     do: {state, [{:send, %MiscGametimeAck{hour: hour, minute: minute, second: second}}]}
 
@@ -161,6 +184,15 @@ defmodule WorldManager.Handler do
 
   def perform({:delete_character, world_no, user_no, slot}),
     do: {:character_deleted, slot, Persistence.delete_character(world_no, user_no, slot)}
+
+  def perform({:rename_character, world_no, user_no, slot, name}) do
+    result =
+      if WorldManager.CharacterCreate.valid_name?(name, 16),
+        do: Persistence.rename_character(world_no, user_no, slot, name),
+        else: {:error, :name}
+
+    {:character_renamed, slot, name, result}
+  end
 
   def perform(:game_time) do
     {_date, time} = Clock.local_time(Clock.system_time(:second))

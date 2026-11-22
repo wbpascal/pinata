@@ -38,7 +38,11 @@ defmodule Proto.Packets do
     0x1406 => Proto.Packets.AvatarCreatesuccAck,
     0x1407 => Proto.Packets.AvatarEraseReq,
     0x140A => Proto.Packets.AvatarErasefailAck,
-    0x140C => Proto.Packets.AvatarErasesuccAck
+    0x140C => Proto.Packets.AvatarErasesuccAck,
+    0x140F => Proto.Packets.AvatarRenameReq,
+    0x1410 => Proto.Packets.AvatarRenameAck,
+    0xB409 => Proto.Packets.UserConnectionChangeCharIdReq,
+    0xB40C => Proto.Packets.UserConnectionChangeCharIdAck
   }
 
   @doc "The module for an opcode."

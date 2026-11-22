@@ -103,6 +103,8 @@ The in-game clock and the stored dates shown to the client (for example the King
 
 A character name has 1 to 20 bytes, no space, and must pass `shn/BadNameFilter.shn` of the data directory. The Sentinel class needs a character of the level in the row `ChrLevel_CanCreateSen` of `shn/SingleData.shn` on the same account and world. The starting values (map, position, level, items, skills, shortcuts) come from `tables/DefaultCharacterData/*.csv` of the data directory. A change to these files needs a restart.
 
+A rename on the character list follows the same rules with at most 16 bytes, and a name already used in the world is refused whatever the letter case; the rename right (rename by item) is always refused in this version.
+
 A database created by an earlier build must be deleted: the initial migration gained columns and tables.
 
 ## Database and migrations
