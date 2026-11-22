@@ -41,7 +41,7 @@ defmodule GameData.Loader do
     spec = schema.__schema__()
     {format, rel} = spec.source
 
-    case File.read(Path.join(data_dir, rel)) do
+    case File.read(GameData.DataFile.path(data_dir, rel)) do
       {:error, :enoent} -> {:error, ["#{rel}: file not found"]}
       {:error, reason} -> {:error, ["#{rel}: #{:file.format_error(reason)}"]}
       {:ok, binary} -> binary |> read(format) |> table(schema, spec, rel)

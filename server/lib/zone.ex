@@ -5,5 +5,16 @@ defmodule Zone do
 
   @doc "The data tables this part reads (ADR 0006)."
   @spec game_data() :: [module()]
-  def game_data, do: []
+  def game_data do
+    [
+      GameData.FieldList,
+      GameData.ShineNpc,
+      GameData.LinkTable,
+      GameData.ChrCommon,
+      GameData.MobInfo,
+      GameData.TownPortal,
+      GameData.SpamerPenalty,
+      GameData.SpamerPenaltyRule
+    ]
+  end
 end

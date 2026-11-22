@@ -4,6 +4,14 @@
 
 A character enters the world: the client loads the map, walks and runs, takes gates and town portals to other maps, sees other players and the standing NPCs, and chats (normal, shout, whisper). Logging out, a lost connection and a second login of the account save the character, and a character can be renamed on the character list. Maps have no mobs yet, and items and skills do not work.
 
+### New
+
+- A node with the Zone part reads the map and NPC tables of the data directory at start-up (`FieldList`, `ShineNPC`, `LinkTable`, `Common` of `ChrCommon`, `MobInfo.shn`, `TownPortal.shn`, `SpamerPenalty.shn`, `SpamerPenaltyRule.shn`) and does not start when one is missing or damaged. Files of the data directory are found whatever the letter case of their names (#105).
+
+### Moving from the previous version
+
+- The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
+
 ## 0.1.0 – Login to character select (2026-11-21)
 
 The first version: the unmodified 2016 client logs in, sees the world list, selects a world and lists, creates and deletes its characters; entering the game does not work yet. The server runs as one node with SQLite, on Linux, macOS and Windows, or as one node per part with PostgreSQL. It comes as release archives for four platforms and as a container image, and is set up with one settings file and a data directory imported from an original `9Data` folder.
