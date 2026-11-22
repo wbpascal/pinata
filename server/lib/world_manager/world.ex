@@ -84,14 +84,17 @@ defmodule WorldManager.World do
   end
 
   @impl GenServer
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
+  def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
     case Map.pop(state.zones, pid) do
       {nil, _zones} -> {:noreply, state}
-      {_zone, zones} -> {:noreply, lose_zone(state, pid, zones)}
+      {_zone, zones} -> {:noreply, lose_zone(state, pid, zones, stopping?(pid, reason))}
     end
   end
 
-  defp lose_zone(state, pid, zones) do
+  # A local Zone part that exits with a shutdown reason means this node is stopping: not a lost Zone node.
+  defp stopping?(pid, reason), do: node(pid) == node() and (reason == :shutdown or match?({:shutdown, _}, reason))
+
+  defp lose_zone(state, pid, zones, stopping?) do
     lost = for {name, ^pid} <- state.maps, do: name
     kept = Map.drop(state.maps, lost)
 
@@ -101,9 +104,11 @@ defmodule WorldManager.World do
     for {winner, names} <- moves, do: send(winner, {:run_maps, number, Enum.reverse(names)})
     moved = moves |> Map.values() |> Enum.map(&length/1) |> Enum.sum()
 
-    Logger.warning(
-      "WorldManager: Zone node #{node(pid)} of world #{number} lost, #{moved} maps reassigned, #{length(lost) - moved} not running"
-    )
+    unless stopping? do
+      Logger.warning(
+        "WorldManager: Zone node #{node(pid)} of world #{number} lost, #{moved} maps reassigned, #{length(lost) - moved} not running"
+      )
+    end
 
     %{state | zones: zones, maps: maps}
   end

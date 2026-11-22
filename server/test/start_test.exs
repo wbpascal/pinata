@@ -85,6 +85,10 @@ defmodule Pinata.StartTest do
       :ok = :gen_tcp.send(socket, heartbeat)
       assert {:ok, <<2, 5, 8>>} = :gen_tcp.recv(socket, 3, 1000)
     end
+
+    # a normal stop is not a lost Zone node
+    stop_log = TestLog.capture(fn -> assert :ok = Application.stop(:pinata) end)
+    refute stop_log =~ "lost"
   end
 
   test "with a valid file every supervisor starts", %{tmp_dir: tmp_dir} do

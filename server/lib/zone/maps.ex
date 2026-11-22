@@ -24,6 +24,7 @@ defmodule Zone.Maps do
     Logger.info("Zone: #{total - placed} of #{total} NPC rows skipped: their map does not run")
 
     state = %{settings: settings, names: names, worlds: %{}, maps: %{}}
+    for %{number: n} <- settings.world, do: :ok = Cluster.Registry.join_zones(n, self())
     {:ok, Enum.reduce(settings.world, state, &join(&2, &1.number))}
   end
 
@@ -70,7 +71,6 @@ defmodule Zone.Maps do
       {:ok, pid} ->
         address = {state.settings.public_host, state.settings.zone.port}
         assigned = Cluster.WorldManager.join_zone(number, self(), address, state.names)
-        :ok = Cluster.Registry.join_zones(number, self())
         _ = start_maps(state.settings, number, assigned)
         Logger.info("Zone: world #{number}: #{length(assigned)} map instances started")
         %{state | worlds: Map.put(state.worlds, Process.monitor(pid), number)}
