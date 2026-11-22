@@ -46,6 +46,7 @@ defmodule ClusterTest do
     assert Cluster.Sessions.take_over(904) == :ok
     assert Cluster.Sessions.take_over(904) == :ok
     refute_receive {:cluster, _}, 50
+    :ok = Cluster.Sessions.leave(904)
 
     test = self()
 
@@ -58,11 +59,33 @@ defmodule ClusterTest do
       end
     end)
 
-    # The spawned process is the older session now: wait for it, then take over again.
-    assert_receive {:cluster, :session_replaced}, 1000
+    # The spawned process is the older session now; it ends after the message, so the take-over returns.
     assert_receive :joined, 1000
-    :ok = Cluster.Sessions.take_over(904)
+    assert :ok = Cluster.Sessions.take_over(904)
     assert_receive {:forwarded, {:cluster, :session_replaced}}, 1000
+  end
+
+  test "take_over waits for the older members, at most the replace timeout" do
+    Application.put_env(:pinata, :replace_timeout_ms, 100)
+    on_exit(fn -> Application.delete_env(:pinata, :replace_timeout_ms) end)
+    test = self()
+
+    old =
+      spawn_link(fn ->
+        :ok = :pg.join(Registry.scope(), {:session, 907}, self())
+        send(test, :joined)
+        receive do: (:stop -> :ok)
+      end)
+
+    assert_receive :joined, 1000
+    assert Cluster.Sessions.take_over(907) == {:error, :timeout}
+    refute_received {:DOWN, _, _, _, _}
+    refute_received {_ref, :timeout}
+    send(old, :stop)
+  end
+
+  test "leave_world" do
+    assert Cluster.Sessions.leave_world(spawn(fn -> :ok end)) == :ok
   end
 
   test "leave" do

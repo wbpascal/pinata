@@ -114,19 +114,28 @@ defmodule Login.Handler do
   defp refuse(code, reason),
     do: [{:send, %UserLoginfailAck{error: code}}, {:close, :info, "login refused, " <> reason}]
 
+  # 0x45: the code of a database failure (D01 section 3.2).
+  defp replace_timeout(name),
+    do: [
+      {:send, %UserLoginfailAck{error: 0x45}},
+      {:close, :error, "login refused, " <> account(name) <> ", the old session did not end in time"}
+    ]
+
   # inspect/1: a typed name can never break the one-line rule.
   defp account(name), do: "account " <> inspect(name)
 
   @impl Net.Handler
   def handle_info(state, {:login_checked, result}), do: {%{state | pending: result}, []}
 
-  def handle_info(state, {:taken_over, user_no}),
+  def handle_info(state, {:taken_over, user_no, :ok}),
     do:
       {%{state | user_no: user_no},
        [
          {:log, :info, "login accepted, " <> account(state.user_name)},
          {:perform, {:world_list, UserLoginAck, state.worlds}}
        ]}
+
+  def handle_info(state, {:taken_over, _user_no, {:error, :timeout}}), do: {state, replace_timeout(state.user_name)}
 
   def handle_info(state, {:token_taken, {:ok, user_no, user_name}}),
     do:
@@ -135,6 +144,8 @@ defmodule Login.Handler do
          {:log, :info, "login accepted with a login token, " <> account(user_name)},
          {:perform, {:world_list, UserLoginAck, state.worlds}}
        ]}
+
+  def handle_info(state, {:token_taken, {:error, :timeout, user_name}}), do: {state, replace_timeout(user_name)}
 
   # No client text for 0x52 (L00-B4 kept by decision).
   def handle_info(state, {:token_taken, :error}), do: {state, refuse(0x52, "unknown or expired login token")}
@@ -164,16 +175,15 @@ defmodule Login.Handler do
     {:login_checked, result}
   end
 
-  def perform({:take_over, user_no}) do
-    :ok = Cluster.Sessions.take_over(user_no)
-    {:taken_over, user_no}
-  end
+  def perform({:take_over, user_no}), do: {:taken_over, user_no, Cluster.Sessions.take_over(user_no)}
 
   def perform({:take_token, otp}) do
     case Login.Tokens.take(otp) do
       {:ok, {user_no, user_name}} ->
-        :ok = Cluster.Sessions.take_over(user_no)
-        {:token_taken, {:ok, user_no, user_name}}
+        case Cluster.Sessions.take_over(user_no) do
+          :ok -> {:token_taken, {:ok, user_no, user_name}}
+          {:error, :timeout} -> {:token_taken, {:error, :timeout, user_name}}
+        end
 
       :error ->
         {:token_taken, :error}

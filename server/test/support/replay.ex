@@ -75,6 +75,7 @@ defmodule Replay do
     :ok = Replay.Deferrals.validate!(deferrals, transcript.packets)
     masks = masks ++ for({:payload, mod, path, _m, reason} <- deferrals, path != :all, do: {mod, path, reason})
     payload_all = for {:payload, mod, :all, _m, _r} <- deferrals, into: MapSet.new(), do: mod.opcode()
+    at = for {:payload, indices, mod, path, _m, _r} <- deferrals, do: {MapSet.new(indices), mod, path}
 
     packets = transcript.packets |> Enum.filter(&played?(&1, Keyword.fetch!(opts, :stop), transcript.start))
     packets = Replay.Deferrals.apply(packets, deferrals, Masks.map_names() ++ opts[:map_names])
@@ -89,7 +90,8 @@ defmodule Replay do
       before: opts[:before],
       timeout: opts[:timeout],
       drop_after: opts[:drop_after],
-      payload_all: payload_all
+      payload_all: payload_all,
+      payload_at: at
     }
 
     previous = Application.fetch_env(:pinata, :clock_source)
@@ -296,7 +298,10 @@ defmodule Replay do
 
   # a payload deferral of the whole packet: accepted without comparison, no handle binding
   defp compared(packet, received, state, ctx) do
-    if MapSet.member?(ctx.payload_all, packet.opcode) do
+    if MapSet.member?(ctx.payload_all, packet.opcode) or
+         Enum.any?(ctx.payload_at, fn {at, mod, path} ->
+           path == :all and packet.index in at and mod.opcode() == packet.opcode
+         end) do
       {:ok, state}
     else
       with {:ok, bound} <- compare(packet, received, state.bound, ctx), do: {:ok, %{state | bound: bound}}
@@ -435,6 +440,16 @@ defmodule Replay do
     mods = entries |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
     handles = for {mod, path, ns, _} <- ctx.handles, mod in mods, do: {mod, path, ns}
     masks = for {mod, path, _} <- ctx.masks, mod in mods, do: {mod, path}
+
+    at =
+      for {at, mod, path} <- ctx.payload_at,
+          path != :all,
+          packet.index in at,
+          mod.opcode() == packet.opcode,
+          do: {mod, path}
+
+    mods = Enum.uniq(mods ++ Enum.map(at, &elem(&1, 0)))
+    masks = masks ++ at
 
     if byte_size(expected) == byte_size(received) do
       compare_same_size(packet, received, {masks, handles, mods}, bound, ctx)

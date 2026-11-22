@@ -15,6 +15,9 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A client packet that belongs to the protocol but is not built yet is ignored with a `debug` line; before, it closed the connection. A packet outside the protocol still closes it (#108).
 - Players on a map see each other and the standing NPCs: when they enter the map, when they come into or leave each other's sight, and when one leaves the map. A player in a crowd (29 or more objects within 500 units) gets the players of a smaller radius at entry, as in the original. A map without `MapInfo` row and an NPC without `MobInfo` row are logged with an `info` line at start-up (#109).
 - Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
+- Leaving the world (back to the character list, quit, lost connection) saves map, position, HP, SP, play minutes and the logout time, and the character can be selected again at once (#111).
+- Every character in the world is saved every 10 minutes; a crashed map disconnects its players and loses what happened since their last save; stopping the server saves every player first (#111).
+- A second login of an account waits until the first session's character is saved; when that takes more than 5 s the login is refused and an `error` line is written (#111).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 - `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
@@ -27,6 +30,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A client request for the appear packet of an object (`0x1C01`) is answered only when the object is in sight (#109).
 - A whisper whose size does not match its item links is ignored; the original copied past its buffer and any player could stop WorldManager with it (W04-B2) (#114).
 - The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).
+- No exit countdown on the server: the character leaves the world at once (the original kept it for up to 13 s); a character select right after "back to character select" is never refused (#111).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 
@@ -34,6 +38,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 
 - `public_host` must be an IPv4 address in text form on a node with the Zone part (every single-node setup): a node with a host name there does not start (#106).
 - The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
+- One new database migration (play minutes and logout time of a character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#111).
 
 ## 0.1.0 – Login to character select (2026-11-21)
 

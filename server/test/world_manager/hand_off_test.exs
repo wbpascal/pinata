@@ -7,6 +7,7 @@ defmodule WorldManager.HandOffTest do
 
   alias Proto.Packets.{
     UserClientVersionCheckReq,
+    UserLoginfailAck,
     UserLoginWithOtpReq,
     UserLoginworldReq,
     UserNormallogoutCmd,
@@ -29,7 +30,7 @@ defmodule WorldManager.HandOffTest do
 
   setup %{topology: topology, peers: peers} do
     Persistence.Repo.active().query!("DELETE FROM accounts")
-    {:ok, _} = Persistence.create_account("admin", "pw")
+    {:ok, uid} = Persistence.create_account("admin", "pw")
 
     case topology do
       :single ->
@@ -48,6 +49,7 @@ defmodule WorldManager.HandOffTest do
           call: fn part, m, f, a -> :peer.call(peers[part], m, f, a) end
         }
     end
+    |> Map.put(:uid, uid)
   end
 
   defp connect({host, port}) do
@@ -133,6 +135,26 @@ defmodule WorldManager.HandOffTest do
   defp wm_session(t) do
     {key, _login} = select(t)
     t |> world_login("admin", key) |> alive()
+  end
+
+  defp put_env(key, value) do
+    Application.put_env(:pinata, key, value)
+    on_exit(fn -> Application.delete_env(:pinata, key) end)
+  end
+
+  # A process in the session group of the account that never ends: every take-over of the account times out.
+  defp stuck_session(uid) do
+    test = self()
+
+    pid =
+      spawn(fn ->
+        :ok = :pg.join(Cluster.Registry.scope(), {:session, uid}, self())
+        send(test, :joined)
+        receive do: (:stop -> :ok)
+      end)
+
+    on_exit(fn -> Process.exit(pid, :kill) end)
+    assert_receive :joined
   end
 
   defp eventually(fun, tries \\ 100) do
@@ -301,6 +323,44 @@ defmodule WorldManager.HandOffTest do
 
       assert log =~
                "[info] Login: connection closed: login refused, unknown or expired login token, peer 127.0.0.1:"
+    end
+
+    test "a world login that waits longer than the replace timeout is refused with 0x46", t do
+      {key, _login} = select(t)
+      put_env(:replace_timeout_ms, 100)
+      stuck_session(t.uid)
+
+      log =
+        TestLog.capture(fn ->
+          client = t |> world_login("admin", key) |> recv!(<<0x15, 0x0C, 0x46, 0x00>>)
+          assert {:error, :closed} = TestClient.recv_raw(client)
+        end)
+
+      assert [_] =
+               Regex.scan(
+                 ~r/\[error\] WorldManager: connection closed: world login refused, the old session did not end in time, peer/,
+                 log
+               )
+    end
+
+    test "a token login that waits longer than the replace timeout is refused with 0x45", t do
+      {otp, wm} = t |> wm_session() |> token()
+      TestClient.close(wm)
+      eventually(fn -> :pg.get_members(Cluster.Registry.scope(), {:session, t.uid}) == [] end)
+      put_env(:replace_timeout_ms, 100)
+      stuck_session(t.uid)
+
+      log =
+        TestLog.capture(fn ->
+          assert {:ok, %UserLoginfailAck{error: 0x45}, client} = TestClient.recv(token_login(t, otp))
+          assert {:error, :closed} = TestClient.recv_raw(client)
+        end)
+
+      assert [_] =
+               Regex.scan(
+                 ~r/\[error\] Login: connection closed: login refused, account "admin", the old session did not end in time, peer/,
+                 log
+               )
     end
 
     test "a second 0x0C0F is ignored", t do

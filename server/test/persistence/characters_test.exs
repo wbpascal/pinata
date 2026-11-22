@@ -320,4 +320,44 @@ defmodule Persistence.CharactersTest do
       refute Persistence.Repo.active().in_transaction?()
     end
   end
+
+  describe "save_character/4" do
+    @saved %{map: "Eld", x: 1234, y: 5678, hp: 77, sp: 33}
+
+    test "an auto-save writes the five columns, not the play minutes and the logout time", %{id: id} do
+      c = Factory.character(id, %{slot: 0, name: "Save"})
+      assert :ok = Persistence.save_character(0, c.id, @saved, :auto)
+      row = Persistence.Repo.active().get!(Persistence.Character, c.id)
+      assert {row.login_map, row.login_x, row.login_y, row.hp, row.sp} == {"Eld", 1234, 5678, 77, 33}
+      assert {row.play_minutes, row.logout_at} == {0, nil}
+      # the KQ date is the last save time (the original's p_Char_SaveLocation)
+      assert abs(DateTime.to_unix(row.kq_date) - Clock.system_time(:second)) <= 5
+      assert {row.name, row.level, row.money} == {c.name, c.level, c.money}
+      refute Persistence.Repo.active().in_transaction?()
+    end
+
+    test "a leave adds the play minutes and sets the logout time", %{id: id} do
+      c = Factory.character(id, %{slot: 0, name: "Save"})
+      assert :ok = Persistence.save_character(0, c.id, @saved, {:leave, 3})
+      assert :ok = Persistence.save_character(0, c.id, %{@saved | x: 1}, {:leave, 3})
+      row = Persistence.Repo.active().get!(Persistence.Character, c.id)
+      assert {row.login_x, row.play_minutes} == {1, 6}
+      assert %DateTime{} = row.logout_at
+      assert {row.name, row.tutorial_state, row.kq_map} == {c.name, c.tutorial_state, c.kq_map}
+    end
+
+    test "an unknown id and another world are not found", %{id: id} do
+      c = Factory.character(id, %{slot: 0, name: "Save"})
+      assert {:error, :not_found} = Persistence.save_character(0, c.id + 100, @saved, :auto)
+      assert {:error, :not_found} = Persistence.save_character(1, c.id, @saved, {:leave, 1})
+      assert Persistence.Repo.active().get!(Persistence.Character, c.id).play_minutes == 0
+    end
+
+    test "a database failure is an error value", %{id: id} do
+      c = Factory.character(id, %{slot: 0, name: "Save"})
+      Persistence.Repo.active().query!("ALTER TABLE characters RENAME TO characters_off")
+      on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
+      assert {:error, :database} = Persistence.save_character(0, c.id, @saved, :auto)
+    end
+  end
 end

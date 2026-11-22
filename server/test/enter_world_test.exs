@@ -21,6 +21,7 @@ defmodule EnterWorldTest do
   setup do
     # after a test that restarted the application the Zone part joins its world again a moment later
     wait_until(fn -> match?({:ok, _}, WorldManager.World.zone_of(0, "RouN")) end)
+    :ok = TestSessions.wait_none()
     Persistence.Repo.active().query!("DELETE FROM accounts")
     {:ok, id} = Persistence.create_account("admin", "pw")
     %{id: id}
@@ -85,7 +86,7 @@ defmodule EnterWorldTest do
   end
 
   defp list(client) do
-    client = send!(client, %UserAvatarListReq{})
+    client = send!(client, %UserAvatarListReq{unset: 0})
     assert {:ok, %UserLoginworldAck{avatars: avatars}, client} = TestClient.recv(client)
     {avatars, client}
   end

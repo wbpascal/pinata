@@ -85,7 +85,7 @@ defmodule WorldManager.CharacterRenameTest do
   end
 
   defp names(client) do
-    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{})
+    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{unset: 0})
     assert {:ok, %UserLoginworldAck{avatars: avatars}, client} = TestClient.recv(client)
     {Enum.map(avatars, &{&1.slot, &1.name}), client}
   end

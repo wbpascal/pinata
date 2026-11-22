@@ -72,10 +72,23 @@ defmodule Net.Connection do
   def handle_data(data, socket, state), do: frames(socket, %{state | buffer: state.buffer <> data})
 
   @impl ThousandIsland.Handler
-  def handle_close(_socket, %__MODULE__{closed?: false} = state),
-    do: log(state, :debug, "connection closed by the client")
+  def handle_close(_socket, %__MODULE__{closed?: false} = state) do
+    log(state, :debug, "connection closed by the client")
+    ended(state)
+  end
 
-  def handle_close(_socket, _state), do: :ok
+  def handle_close(_socket, state), do: ended(state)
+
+  @impl ThousandIsland.Handler
+  def handle_shutdown(_socket, %__MODULE__{} = state) do
+    log(state, :info, "connection closed: listener stopped")
+    ended(state)
+  end
+
+  def handle_shutdown(_socket, _options), do: :ok
+
+  @impl ThousandIsland.Handler
+  def handle_error(_reason, _socket, state), do: ended(state)
 
   @impl GenServer
   def handle_info(:check, {socket, state}) do
@@ -94,7 +107,7 @@ defmodule Net.Connection do
     end
   end
 
-  def handle_info({:cluster, _} = message, {socket, state}) do
+  def handle_info({tag, _} = message, {socket, state}) when tag in [:cluster, :timer] do
     {handler_state, effects} = state.handler.handle_info(state.handler_state, message)
     effects(socket, effects, %{state | handler_state: handler_state}) |> reply(socket)
   end
@@ -113,6 +126,18 @@ defmodule Net.Connection do
       {:close, state} -> {:stop, {:shutdown, :local_closed}, reply, {socket, state}}
     end
   end
+
+  # Thousand Island calls one of handle_close/2, handle_shutdown/2 and handle_error/3 once, for every end of the
+  # process but a brutal kill; the state is not yet a connection when handle_connection/2 never ran.
+  defp ended(%__MODULE__{handler: handler} = state) do
+    if function_exported?(handler, :terminate, 1) do
+      Enum.each(handler.terminate(state.handler_state), fn {:log, level, message} -> log(state, level, message) end)
+    end
+
+    :ok
+  end
+
+  defp ended(_options), do: :ok
 
   defp reply({:continue, state}, socket), do: {:noreply, {socket, state}}
   defp reply({:close, state}, socket), do: {:stop, {:shutdown, :local_closed}, {socket, state}}

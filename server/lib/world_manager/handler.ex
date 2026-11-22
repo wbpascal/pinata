@@ -38,8 +38,11 @@ defmodule WorldManager.Handler do
   and the GM colour bit of `0x200D`.
 
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
-  `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
-  with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
+  `0x0C18` with type 0 closes the connection. `0x0C18` with type 1 (back to the character list) asks the Zone
+  connection to leave the world and waits for its save (`Cluster.Sessions.leave_world/1`); the client then asks for
+  the list with `0x0C1F`. Other types are ignored. A closed socket ends the process and with it the session, once
+  (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here); the Zone connection then saves and closes
+  (flow: `docs/technical/flows/leave-world.md`).
   """
 
   @behaviour Net.Handler
@@ -143,6 +146,10 @@ defmodule WorldManager.Handler do
   def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}),
     do: {state, [{:close, :debug, "client logged out"}]}
 
+  def handle_packet(%__MODULE__{step: :open, zone: zone} = state, %UserNormallogoutCmd{logout_type: 1})
+      when is_pid(zone),
+      do: {state, [{:perform, {:leave_world, zone}}]}
+
   # As the original's "PlayingCharNo" refusal: the session already has a character in the world.
   def handle_packet(%__MODULE__{step: :open, zone: zone} = state, %CharLoginReq{}) when is_pid(zone),
     do: {state, [{:send, %CharLoginfailAck{error: 0x145}}]}
@@ -213,6 +220,20 @@ defmodule WorldManager.Handler do
     do:
       {state,
        [{:send, %UserLoginworldfailAck{error: 0x44}}, {:close, :info, "world login refused, no matching reservation"}]}
+
+  def handle_info(state, {:login_taken, :timeout}),
+    do:
+      {state,
+       [
+         {:send, %UserLoginworldfailAck{error: 0x46}},
+         {:close, :error, "world login refused, the old session did not end in time"}
+       ]}
+
+  def handle_info(state, {:left_world, :ok}), do: {%{state | zone: :none}, []}
+
+  # The zone stays set: 0x1001 answers 0x145 until its :DOWN.
+  def handle_info(state, {:left_world, {:error, :timeout}}),
+    do: {state, [{:log, :error, "the Zone connection did not confirm the leave within 5 s"}]}
 
   def handle_info(state, {:characters, {:ok, characters}}),
     do:
@@ -401,15 +422,22 @@ defmodule WorldManager.Handler do
 
     case taken do
       {world_no, user_no, handle} ->
-        :ok = Cluster.Sessions.take_over(user_no)
-        :ok = Cluster.Sessions.register_handle(handle)
-        :ok = Cluster.Registry.join_players(world_no, self())
-        {:login_taken, {:ok, world_no, user_no, name, handle}}
+        case Cluster.Sessions.take_over(user_no) do
+          :ok ->
+            :ok = Cluster.Sessions.register_handle(handle)
+            :ok = Cluster.Registry.join_players(world_no, self())
+            {:login_taken, {:ok, world_no, user_no, name, handle}}
+
+          {:error, :timeout} ->
+            {:login_taken, :timeout}
+        end
 
       nil ->
         {:login_taken, :error}
     end
   end
+
+  def perform({:leave_world, zone}), do: {:left_world, Cluster.Sessions.leave_world(zone)}
 
   def perform({:list_characters, world_no, user_no}),
     do: {:characters, Persistence.list_characters(world_no, user_no)}

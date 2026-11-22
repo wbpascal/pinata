@@ -9,7 +9,10 @@ defmodule Zone.MapInstance do
   gets the next free handle from 8000 to 9499, counting on from the last one given and wrapping to 8000, so a freed
   handle is not reused before the wrap; 1500 players fill the map. A player enters in mode 0 (receives nothing,
   shown to nobody) and is in mode 1 after `login_complete/2`. The instance monitors the connection of each player
-  and removes its players when it ends. The map ticks every 100 ms through `Clock.send_after/3`, only while it has
+  and removes its players when it ends. It never touches the database: the connection saves its player (flow:
+  `docs/technical/flows/leave-world.md`). Stopped in order (`:normal`, `:shutdown`), it sends each player's
+  connection `{:cluster, {:map_stopped, player}}` so the connection saves that snapshot and closes; a crash sends
+  nothing. The map ticks every 100 ms through `Clock.send_after/3`, only while it has
   players. Each tick is the telemetry span `[:pinata, :tick]` (`docs/technical/telemetry.md`).
 
   Sight (`Zone.Sight`, `docs/technical/sight.md`): `login_complete/2` runs the entry exchange, `step/3` sends the
@@ -54,8 +57,13 @@ defmodule Zone.MapInstance do
   @spec login_complete(pid(), 8000..9499) :: {:ok, [struct()]} | {:error, :not_entered}
   def login_complete(pid, handle), do: GenServer.call(pid, {:login_complete, handle})
 
-  @spec leave(pid(), 8000..9499) :: :ok
+  @doc "Removes the player of the handle and returns it as it was on the map; `:error` for an unknown handle."
+  @spec leave(pid(), 8000..9499) :: {:ok, Zone.Player.t()} | :error
   def leave(pid, handle), do: GenServer.call(pid, {:leave, handle})
+
+  @doc "The current player of the handle (for the auto-save)."
+  @spec player(pid(), 8000..9499) :: {:ok, Zone.Player.t()} | :error
+  def player(pid, handle), do: GenServer.call(pid, {:player, handle})
 
   @doc """
   The player of the handle stands at a new point: the appear and disappear packets go to the players concerned.
@@ -76,6 +84,9 @@ defmodule Zone.MapInstance do
 
   @impl GenServer
   def init({world_id, name, data_dir}) do
+    # terminate/2 runs on a supervisor shutdown only when exits are trapped.
+    Process.flag(:trap_exit, true)
+
     radius =
       case GameData.fetch(GameData.MapInfo, name) do
         {:ok, %{sight: sight}} ->
@@ -154,7 +165,14 @@ defmodule Zone.MapInstance do
     end
   end
 
-  def handle_call({:leave, handle}, _from, state), do: {:reply, :ok, remove(state, &(&1 == handle))}
+  def handle_call({:leave, handle}, _from, state) do
+    case Map.fetch(state.players, handle) do
+      {:ok, player} -> {:reply, {:ok, player}, remove(state, &(&1 == handle))}
+      :error -> {:reply, :error, state}
+    end
+  end
+
+  def handle_call({:player, handle}, _from, state), do: {:reply, Map.fetch(state.players, handle), state}
 
   def handle_call({:step, handle, {x, y} = point}, _from, state) do
     case state.players do
@@ -202,9 +220,25 @@ defmodule Zone.MapInstance do
 
   def handle_info({:tick, _stale}, state), do: {:noreply, state}
 
-  # The connection of a player ended: its players leave and are announced with 0x1805 (saving is issue 111).
+  # The connection of a player ended (the Zone connection saves, or was killed): its players leave and are announced with 0x1805.
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state),
     do: {:noreply, remove(state, fn handle -> state.players[handle].conn == pid end)}
+
+  # Trapped exits of linked processes (none today) are ignored; the parent's exit is handled by GenServer.
+  def handle_info({:EXIT, _pid, _reason}, state), do: {:noreply, state}
+
+  # Stopped in order: each connection saves the snapshot of its player and closes.
+  @impl GenServer
+  def terminate(reason, state) do
+    if reason in [:normal, :shutdown] or match?({:shutdown, _}, reason) do
+      Enum.each(state.players, fn
+        {_handle, %Zone.Player{conn: conn} = player} when is_pid(conn) -> send(conn, {:cluster, {:map_stopped, player}})
+        {_handle, _player} -> :ok
+      end)
+    end
+
+    :ok
+  end
 
   defp remove(state, leaves?) do
     state =

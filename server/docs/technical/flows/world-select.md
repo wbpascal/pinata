@@ -19,7 +19,7 @@ sequenceDiagram
     C->>M: connects, 0x0C0F user name, key
     M->>W: take_login(user name, key)
     W-->>M: {:ok, user_no, handle}
-    M->>K: Cluster.Sessions.take_over(user_no), join_players(world)
+    M->>K: Cluster.Sessions.take_over(user_no) (waits for the older session, 5 s at most, then 0x0C15 {0x46}; leave-world.md), join_players(world)
     Note over M: the character list follows (character-list.md)
 ```
 
@@ -41,7 +41,7 @@ sequenceDiagram
 
 ## Session
 
-An accepted connection calls `Cluster.Sessions.take_over/1` (an older session gets `{:cluster, :session_replaced}` and answers `0x0C17 {0x683}`) and joins the `:pg` group `{:players, world}`. The way back: [`return-to-world-list.md`](return-to-world-list.md). When the socket closes the process ends and the player count drops.
+An accepted connection calls `Cluster.Sessions.take_over/1` (an older session gets `{:cluster, :session_replaced}` and answers `0x0C17 {0x683}`; the call waits until it and its Zone connection have ended, and after 5 s the login is refused with `0x0C15 {0x46}` and an `error` line, flow: [`leave-world.md`](leave-world.md)) and joins the `:pg` group `{:players, world}`. The way back: [`return-to-world-list.md`](return-to-world-list.md). When the socket closes the process ends and the player count drops.
 
 ## Original-server bugs
 

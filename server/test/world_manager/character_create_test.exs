@@ -119,7 +119,7 @@ defmodule WorldManager.CharacterCreateTest do
     payload = Base.decode16!("0258333744656c0000000000000000000000000000d5040000", case: :mixed)
     {<<0x06, 0x14, 1, _::binary>>, client} = world_login() |> create(payload)
 
-    {:ok, client} = TestClient.send_raw(client, <<0x1F, 0x0C>>)
+    {:ok, client} = TestClient.send_raw(client, <<0x1F, 0x0C, 0>>)
     assert {:ok, <<0x14, 0x0C, _::little-16, 1, record::binary>>, _client} = TestClient.recv_raw(client)
 
     <<_::binary-size(3 + 2 * 130), expected::binary-130, _::binary>> =
@@ -215,7 +215,7 @@ defmodule WorldManager.CharacterCreateTest do
       world_login() |> create(request(0, name, 1, gender: 1, look: {4, 0, 0}))
 
     assert {sent, level} == {name, 1}
-    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{})
+    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{unset: 0})
     assert {:ok, %UserLoginworldAck{avatars: [%{name: ^name}]}, _client} = TestClient.recv(client)
   end
 end

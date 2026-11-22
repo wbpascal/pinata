@@ -141,6 +141,29 @@ defmodule Net.ConnectionTest do
     end
   end
 
+  defmodule EndHandler do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    alias Proto.Packets.MiscSeedAck
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, _packet), do: {state, [{:close, :info, "test"}]}
+
+    @impl Net.Handler
+    def handle_info(state, {:timer, :x}), do: {state, [{:send, %MiscSeedAck{seed: 8}}]}
+
+    @impl Net.Handler
+    def terminate(_state) do
+      # the test may have ended before the connection
+      _ = if pid = Process.whereis(:connection_test), do: send(pid, :ended)
+      [{:log, :error, "ended"}]
+    end
+  end
+
   @limits %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576}
 
   setup do
@@ -560,5 +583,78 @@ defmodule Net.ConnectionTest do
     assert {:ok, <<4, 0x07, 0x08, 7, 0>>} = :gen_tcp.recv(socket, 5, 1000)
     send(pid, :stop)
     assert {:ok, <<4, 0x07, 0x08, 6, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+  end
+
+  describe "terminate/1" do
+    setup do
+      Process.register(self(), :connection_test)
+      :ok
+    end
+
+    test "runs once on a close by the client, its lines after the close line" do
+      {listener, port} = listen(EndHandler)
+      {socket, _cipher} = connect(port)
+      pid = conn_pid(listener)
+      ref = Process.monitor(pid)
+
+      log =
+        TestLog.capture(fn ->
+          :ok = :gen_tcp.close(socket)
+          assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2000
+        end)
+
+      assert_received :ended
+      refute_received :ended
+      assert log =~ ~r/connection closed by the client.*\n.*\[error\] Net: ended, peer 127\.0\.0\.1:/s
+    end
+
+    test "runs once on a close effect" do
+      {listener, port} = listen(EndHandler)
+      {socket, cipher} = connect(port)
+      pid = conn_pid(listener)
+      ref = Process.monitor(pid)
+      {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
+
+      log =
+        TestLog.capture(fn ->
+          :ok = :gen_tcp.send(socket, req)
+          closed(socket)
+          assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2000
+        end)
+
+      assert_received :ended
+      refute_received :ended
+      one_close(log, "[info] Net: connection closed: test, peer 127.0.0.1:")
+      assert log =~ "[error] Net: ended, peer 127.0.0.1:"
+    end
+
+    test "runs once on a listener stop, after the close line" do
+      {listener, port} = listen(EndHandler)
+      {socket, _cipher} = connect(port)
+      _ = conn_pid(listener)
+
+      log =
+        TestLog.capture(fn ->
+          :ok = ThousandIsland.stop(listener)
+          closed(socket)
+        end)
+
+      assert_received :ended
+      refute_received :ended
+      one_close(log, "[info] Net: connection closed: listener stopped, peer 127.0.0.1:")
+      assert log =~ "[error] Net: ended, peer 127.0.0.1:"
+    end
+
+    test "a timer message goes to handle_info" do
+      {listener, port} = listen(EndHandler)
+      {socket, _cipher} = connect(port)
+      send(conn_pid(listener), {:timer, :x})
+      assert {:ok, <<4, 0x07, 0x08, 8, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+
+      TestLog.capture(fn ->
+        :ok = :gen_tcp.close(socket)
+        assert_receive :ended, 2000
+      end)
+    end
   end
 end

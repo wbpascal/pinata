@@ -131,7 +131,8 @@ defmodule Replay.HarnessTest do
       do: {state, [{:send, %Reply{code: 1, token: rem(Clock.system_time(:millisecond), 4_294_967_296), handle: 7}}]}
   end
 
-  # answers, then closes the connection
+  # answers, then closes the connection a moment later: a close with the heartbeat of the harness unread resets the
+  # connection on Windows and the client loses the answer
   defmodule Refuser do
     @moduledoc false
     @behaviour Net.Handler
@@ -140,8 +141,13 @@ defmodule Replay.HarnessTest do
     def init(_settings), do: %{}
 
     @impl Net.Handler
-    def handle_packet(state, %MiscSeedAck{seed: 1}),
-      do: {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}, {:close, :info, "bye"}]}
+    def handle_packet(state, %MiscSeedAck{seed: 1}) do
+      Process.send_after(self(), {:cluster, :bye}, 200)
+      {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}]}
+    end
+
+    @impl Net.Handler
+    def handle_info(state, {:cluster, :bye}), do: {state, [{:close, :info, "bye"}]}
   end
 
   # a seed of 10, 11 or 12 enters a map; the handle of a later reply depends on the map entered
@@ -304,7 +310,7 @@ defmodule Replay.HarnessTest do
       assert run(Tokener, lines, conns: ["zone#1"]) == :ok
     end
 
-    test "an answer followed by a close by the server is still a transcript line" do
+    test "an answer followed by a close by the server is a transcript line and the close ends the replay" do
       lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 0100000000000700"
       assert run(Refuser, lines, conns: ["zone#1"]) == :ok
     end
@@ -420,10 +426,32 @@ defmodule Replay.HarnessTest do
       assert run(Stub, lines, deferrals: [{:payload, Reply, :token, 4, "r"}]) == :ok
     end
 
+    test "payload by index: a field or the payload of those server packets only" do
+      lines = @trigger <> "0100\n" <> @reply <> "0100aaaaaaaa0700"
+      assert run(Stub, lines, deferrals: [{:payload, [3], Reply, :token, 4, "r"}]) == :ok
+      assert run(Stub, lines, deferrals: [{:payload, [3], Reply, :all, 4, "r"}]) == :ok
+
+      two = @trigger <> "0200\n" <> @reply <> "0100aaaaaaaa0700\n" <> @reply <> "0100aaaaaaaa0700"
+      assert {:error, %Failure{kind: :mismatch}} = run(Stub, two, deferrals: [{:payload, [3], Reply, :token, 4, "r"}])
+      assert run(Stub, two, deferrals: [{:payload, [3, 4], Reply, :token, 4, "r"}]) == :ok
+
+      packets = transcript(lines).packets
+
+      assert_raise ArgumentError, ~r/:payload 2 is not a/, fn ->
+        Replay.Deferrals.validate!([{:payload, [2], Reply, :token, 4, "r"}], packets)
+      end
+    end
+
     test "absent: the packet is taken out of the transcript" do
       lines = @good <> "\n100.700000 login#1 S 0x7F02 00"
       assert {:error, %Failure{kind: :missing}} = run(Stub, lines)
       assert run(Stub, lines, deferrals: [{:absent, Box, 4, "r"}]) == :ok
+    end
+
+    test "absent by index: only those server packets are taken out" do
+      lines = @good <> "\n100.700000 login#1 S 0x7F02 00\n100.800000 login#1 S 0x7F02 00"
+      assert {:error, %Failure{kind: :missing}} = run(Stub, lines, deferrals: [{:absent, [4], 4, "r"}])
+      assert run(Stub, lines, deferrals: [{:absent, [4, 5], 4, "r"}]) == :ok
     end
 
     test "unsent: a client packet and its answers are left out, the replay continues" do
@@ -450,6 +478,10 @@ defmodule Replay.HarnessTest do
 
       assert_raise ArgumentError, ~r/not a server packet/, fn ->
         Replay.Deferrals.validate!([{:unsent, 2, [2], 3, "r"}], packets)
+      end
+
+      assert_raise ArgumentError, ~r/:absent 2 is not a server packet/, fn ->
+        Replay.Deferrals.validate!([{:absent, [2], 3, "r"}], packets)
       end
 
       assert_raise ArgumentError, ~r/malformed/, fn -> Replay.Deferrals.validate!([{:bogus, 1}], packets) end

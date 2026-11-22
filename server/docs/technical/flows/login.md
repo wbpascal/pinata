@@ -24,7 +24,8 @@ sequenceDiagram
     H-->>N: send 0x0C05, then the answer to the held result
     Note over H,N: on a refusal: send 0x0C09 and close
     N->>K: take_over(user_no) in :pg group {:session, user_no}
-    K-->>N: older session of the account gets {:cluster, :session_replaced}: 0x0C17 {0x683}, close
+    K-->>N: older session and its Zone connection get {:cluster, :session_replaced} and end (0x0C17 {0x683}; the Zone saves); returns when both ended, 5 s at most (leave-world.md)
+    Note over N: after 5 s: 0x0C09 {0x45}, close (error line)
     N->>K: world registered? player_count (:global, :pg)
     N->>C: 0x0C0A world list
     C->>N: 0x0C1B

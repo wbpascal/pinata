@@ -84,7 +84,7 @@ defmodule Zone.MapInstanceTest do
     {:ok, 8000} = Zone.MapInstance.enter(pid, player())
     TestClock.set(2_000_000)
     assert :sys.get_state(pid).ticks == 10
-    :ok = Zone.MapInstance.leave(pid, 8000)
+    {:ok, %Zone.Player{handle: 8000}} = Zone.MapInstance.leave(pid, 8000)
     TestClock.set(3_000_000)
     assert :sys.get_state(pid).ticks == 10
     assert :sys.get_state(idle).ticks == 0
@@ -94,7 +94,7 @@ defmodule Zone.MapInstanceTest do
     pid = start("Rou")
     assert {:ok, 8000} = Zone.MapInstance.enter(pid, player())
     assert {:ok, 8001} = Zone.MapInstance.enter(pid, player())
-    :ok = Zone.MapInstance.leave(pid, 8000)
+    {:ok, %Zone.Player{handle: 8000}} = Zone.MapInstance.leave(pid, 8000)
     assert {:ok, 8002} = Zone.MapInstance.enter(pid, player())
     assert %{handle: 8002, mode: 0} = :sys.get_state(pid).players[8002]
 
@@ -167,6 +167,12 @@ defmodule Zone.MapInstanceTest do
     assert log =~ "[info] Zone: map Eld: NPC KDSoccer_MctNPC not shown: no MobInfo row"
   end
 
+  test "an exit message of a linked process is ignored" do
+    pid = start("Rou")
+    send(pid, {:EXIT, self(), :boom})
+    assert {:error, :not_entered} = Zone.MapInstance.step(pid, 9000, {10, 10})
+  end
+
   test "step, set_layer and inform of an unknown handle" do
     pid = start("Rou")
     assert {:error, :not_entered} = Zone.MapInstance.step(pid, 9000, {10, 10})
@@ -181,11 +187,11 @@ defmodule Zone.MapInstanceTest do
     {:ok, other} = Zone.MapInstance.enter(pid, player())
     {:ok, _} = Zone.MapInstance.login_complete(pid, other)
     assert_receive {:cluster, {:packets, [%Proto.Packets.BriefinfoLogincharacterCmd{handle: ^other}]}}
-    :ok = Zone.MapInstance.leave(pid, other)
+    {:ok, _} = Zone.MapInstance.leave(pid, other)
     assert_receive {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: ^other}]}}
 
     {:ok, hidden} = Zone.MapInstance.enter(pid, player())
-    :ok = Zone.MapInstance.leave(pid, hidden)
+    {:ok, _} = Zone.MapInstance.leave(pid, hidden)
     refute_receive {:cluster, _}, 50
   end
 
@@ -236,5 +242,69 @@ defmodule Zone.MapInstanceTest do
       {:ok, pid} when pid != old -> :ok
       _ when tries > 0 -> Process.sleep(10) && wait_for_new(old, tries - 1)
     end
+  end
+
+  test "leave returns the player as it was on the map, player/2 reads it" do
+    pid = start("Rou")
+    {:ok, handle} = Zone.MapInstance.enter(pid, player())
+    :sys.replace_state(pid, &put_in(&1.players[handle].x, 77))
+    assert {:ok, %Zone.Player{handle: ^handle, x: 77}} = Zone.MapInstance.player(pid, handle)
+    assert {:ok, %Zone.Player{handle: ^handle, x: 77}} = Zone.MapInstance.leave(pid, handle)
+    assert :error = Zone.MapInstance.leave(pid, handle)
+    assert :error = Zone.MapInstance.player(pid, handle)
+  end
+
+  test "stopped in order it sends each connection its player; killed it sends nothing" do
+    pid = start("Rou")
+    {:ok, handle} = Zone.MapInstance.enter(pid, player(self()))
+    {:ok, _other} = Zone.MapInstance.enter(pid, player())
+    :ok = GenServer.stop(pid, :shutdown)
+    assert_receive {:cluster, {:map_stopped, %Zone.Player{handle: ^handle}}}, 1000
+    refute_receive {:cluster, _}, 50
+
+    pid = start("RouCos02")
+    {:ok, _handle} = Zone.MapInstance.enter(pid, player(self()))
+
+    TestLog.capture(fn ->
+      Process.exit(pid, :kill)
+      refute_receive {:cluster, _}, 100
+    end)
+  end
+
+  test "after a restart of Zone.Maps a killed instance is still logged" do
+    old_maps = Process.whereis(Zone.Maps)
+
+    TestLog.capture(fn ->
+      Process.exit(old_maps, :kill)
+      wait_until(fn -> Process.whereis(Zone.Maps) not in [nil, old_maps] end)
+      _ = :sys.get_state(Zone.Maps)
+    end)
+
+    {:ok, old} = Zone.MapInstance.whereis(0, "RouCos01")
+
+    log =
+      TestLog.capture(fn ->
+        Process.exit(old, :kill)
+        wait_for_new(old)
+        _ = :sys.get_state(Zone.Maps)
+      end)
+
+    assert [_] = Regex.scan(~r/\[error\] Zone: map instance RouCos01 of world 0 crashed/, log)
+  end
+
+  test "five kills of one instance in a row leave the other instances running" do
+    {:ok, other} = Zone.MapInstance.whereis(0, "Rou")
+
+    TestLog.capture(fn ->
+      for _ <- 1..5 do
+        {:ok, old} = Zone.MapInstance.whereis(0, "RouCos01")
+        Process.exit(old, :kill)
+        wait_for_new(old)
+      end
+
+      _ = :sys.get_state(Zone.Maps)
+    end)
+
+    assert {:ok, ^other} = Zone.MapInstance.whereis(0, "Rou")
   end
 end
