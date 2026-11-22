@@ -72,6 +72,12 @@ defmodule GameData.LoaderTest do
     assert {:ok, %{Mob => _, Drop => _}, []} = Loader.parse(dir, [Drop], true)
   end
 
+  test "a file whose name differs in letter case is found", %{tmp_dir: dir} do
+    write(dir, "MOB.CSV", "ID,Name,Extra\n1,Rat,x\n2,Bat,y\n")
+    assert {:ok, %{Mob => %{rows: rows}}, []} = Loader.parse(dir, [Mob], true)
+    assert map_size(rows) == 2
+  end
+
   test "a missing column", %{tmp_dir: dir} do
     valid(dir)
     write(dir, "mob.csv", "ID\n1\n")

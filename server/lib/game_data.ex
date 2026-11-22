@@ -23,7 +23,17 @@ defmodule GameData do
       CharDefaultItem,
       CharDefaultSkill,
       CharDefaultQuest,
-      CharDefaultShortcut
+      CharDefaultShortcut,
+      FieldList,
+      ShineNpc,
+      LinkTable,
+      ChrCommon,
+      MobInfo,
+      TownPortal,
+      SpamerPenalty,
+      SpamerPenaltyRule,
+      BlockData,
+      DataFile
     ]
 
   require Logger
@@ -115,6 +125,12 @@ defmodule GameData do
   def follow(%schema{} = row, field) do
     target = Keyword.fetch!(schema.__schema__().references, field)
     fetch(target, Map.fetch!(row, field))
+  end
+
+  @doc "The plain field maps: the `FieldList` rows with `KQ = 0` and no sub-map range, in file order. Raises when the table was not loaded."
+  @spec plain_field_maps() :: [GameData.FieldList.t()]
+  def plain_field_maps do
+    for {_row, %{kq: 0, sub_from: "-", sub_to: "-"} = field} <- Enum.sort(table(GameData.FieldList).rows), do: field
   end
 
   defp table(schema), do: :persistent_term.get({GameData, schema})

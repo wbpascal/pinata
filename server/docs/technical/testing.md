@@ -182,7 +182,7 @@ One multi-mode run on SQLite once failed with "Ecto repo Persistence.Repo.SQLite
 
 ## Digest test
 
-`test/cluster/data_digest_test.exs` starts peers, then a real node (Zone port from `TestPorts.free(1)`) (`elixir --name ... -e`, the code paths of the test VM, `PINATA_PARTS=zone`, `cluster.nodes` naming the WorldManager peer) with a data directory that differs. It asserts exit status 1, the message and both digests in the output, and that the WorldManager peer is still alive. The log level of the WorldManager peer is set to `:none`, so its expected refusal error does not show in the test output. The node halts itself with status 3 after 30 seconds if it is never refused. While `Zone.game_data/0` is `[]` any different directory works; when Zone declares tables, copy the test data directory and change one file.
+`test/cluster/data_digest_test.exs` starts peers, then a real node (Zone port from `TestPorts.free(1)`) (`elixir --name ... -e`, the code paths of the test VM, `PINATA_PARTS=zone`, `cluster.nodes` naming the WorldManager peer) with a data directory that differs. It asserts exit status 1, the message and both digests in the output, and that the WorldManager peer is still alive. The log level of the WorldManager peer is set to `:none`, so its expected refusal error does not show in the test output. The node halts itself with status 3 after 30 seconds if it is never refused. The differing directory holds only the tables of `Zone.game_data/0`, copied from the test data directory, and one extra file.
 
 ## Asserting server log lines
 

@@ -12,9 +12,17 @@ defmodule Cluster.DataDigestTest do
     # the WorldManager peer logs the refusal as an error; it is expected here and would show in the test output
     :ok = :peer.call(peers.wm, Logger, :configure, [[level: :none]])
 
-    # works while Zone.game_data/0 is []; when Zone declares tables, copy the test data directory and change one file
+    # the directory holds the tables Zone loads and differs by everything else
     bad_dir = Path.join(tmp_dir, "data")
     File.mkdir_p!(bad_dir)
+    good_dir = System.fetch_env!("PINATA_TEST_DATA_DIR")
+
+    for schema <- Zone.game_data() do
+      {_format, rel} = schema.__schema__().source
+      File.mkdir_p!(Path.dirname(Path.join(bad_dir, rel)))
+      File.cp!(Path.join(good_dir, rel), Path.join(bad_dir, rel))
+    end
+
     File.write!(Path.join(bad_dir, "x.txt"), "x")
 
     config = Path.join(tmp_dir, "pinata.toml")

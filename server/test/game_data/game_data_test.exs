@@ -89,4 +89,58 @@ defmodule GameDataTest do
       assert GameData.digest(make(Path.join(tmp, "b"), [{"pinata.db", "x"}, {"pinata.db-wal", "y"} | files])) == base
     end
   end
+
+  test "the tables of the Zone part load without warnings" do
+    assert {:ok, tables, []} = GameData.Loader.parse(@dir, Zone.game_data(), true)
+    assert map_size(tables) == 8
+
+    counts = %{
+      GameData.FieldList => 153,
+      GameData.ShineNpc => 537,
+      GameData.LinkTable => 236,
+      GameData.ChrCommon => 15,
+      GameData.MobInfo => 2842,
+      GameData.TownPortal => 8,
+      GameData.SpamerPenalty => 10,
+      GameData.SpamerPenaltyRule => 1
+    }
+
+    for {schema, count} <- counts, do: assert(map_size(tables[schema].rows) == count)
+  end
+
+  test "plain field maps" do
+    maps = GameData.plain_field_maps()
+    names = Enum.map(maps, & &1.map_id_client)
+    assert length(maps) == 88
+    assert Enum.uniq(names) == names
+    for name <- ["Linkfield01", "Linkfield02", "Wedding", "RouN"], do: assert(name in names)
+    refute "GuildT01" in names
+    assert %{map_id_client: "Rou", map_name: "Roumen", chat: 1, shout: 1} = hd(maps)
+  end
+
+  test "map table samples" do
+    assert [
+             %{
+               mob_name: "RouSmithJames",
+               x: 5645,
+               y: 8824,
+               direct: -62,
+               npc_menu: 1,
+               role: "Merchant",
+               role_arg: "Weapon"
+             }
+             | _
+           ] =
+             GameData.lookup(GameData.ShineNpc, :map, "RouN")
+
+    assert [%{map_server: "RouCos02", map_client: "RouCos02", x: 17_418, y: 13_832, direct: 80, party: 1}] =
+             GameData.lookup(GameData.LinkTable, :argument, "GateRou1")
+
+    assert {:ok, %{argument: 5}} = GameData.fetch(GameData.ChrCommon, "ShoutLevel")
+    assert {:ok, %{argument: 2}} = GameData.fetch(GameData.ChrCommon, "ShoutDelay")
+    assert [%{id: 0}] = GameData.lookup(GameData.MobInfo, :inx_name, "Slime")
+    assert {:ok, %{min_level: 1, group: 0, map_name: "RouN", x: 5874, y: 6530}} = GameData.fetch(GameData.TownPortal, 0)
+    assert {:ok, %{chat_block_time: 10, probate_time: 15}} = GameData.fetch(GameData.SpamerPenalty, 1)
+    assert {:ok, %{second_rule: 3000, repeat_rule: 3}} = GameData.fetch(GameData.SpamerPenaltyRule, 1)
+  end
 end

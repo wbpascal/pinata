@@ -11,7 +11,9 @@ The boundary `GameData` reads the data directory when a node starts and keeps ea
 | `shn/<Name>.shn`, `shn/View/<Name>.shn` | the SHN tables, byte for byte |
 | `tables/…/*.csv` | the server data tables, converted from TXT (below) |
 | `LuaScript/`, `Script/`, `ScenarioBookShelf/` | scripts, copied |
-| `BlockInfo/`, `AreaBMP/` | geometry, copied (not loaded with the tables) |
+| `BlockInfo/`, `AreaBMP/` | geometry, copied; not loaded with the tables, `GameData.BlockData` reads `BlockInfo/` per map |
+
+**File names ignore letter case.** Every file `GameData` opens by a name from a schema, a table or the code goes through `GameData.DataFile.path/2`: per path segment an entry with exactly that name wins, else the first entry of the sorted folder listing that equals it without regard to ASCII letter case, else the name as written (ADR 0006; the data has `linkfield01.shbd`, `linkfield02.shbd` and `wedding.shbd` for the maps `Linkfield01`, `Linkfield02` and `Wedding`). The import does not rename files. Later readers of scripts and other folders must use the same function.
 
 ## Geometry files (`BlockInfo/`)
 
@@ -19,12 +21,31 @@ One set of files per map, named after the map. All integers are little-endian `u
 
 | File | Maps (2016 data) | Content | Used by |
 |---|---|---|---|
-| `<map>.shbd` | 158, every map | Move block bitmap: `bytesPerRow, rows`, then `rows × bytesPerRow` bytes. A set bit is a cell a player cannot stand on. A position outside the map counts as blocked. | The move, stop and pull-back checks of a map instance. Required: a map without it stops the start-up. |
+| `<map>.shbd` | 158, every map | Move block bitmap: `bytesPerRow, rows`, then `rows × bytesPerRow` bytes. A set bit is a cell a player cannot stand on. A position outside the map counts as blocked. | The move, stop and pull-back checks of a map instance. Required: a map without it stops the start-up (the map instance calls `BlockData.check/2`). |
 | `<map>.shab` | 8 | Attack block bitmap, same format. Cells that also block attacks and monster paths. | OR-ed into the move block bitmap at load. Read on its own by monster path finding and fear (milestone 4). |
 | `<map>.aid` | 23 | Named areas, no blocking: `n` (at most 256), then per area `char name[32], type`; type 0 is a circle (3 more values), type 1 a rectangle (5 more values, the last an angle in degrees). | Map scripts only. Not read yet. |
 | `<map>.sbi` | 32 | Door blocks: `n` (at most 31), then per door `char name[32], x0, y0, x1, y1` (cells; the width is a multiple of 8), `len, offset`; then for every door two images of `len` bytes at `offset`, the closed one first, the open one second. | Closing a door ORs its closed image into that rectangle of the move block bitmap, opening copies the open image over it. Not read yet. |
 
 The shipped `.shbd` files hold every door open: 107 of the 128 door rectangles equal the open image and none equals the closed one. The original server closes all doors when a map loads. Until doors are built, the server leaves them open, because the client is not told about a door either.
+
+### Loader (`GameData.BlockData`)
+
+- `check(data_dir, map_name)`: the `.shbd` exists and its header is well formed (for the node start); the `.shab` is not looked at.
+- `load(data_dir, map_name)`: the `.shbd` with the `.shab` OR-ed in; only the merged bitmap is kept (struct `bytes_per_row`, `rows`, `bits`). A missing `.shab` is not an error. `.sbi` and `.aid` are not read. Nothing is cached and nothing logged here; the caller does both.
+- A map name is letters, digits, `_` and `-` only (every `MapIDClient` of the 2016 data is); any other name, for example one with `..` or a path separator, is refused before a file is touched, so a name that one day comes from a client cannot leave `BlockInfo/`. `GameData.DataFile.path/2` itself does not check its path; it is called with paths from the code only.
+- A header is valid when both numbers are above 0 and the file size is `8 + bytesPerRow × rows`; the `.shab` must have the dimensions of the `.shbd`. Errors are `{:error, message}`; `<file>` is `BlockInfo/` and the name on disk (the asked name when not found):
+
+| Message | When |
+|---|---|
+| `BlockInfo: <name> is not a map name` | the name has a byte other than a letter, a digit, `_` or `-`, or is empty |
+| `<file>: file not found` | the `.shbd` is missing |
+| `<file>: <reason>` | another read error |
+| `<file>: damaged block data (header <a> x <b>, <size> bytes)` | zero dimension or wrong size |
+| `<file>: damaged block data (<size> bytes, no header)` | shorter than 8 bytes |
+| `<shab>: damaged block data (header <a> x <b>, <shbd> has <c> x <d>)` | `.shab` of other dimensions |
+
+- Queries (Z02 §2, Z09 §9.2): `blocked?/3` (`mbi_IsMoveBlock`, FUN_0049df70), `free_cell?/3` (`mbi_OccupCellCheck`, FUN_0049e230, radius 1: any of the 3 × 3 cells inside the map and free), `line_blocked?/4` (`sp_MovePathBlockCheck`, FUN_00456a70: `need` consecutive blocked inner steps, default 2, end points never tested). The cell of a coordinate is `div(band(v × 8, 0xFFFFFFFF), 50)` (the `u32` arithmetic of the original), so a negative coordinate is outside the map and outside counts as blocked. The original interpolates with x87 floats; the rebuild uses floats and `round/1`, which differ only on an exact .5 tie, by one unit.
+- No map instance calls it yet.
 
 ## Import (`mix pinata.import_data <9Data folder> <new data directory>`)
 
@@ -88,9 +109,24 @@ One module per table, `GameData.<Name>`, implementing `GameData.Schema`: a struc
 
 A schema lists only the columns the server reads. A column of the file that it does not list is ignored; a listed column the file lacks is an error. A table without a schema is not loaded. Built so far (all read by character creation, `docs/pseudocode/db/D02-character.md` §3.3 and `docs/pseudocode/wm/W01-core.md` §4.1): `SingleData`, `MapInfo`, `ItemInfo`, `HairInfo`, `HairColorInfo`, `FaceInfo`, `CharDefault`, `CharDefaultItem`, `CharDefaultSkill`, `CharDefaultQuest`, `CharDefaultShortcut`, and `BadNameFilter` (the name filter of WorldManager, W01 §4.1). The references are `CharDefault.start_map` to `MapInfo` and `CharDefaultItem.item_id` to `ItemInfo`.
 
+Map tables, declared by `Zone` and read by the map instances, NPCs, gates, town portal and chat later:
+
+| Module | File | Key | Index |
+|---|---|---|---|
+| `FieldList` | `tables/World/Field/FieldList.csv` | row | `map_id_client` |
+| `ShineNpc` (`ShineNPC`) | `tables/World/NPC/ShineNPC.csv` | row | `map` |
+| `LinkTable` | `tables/World/NPC/LinkTable.csv` | row | `argument` |
+| `ChrCommon` (`Common`) | `tables/World/ChrCommon/Common.csv` | `key` | none |
+| `MobInfo` | `shn/MobInfo.shn` | `id` | `inx_name` |
+| `TownPortal` | `shn/TownPortal.shn` | `index` | none |
+| `SpamerPenalty` | `shn/SpamerPenalty.shn` | `penalty_lv` | none |
+| `SpamerPenaltyRule` | `shn/SpamerPenaltyRule.shn` | row | none |
+
+`FieldList`, `ShineNPC` and `LinkTable` are keyed by row because no column is unique. None of the eight has references; `ShineNPC.Map` is deliberately not one (rows on maps that do not run exist). `GameData.plain_field_maps/0` returns the `FieldList` rows with `KQ = 0` and no sub-map range (`SubFrom` and `SubTo` are `-`), in file order: 88 of 153 rows in the 2016 data.
+
 ## Loading
 
-`GameData.load(data_dir, schemas, strict_references: boolean)` is called by `Pinata.Application` after the settings and before any supervisor. A part declares its tables in `game_data/0` (`Login` and `Zone` none, `WorldManager` the twelve above); the application loads the union and the schemas they refer to. A missing data directory returns the error that names `mix pinata.import_data`. `GameData.Loader.parse/3` (pure) reads every table and returns **all** problems together; any problem stops the start:
+`GameData.load(data_dir, schemas, strict_references: boolean)` is called by `Pinata.Application` after the settings and before any supervisor. A part declares its tables in `game_data/0` (`Login` none, `WorldManager` the twelve above, `Zone` the eight map tables below); the application loads the union and the schemas they refer to. A missing data directory returns the error that names `mix pinata.import_data`. `GameData.Loader.parse/3` (pure) reads every table and returns **all** problems together; any problem stops the start:
 
 | Problem | Message (starts with the file) |
 |---|---|
@@ -128,4 +164,4 @@ Bytes are `:erts_debug.flat_size/1` times the word size; it leaves out binaries 
 
 ## Not built yet
 
-The MD5 of the 49 checksummed client data tables, loading of the geometry, and tables for everything other than character creation (ADR 0006).
+The MD5 of the 49 checksummed client data tables, a map instance that uses the block data (`.shab` on its own, `.sbi` and `.aid` are not read), and tables for everything other than character creation (ADR 0006).
