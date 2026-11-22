@@ -12,6 +12,7 @@ How the parts find each other and call each other (ADR 0002: fail simple).
 | `:pg` group `{:players, world_id}` | WorldManager connections that logged in (`Cluster.Registry.join_players/2`, `player_count/1`) |
 | `:pg` group `{:session, user_no}` | the process that is the session of the account |
 | `:pg` group `{:wm_handle, handle}` | the sessions with this session handle (`worldmanager` of `0x0C14`) |
+| `:pg` group `{:character, world_id, key}` | the session whose character of this name is in the world (`key` = the name with ASCII letters lower-cased) |
 
 The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs only when `cluster.nodes` is not empty, with `Cluster.Strategy.Epmd` and those hosts. `Cluster.Root` has that name because libcluster owns `Cluster.Supervisor`.
 
@@ -28,6 +29,8 @@ When a Zone node is lost (monitor), each of its maps goes to the remaining Zone 
 `Cluster.Sessions.register_handle/1` puts the calling WorldManager session into the group `{:wm_handle, handle}` at world login. `Cluster.Sessions.redeem/2` is called by a Zone connection on `0x1801`: it calls every member with `{:cluster, {:redeem, name, node(), self()}}` (`handle_call/2` of the handler; an exit counts as no session). The first success returns `{:ok, session_pid, entry}`; otherwise the first refusal that is not `:no_session`, else `{:error, :no_session}`. A handle repeats after 65536 logins; the character name and the node decide. Flow: [`flows/enter-world.md`](flows/enter-world.md).
 
 `Cluster.Sessions.map_login_done/1` is sent by the Zone connection to the session after `0x1803` (`{:cluster, :map_login_done}`, a message, no reply); the session answers it with the WorldManager burst ([`flows/map-entry.md`](flows/map-entry.md)).
+
+`Cluster.Sessions.enter_world/2` puts the calling WorldManager session into the group `{:character, world_id, key}` when a Zone connection redeems its map-login ticket; `leave_world/2` takes it out when the session accepts a new `0x1001`, and the group drops it when the process ends. A closed Zone connection does not take it out (between maps). `find_character/2` returns `{:ok, pid}` of the first member on any node, ASCII letter case ignored, or `:error`. A whisper is passed on in three messages, no calls: `whisper/2` sends `{:cluster, {:whisper, from, whisper}}` to the receiver's session, which answers the talker's session with `whisper_delivered/2` (`{:cluster, {:whisper_delivered, whisper}}`, the receiver's stored spelling) or, when its character has left the world meanwhile, `whisper_refused/2` (`{:cluster, {:whisper_refused, receiver}}`). Flow: [`flows/whisper.md`](flows/whisper.md).
 
 ## Facades
 

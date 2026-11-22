@@ -120,7 +120,9 @@ defmodule Zone.MapInstanceTest do
     assert {:ok, [%Proto.Packets.CharClientCardcollectCmd{} | _] = packets} =
              Zone.MapInstance.login_complete(pid, handle)
 
-    assert packets == Zone.MapEntry.login_complete(%{:sys.get_state(pid).players[handle] | mode: 0})
+    sight = Enum.filter(packets, &match?(%Proto.Packets.BriefinfoMobCmd{}, &1))
+    assert [_ | _] = sight
+    assert packets == Zone.MapEntry.login_complete(:sys.get_state(pid).players[handle], sight)
     assert :sys.get_state(pid).players[handle].mode == 1
     assert {:error, :not_entered} = Zone.MapInstance.login_complete(pid, handle)
     assert {:error, :not_entered} = Zone.MapInstance.login_complete(pid, 9000)
@@ -134,6 +136,63 @@ defmodule Zone.MapInstanceTest do
     send(conn, :stop)
     wait_until(fn -> not Map.has_key?(:sys.get_state(pid).players, handle) end)
     assert Map.keys(:sys.get_state(pid).players) == [other]
+  end
+
+  test "the appear elements of NPCs: a gate and a plain NPC as captured (idle_in_world)" do
+    state = "RouN" |> start() |> :sys.get_state()
+    by_place = Map.new(state.npcs, &{{&1.x, &1.y}, &1})
+
+    # the captured gate element: mob 159 at 7538, 5470, Direct 182, to Fbattle01
+    gate = by_place[{7538, 5470}]
+
+    assert %Proto.Packets.BriefinfoRegenmobCmd{mode: 2, mob_id: 159, dir: 91, flagstate: 1, kq_team_type: 2} =
+             gate.brief
+
+    assert gate.brief.flag == "Fbattle01" <> <<0::24, 0::192, 0x08, 0::496>>
+    # a plain NPC: mob 29 at 7305, 8999, no flag
+    assert %{mob_id: 29, dir: 30, flagstate: 0, flag: <<0::792>>} = by_place[{7305, 8999}].brief
+
+    gates =
+      for %{row: %{role: role}} = npc <- state.npcs, role in ["Gate", "IDGate", "ModeIDGate", "RandomGate"], do: npc
+
+    assert [_ | _] = gates
+    assert Enum.all?(gates, &(&1.brief.flagstate == 1))
+    assert map_size(state.npc_index) == length(state.npcs)
+  end
+
+  test "a map without MapInfo row and an NPC without MobInfo row are logged at start" do
+    log = TestLog.capture(fn -> start("RouCos04") end)
+    assert log =~ "[info] Zone: map RouCos04: no MapInfo row, sight radius 0"
+    log = TestLog.capture(fn -> start("Eld") end)
+    assert log =~ "[info] Zone: map Eld: NPC KDSoccer_MctNPC not shown: no MobInfo row"
+  end
+
+  test "an exit message of a linked process is ignored" do
+    pid = start("Rou")
+    send(pid, {:EXIT, self(), :boom})
+    assert {:error, :not_entered} = Zone.MapInstance.step(pid, 9000, {10, 10})
+  end
+
+  test "step, set_layer and inform of an unknown handle" do
+    pid = start("Rou")
+    assert {:error, :not_entered} = Zone.MapInstance.step(pid, 9000, {10, 10})
+    assert {:error, :not_entered} = Zone.MapInstance.set_layer(pid, 9000, 1, 0)
+    assert Zone.MapInstance.inform(pid, 9000, 17_084) == []
+  end
+
+  test "a player in sight that leaves is announced with 0x1805; a mode-0 player is not" do
+    pid = start("Rou")
+    {:ok, me} = Zone.MapInstance.enter(pid, player(self()))
+    {:ok, _} = Zone.MapInstance.login_complete(pid, me)
+    {:ok, other} = Zone.MapInstance.enter(pid, player())
+    {:ok, _} = Zone.MapInstance.login_complete(pid, other)
+    assert_receive {:cluster, {:packets, [%Proto.Packets.BriefinfoLogincharacterCmd{handle: ^other}]}}
+    {:ok, _} = Zone.MapInstance.leave(pid, other)
+    assert_receive {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: ^other}]}}
+
+    {:ok, hidden} = Zone.MapInstance.enter(pid, player())
+    {:ok, _} = Zone.MapInstance.leave(pid, hidden)
+    refute_receive {:cluster, _}, 50
   end
 
   defp wait_until(fun, tries \\ 100) do

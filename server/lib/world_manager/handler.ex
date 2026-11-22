@@ -26,6 +26,17 @@ defmodule WorldManager.Handler do
   the session sends its burst: `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9` (placeholders), `0x0849` and `0x182A`
   (flow: `docs/technical/flows/map-entry.md`).
 
+  `0x200C` whispers to a character by name (flow: `docs/technical/flows/whisper.md`). Only a session whose character
+  is in the world (its map-login ticket was redeemed, until its next accepted `0x1001`) can whisper or be whispered
+  to; a session at character select that whispers gets no answer. An empty text is echoed at once with `0x200F` and
+  count 0 (W04-B4 fixed). Otherwise the receiver is looked up in the world on any node, ASCII letter case ignored
+  (`Cluster.Sessions.find_character/2`): not found answers `0x200E` with `0x0F69`, a text of 129 bytes or more
+  `0x0F6B` (W04-B5 kept: the client shows nothing for it); else the receiver's session sends `0x200D` and the sender
+  gets `0x200F` with the receiver's stored spelling. Item links are relayed as opaque bytes; a packet whose size does
+  not match them is dropped by its size check (W04-B2 gone), and more than 78 links are dropped with a line. Absent
+  until their milestones: prison `0x0F6A`, Guild Tournament `0x0F6C`, the chat ban, the chat-title counter `0x6006`
+  and the GM colour bit of `0x200D`.
+
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
   `0x0C18` with type 0 closes the connection. `0x0C18` with type 1 (back to the character list) asks the Zone
   connection to leave the world and waits for its save (`Cluster.Sessions.leave_world/1`); the client then asks for
@@ -36,6 +47,10 @@ defmodule WorldManager.Handler do
 
   @behaviour Net.Handler
 
+  alias Proto.Packets.ActSomeonewhisperCmd
+  alias Proto.Packets.ActWhisperfailAck
+  alias Proto.Packets.ActWhisperReq
+  alias Proto.Packets.ActWhispersuccessAck
   alias Proto.Packets.AvatarCreatefailAck
   alias Proto.Packets.AvatarCreatesuccAck
   alias Proto.Packets.AvatarCreateReq
@@ -72,6 +87,7 @@ defmodule WorldManager.Handler do
   @enforce_keys [:worlds]
   defstruct [:worlds, :world_no, :handle] ++
               [step: :login, user_no: :none, user_name: :none, tutorial: :none, reservation: :none, zone: :none] ++
+              [character: :none] ++
               [kq_time_sent?: false]
 
   @type reservation :: %{character_id: pos_integer(), name: binary(), map: String.t(), node: node()}
@@ -86,8 +102,12 @@ defmodule WorldManager.Handler do
           tutorial: :none | Persistence.character(),
           reservation: :none | reservation(),
           zone: :none | pid(),
+          character: :none | binary(),
           kq_time_sent?: boolean()
         }
+
+  # above it the relayed 0x200D can exceed the frame limit of Net.Connection
+  @max_item_links 78
 
   @impl Net.Handler
   def init(settings), do: %__MODULE__{worlds: Enum.map(settings.world, & &1.number)}
@@ -140,10 +160,12 @@ defmodule WorldManager.Handler do
 
   # A new 0x1001 voids an open reservation and an open question.
   def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %CharLoginReq{slot: slot})
-      when is_integer(user_no),
-      do:
-        {%{state | tutorial: :none, reservation: :none},
-         [{:perform, {:select_character, state.world_no, user_no, slot}}]}
+      when is_integer(user_no) do
+    leave = if is_binary(state.character), do: [{:perform, {:leave_world, state.world_no, state.character}}], else: []
+
+    {%{state | tutorial: :none, reservation: :none, character: :none},
+     leave ++ [{:perform, {:select_character, state.world_no, user_no, slot}}]}
+  end
 
   def handle_packet(%__MODULE__{step: :open, tutorial: %{}} = state, %CharTutorialPopupAck{is_skip: 0}),
     do: {%{state | tutorial: :none}, [{:send, %CharLoginfailAck{error: 0x145}}]}
@@ -166,6 +188,19 @@ defmodule WorldManager.Handler do
     do: {%{state | kq_time_sent?: true}, [{:perform, :kq_list_time}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, %KqListRefreshReq{}), do: {state, []}
+
+  def handle_packet(%__MODULE__{step: :open, character: talker} = state, %ActWhisperReq{item_link_count: n})
+      when is_binary(talker) and n > @max_item_links,
+      do: {state, [{:log, :info, "whisper dropped: #{n} item links"}]}
+
+  # W04-B4 fixed: the count byte is 0
+  def handle_packet(%__MODULE__{step: :open, character: talker} = state, %ActWhisperReq{content: ""} = req)
+      when is_binary(talker),
+      do: {state, [{:send, %ActWhispersuccessAck{item_link_count: 0, receiver: req.receiver, content: "", links: ""}}]}
+
+  def handle_packet(%__MODULE__{step: :open, character: talker} = state, %ActWhisperReq{} = req)
+      when is_binary(talker),
+      do: {state, [{:perform, {:whisper, state.world_no, talker, req}}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
@@ -302,6 +337,48 @@ defmodule WorldManager.Handler do
          {:send, %MapLinkendClientCmd{unused: 0}}
        ]}
 
+  def handle_info(state, :left_world), do: {state, []}
+
+  def handle_info(state, {:whisper_failed, code, receiver}),
+    do: {state, [{:send, %ActWhisperfailAck{error: code, receiver: receiver}}]}
+
+  def handle_info(state, :whisper_passed_on), do: {state, []}
+
+  def handle_info(%__MODULE__{character: name} = state, {:cluster, {:whisper, from, w}}) when is_binary(name),
+    do:
+      {state,
+       [
+         {:send,
+          %ActSomeonewhisperCmd{
+            item_link_count: w.item_link_count,
+            talker: w.talker,
+            flag: 0,
+            content: w.content,
+            links: w.links
+          }},
+         {:perform, {:whisper_delivered, from, %{w | receiver: name}}}
+       ]}
+
+  # The receiver left the world between the lookup and the delivery.
+  def handle_info(state, {:cluster, {:whisper, from, w}}),
+    do: {state, [{:perform, {:whisper_refused, from, w.receiver}}]}
+
+  def handle_info(state, {:cluster, {:whisper_delivered, w}}),
+    do:
+      {state,
+       [
+         {:send,
+          %ActWhispersuccessAck{
+            item_link_count: w.item_link_count,
+            receiver: w.receiver,
+            content: w.content,
+            links: w.links
+          }}
+       ]}
+
+  def handle_info(state, {:cluster, {:whisper_refused, receiver}}),
+    do: {state, [{:send, %ActWhisperfailAck{error: 0x0F69, receiver: receiver}}]}
+
   def handle_info(state, {:cluster, :session_replaced}),
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, {:close, :info, "session replaced"}]}
 
@@ -317,7 +394,8 @@ defmodule WorldManager.Handler do
       map: r.map
     }
 
-    {{:ok, entry}, %{state | reservation: :none}, [{:perform, {:watch_zone, zone_pid}}]}
+    {{:ok, entry}, %{state | reservation: :none, character: name},
+     [{:perform, {:enter_world, state.world_no, name, zone_pid}}]}
   end
 
   def handle_call(%__MODULE__{reservation: %{name: name}} = state, {:redeem, name, _node, _zone_pid}),
@@ -396,9 +474,48 @@ defmodule WorldManager.Handler do
   def perform({:skip_tutorial, world_no, user_no, c}),
     do: {:tutorial_skipped, c, Persistence.skip_tutorial(world_no, user_no, c.slot)}
 
-  def perform({:watch_zone, pid}) do
+  def perform({:enter_world, world_no, name, pid}) do
+    :ok = Cluster.Sessions.enter_world(world_no, name)
     _ = Process.monitor(pid)
     {:zone_connected, pid}
+  end
+
+  def perform({:leave_world, world_no, name}) do
+    :ok = Cluster.Sessions.leave_world(world_no, name)
+    :left_world
+  end
+
+  def perform({:whisper, world_no, talker, req}) do
+    case Cluster.Sessions.find_character(world_no, req.receiver) do
+      :error ->
+        {:whisper_failed, 0x0F69, req.receiver}
+
+      # W04-B5 kept: the client shows nothing for 0x0F6B
+      {:ok, _pid} when byte_size(req.content) > 128 ->
+        {:whisper_failed, 0x0F6B, req.receiver}
+
+      {:ok, pid} ->
+        whisper = %{
+          talker: talker,
+          receiver: req.receiver,
+          item_link_count: req.item_link_count,
+          content: req.content,
+          links: req.links
+        }
+
+        :ok = Cluster.Sessions.whisper(pid, whisper)
+        :whisper_passed_on
+    end
+  end
+
+  def perform({:whisper_delivered, from, whisper}) do
+    :ok = Cluster.Sessions.whisper_delivered(from, whisper)
+    :whisper_passed_on
+  end
+
+  def perform({:whisper_refused, from, receiver}) do
+    :ok = Cluster.Sessions.whisper_refused(from, receiver)
+    :whisper_passed_on
   end
 
   def perform(:kq_list_time) do

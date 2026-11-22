@@ -7,16 +7,19 @@ defmodule Proto.Packet do
       field :name, {:char, 20}                    # decoded up to the first NUL, encoded zero-padded
       field :raw, {:bytes, 5}                     # untouched binary
       field :equip, {:u16s, 20}                   # list of integers
-      field :text, {:counted, :u8}                # u8 length, then that many bytes; must be the last entry
+      field :text, {:counted, :u8}                # u8 length, then that many bytes; must be the last entry or be followed only by a `:records` field
+      field :links, {:records, :count, 0x67}      # count (an earlier integer field) x 0x67 opaque bytes; must be the last entry
       field :avatar, MyApp.Avatar                 # nested struct (any module using this DSL)
       bits [gender: 1, chrclass: 5, race: 2]      # one byte, most significant bit first
       array :worlds, MyApp.World, count: :u8      # must be the last entry
 
   Rules: a char field is cut at its first NUL and zero-padded on encode; lengths are strict, any other size
-  gives `{:error, :bad_size}`; an array count and the length of a counted field are not struct fields.
+  gives `{:error, :bad_size}`; an array count and the length of a counted field are not struct fields. The count of a
+  `:records` field is an ordinary struct field which the encoder writes as given: the caller keeps both consistent.
 
   `__packet__/0` has `layout`: `{name, offset, size, sub}` per key (byte offset in the payload; `size` nil and `offset`
   of the count for an array or a counted field; `sub` is nil, a nested module or `{:array, module, count_bytes}`), used by the replay masks.
+  Fields after a variable-sized entry have no usable `layout` offset.
 
   The decode is one function head with a literal binary pattern.
   """
@@ -123,6 +126,23 @@ defmodule Proto.Packet do
       size: nil,
       sub: nil,
       doc: [{name, "bytes[count: #{count_type}]"}]
+    }
+  end
+
+  # opaque fixed-size records whose count is an earlier integer field of the same packet
+  defp entry({:field, name, {:records, count_field, n}}) do
+    v = Macro.var(name, nil)
+    c = Macro.var(count_field, nil)
+
+    %{
+      keys: [{name, quote(do: binary())}],
+      pat: [{:"::", [], [v, quote(do: binary - size(unquote(c) * unquote(n)))]}],
+      pre: [],
+      vals: [{name, v}],
+      enc: [bin_seg(v)],
+      size: nil,
+      sub: nil,
+      doc: [{name, "bytes[#{count_field} x #{n}]"}]
     }
   end
 

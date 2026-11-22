@@ -4,18 +4,25 @@ defmodule Replay.Deferrals do
   yet. Every entry names a milestone and a reason, and the milestone that builds the part removes the entry.
 
   Forms (`entry/0`): `{:payload, module, path | :all, milestone, reason}` (a field, or the whole payload, of a
-  server packet is not compared), `{:absent, module, milestone, reason}` (the server packet is not sent yet),
+  server packet is not compared), `{:payload, [index, ...], module, path | :all, milestone, reason}` (the same for
+  the server packets of these transcript indices only), `{:absent, module, milestone, reason}` (the server packet is not sent yet),
   `{:absent, [index, ...], milestone, reason}` (these server packets are left out, by transcript index: for an opcode
   that built code also sends),
   `{:unsent, client_index, answer_indices, milestone, reason}` (a client packet and its answers are left out, by
   transcript index) and `{:mobs, mobs, milestone, reason}` (the monsters of a map are left out per object).
+
+  A `lists` entry of `:mobs` is `{module, array, handle_field, mob_id_field, max}`: the elements of a list packet
+  that are monsters are taken out. Then a run of consecutive kept list packets of one connection (same opcode) has
+  its elements concatenated and split again into lists of at most `max`; chunk *i* takes the place (index, time,
+  scope) of packet *i* of the run, run packets left without a chunk are taken out. The reason: the original fills a
+  list with NPCs and monsters, the rebuild only with NPCs, so the list borders differ until milestone 4.
   """
 
   alias Replay.Masks
 
   @type mobs :: %{
           appear: [{module(), handle :: Masks.path(), mob_id :: Masks.path()}],
-          lists: [{module(), array :: atom(), handle :: atom(), mob_id :: atom()}],
+          lists: [{module(), array :: atom(), handle :: atom(), mob_id :: atom(), max :: pos_integer()}],
           gone: [{module(), handle :: Masks.path()}],
           about: [{module(), Masks.path()}],
           npc?: (map :: String.t() | nil, mob_id :: non_neg_integer() -> boolean())
@@ -23,6 +30,7 @@ defmodule Replay.Deferrals do
 
   @type entry ::
           {:payload, module(), Masks.path() | :all, milestone :: pos_integer(), reason :: String.t()}
+          | {:payload, [pos_integer()], module(), Masks.path() | :all, pos_integer(), String.t()}
           | {:absent, module(), pos_integer(), String.t()}
           | {:absent, [pos_integer()], pos_integer(), String.t()}
           | {:unsent, client_index :: pos_integer(), answer_indices :: [pos_integer()], pos_integer(), String.t()}
@@ -59,6 +67,15 @@ defmodule Replay.Deferrals do
   defp check_shape!({:payload, mod, path, _m, r}, _packets) when is_atom(mod), do: Masks.validate!([{mod, path, r}])
   defp check_shape!({:absent, mod, _m, _r}, _packets) when is_atom(mod), do: :ok
 
+  defp check_shape!({:payload, indices, mod, path, _m, r}, packets) when is_list(indices) and is_atom(mod) do
+    for index <- indices,
+        not Enum.any?(packets, &(&1.index == index and &1.dir == :server and &1.opcode == mod.opcode())),
+        do:
+          raise(ArgumentError, "deferral :payload #{inspect(index)} is not a #{inspect(mod)} packet of the transcript")
+
+    if path == :all, do: :ok, else: Masks.validate!([{mod, path, r}])
+  end
+
   defp check_shape!({:absent, indices, _m, _r}, packets) when is_list(indices) do
     for index <- indices,
         not Enum.any?(packets, &(&1.index == index and &1.dir == :server)),
@@ -83,7 +100,8 @@ defmodule Replay.Deferrals do
     Masks.validate!(for({mod, handle, id} <- a, p <- [handle, id], do: {mod, p, "x"}))
     Masks.validate!(for {mod, handle} <- g ++ ab, do: {mod, handle, "x"})
 
-    Enum.each(l, fn {mod, array, handle, id} ->
+    Enum.each(l, fn {mod, array, handle, id, max} ->
+      if not (is_integer(max) and max > 0), do: raise(ArgumentError, "deferral :mobs list max must be above 0")
       Masks.validate!([{mod, array, "x"}])
       {^array, _off, _size, {:array, elem, _count_bytes}} = List.keyfind(mod.__packet__().layout, array, 0)
       Masks.validate!([{elem, handle, "x"}, {elem, id, "x"}])
@@ -113,7 +131,40 @@ defmodule Replay.Deferrals do
         end
       end)
 
-    Enum.reverse(kept)
+    kept |> Enum.reverse() |> repack(for(m <- mobs, l <- m.lists, do: l))
+  end
+
+  # Runs of consecutive list packets of one connection are cut again into lists of at most max elements.
+  defp repack(packets, []), do: packets
+
+  defp repack(packets, lists) do
+    list = fn p -> if p.dir == :server, do: find(lists, p.opcode) end
+
+    packets
+    |> Enum.chunk_by(&if(list.(&1), do: {&1.conn, &1.opcode}, else: {:single, &1.index}))
+    |> Enum.flat_map(fn [first | _] = run ->
+      case list.(first) do
+        {mod, array, _handle, _id, max} -> repack_run(run, mod, array, max)
+        nil -> run
+      end
+    end)
+  end
+
+  defp repack_run(run, mod, array, max) do
+    {^array, off, nil, {:array, elem, count_bytes}} = List.keyfind(mod.__packet__().layout, array, 0)
+    size = elem.__packet__().size
+    bits = count_bytes * 8
+
+    elements =
+      for p <- run,
+          <<_prefix::binary-size(^off), _count::binary-size(^count_bytes), rest::binary>> = p.payload,
+          <<e::binary-size(^size) <- rest>>,
+          do: e
+
+    for {p, chunk} <- Enum.zip(run, Enum.chunk_every(elements, max)) do
+      <<prefix::binary-size(^off), _rest::binary>> = p.payload
+      %{p | payload: prefix <> <<length(chunk)::little-size(bits)>> <> Enum.join(chunk)}
+    end
   end
 
   defp one(packet, ctx, state) do
@@ -181,7 +232,7 @@ defmodule Replay.Deferrals do
 
   defp list(%{dir: :server} = packet, m, excluded) do
     case find(m.lists, packet.opcode) do
-      {mod, array, handle, id} -> reduce_list(packet, mod, {array, handle, id}, m, excluded)
+      {mod, array, handle, id, _max} -> reduce_list(packet, mod, {array, handle, id}, m, excluded)
       nil -> {packet, excluded}
     end
   end

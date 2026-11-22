@@ -80,6 +80,13 @@ defmodule Proto.RoundtripTest.Fixtures.Wide do
   field :text, {:counted, :u8}
 end
 
+defmodule Proto.RoundtripTest.Fixtures.Linked do
+  use Proto.Packet
+  field :count, :u8
+  field :text, {:counted, :u8}
+  field :links, {:records, :count, 3}
+end
+
 defmodule Proto.RoundtripTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
@@ -162,8 +169,18 @@ defmodule Proto.RoundtripTest do
     assert F.Wide.__packet__().fields == [big: "u64", small: "i8", text: "bytes[count: u8]"]
   end
 
+  test "records counted by an earlier field" do
+    p = %F.Linked{count: 2, text: "hi", links: "abcdef"}
+    bytes = <<2, 2, "hi", "abcdef">>
+    assert F.Linked.encode(p) == bytes
+    assert F.Linked.decode(bytes) == {:ok, p}
+    assert F.Linked.decode(<<2, 2, "hi", "abcde">>) == {:error, :bad_size}
+    assert F.Linked.decode(<<2, 2, "hi", "abcdefg">>) == {:error, :bad_size}
+    assert F.Linked.__packet__().fields == [count: "u8", text: "bytes[count: u8]", links: "bytes[count x 3]"]
+  end
+
   property "decode of random binaries never raises" do
-    check all mod <- StreamData.member_of([F.World, F.Avatar, F.Wide | Map.values(@modules)]),
+    check all mod <- StreamData.member_of([F.World, F.Avatar, F.Wide, F.Linked | Map.values(@modules)]),
               bin <- StreamData.binary() do
       result = mod.decode(bin)
       assert match?({:ok, %^mod{}}, result) or result == {:error, :bad_size}

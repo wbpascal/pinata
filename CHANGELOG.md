@@ -13,6 +13,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - The Client data check: a client whose copy of one of 49 client tables differs from the server's is refused at the map login with "The client has been illegally manipulated…", and a `warning` line names the table and both hashes. A node with the Zone part does not start when one of the 49 files is missing; the error names the file (#107).
 - A character that enters the world passes the loading screen and stands on its stored map at its stored position, wearing its equipment. Inventory, skills, quests, titles and the shortcut bar are empty until their milestones (#108).
 - A client packet that belongs to the protocol but is not built yet is ignored with a `debug` line; before, it closed the connection. A packet outside the protocol still closes it (#108).
+- Players on a map see each other and the standing NPCs: when they enter the map, when they come into or leave each other's sight, and when one leaves the map. A player in a crowd (29 or more objects within 500 units) gets the players of a smaller radius at entry, as in the original. A map without `MapInfo` row and an NPC without `MobInfo` row are logged with an `info` line at start-up (#109).
+- Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
 - Leaving the world (back to the character list, quit, lost connection) saves map, position, HP, SP, play minutes and the logout time, and the character can be selected again at once (#111).
 - Every character in the world is saved every 10 minutes; a crashed map disconnects its players and loses what happened since their last save; stopping the server saves every player first (#111).
 - A second login of an account waits until the first session's character is saved; when that takes more than 5 s the login is refused and an `error` line is written (#111).
@@ -24,6 +26,10 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 
 - Skipping the tutorial enters the world on the character's stored map; the original refused the login after the skip (P02-B33) (#107).
 - A refused map login carries the real refusal code; the original sent another one (Z01-B1) (#107).
+- Objects in different dimensions no longer get an appear and a delete packet on every step (P02-B27) (#109).
+- A client request for the appear packet of an object (`0x1C01`) is answered only when the object is in sight (#109).
+- A whisper whose size does not match its item links is ignored; the original copied past its buffer and any player could stop WorldManager with it (W04-B2) (#114).
+- The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).
 - No exit countdown on the server: the character leaves the world at once (the original kept it for up to 13 s); a character select right after "back to character select" is never refused (#111).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).

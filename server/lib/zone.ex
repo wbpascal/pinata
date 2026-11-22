@@ -30,6 +30,7 @@ defmodule Zone do
       GameData.ChrCommon,
       GameData.ItemInfo,
       GameData.MobInfo,
+      GameData.MapInfo,
       GameData.TownPortal,
       GameData.SpamerPenalty,
       GameData.SpamerPenaltyRule

@@ -340,5 +340,15 @@ defmodule EnterWorldTest do
                 {:close, :info, "map login refused: reserved for another Zone node"}
               ]} = Zone.Handler.handle_info(state, {:redeemed, {:error, :wrong_node}})
     end
+
+    test "pushed sight packets are dropped before the world and sent in it" do
+      msg = {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: 8001}]}}
+      state = %Zone.Handler{checksums: [], step: :loading}
+
+      assert {^state, []} = Zone.Handler.handle_info(state, msg)
+
+      assert {_, [{:send, %Proto.Packets.MapLogoutCmd{handle: 8001}}]} =
+               Zone.Handler.handle_info(%{state | step: :in_world}, msg)
+    end
   end
 end

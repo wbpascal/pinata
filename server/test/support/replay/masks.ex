@@ -50,7 +50,11 @@ defmodule Replay.Masks do
           {Proto.Packets.ItemRewardinvenopenAck, :stray,
            "uninitialised memory (P02-B3): the original adds one unwritten byte, the rebuild sends 0"},
           {Proto.Packets.ActNoticeCmd, :unused,
-           "uninitialised memory (Z09-B54): the original never writes the first byte, the rebuild sends 0"}
+           "uninitialised memory (Z09-B54): the original never writes the first byte, the rebuild sends 0"},
+          {Proto.Packets.ActSomeonewhisperCmd, :flag,
+           "uninitialised memory (P02-B29): the original leaves bits 1 to 7 of the flag as its stack held them, the rebuild sends 0; the mask covers the whole byte, so the GM colour bit is not compared"},
+          {Proto.Packets.ActWhispersuccessAck, :item_link_count,
+           "uninitialised memory (W04-B4): the original never writes the count of the empty-whisper echo, the rebuild sends 0; the mask covers the count of every 0x200F, which test/whisper_test.exs checks instead"}
         ]
 
   defp card_collection_masks do
@@ -92,7 +96,22 @@ defmodule Replay.Masks do
         {Proto.Packets.MapLoginReq, :wm_handle, :wm_session,
          "session handle: the client sends back the handle of 0x0C14"},
         {Proto.Packets.MapLoginAck, :handle, :object, "object handle: the map instance gives the next free handle"}
-      ] ++ brief_handles()
+      ] ++ brief_handles() ++ sight_handles()
+
+  defp sight_handles,
+    do: [
+      {Proto.Packets.BriefinfoMobCmd, [:mobs, :handle], :object, "object handle: the map instance places its NPCs"},
+      {Proto.Packets.BriefinfoRegenmobCmd, :handle, :object, "object handle: the map instance places its NPCs"},
+      {Proto.Packets.BriefinfoLogincharacterCmd, :handle, :object,
+       "object handle: the handle of 0x1802 of the other player"},
+      {Proto.Packets.BriefinfoCharacterCmd, [:chars, :handle], :object,
+       "object handle: the handles of 0x1802 of the players in sight"},
+      {Proto.Packets.BriefinfoBriefinfodeleteCmd, :handle, :object, "object handle: the object that left sight"},
+      {Proto.Packets.MapLogoutCmd, :handle, :object, "object handle: the player that left the map"},
+      {Proto.Packets.BriefinfoInformCmd, :my_handle, :object,
+       "object handle: the client sends its own handle of 0x1802"},
+      {Proto.Packets.BriefinfoInformCmd, :handle, :object, "object handle: the client sends back a handle it was shown"}
+    ]
 
   defp brief_handles do
     for mod <- [

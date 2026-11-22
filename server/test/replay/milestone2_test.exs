@@ -1,9 +1,4 @@
 # Stand-ins for the packets nobody defines yet: the `:absent` deferral needs a module with `opcode/0`.
-defmodule Replay.Milestone2Test.Unbuilt.BriefinfoMobCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x1C09
-end
-
 defmodule Replay.Milestone2Test.Unbuilt.BatAbstateinformNoeffectCmd do
   @spec opcode() :: 0..0xFFFF
   def opcode, do: 0x242A
@@ -69,16 +64,6 @@ defmodule Replay.Milestone2Test.Unbuilt.KqJoiningAlarmCmd do
   def opcode, do: 0x5824
 end
 
-defmodule Replay.Milestone2Test.Unbuilt.BriefinfoBriefinfodeleteCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x1C0E
-end
-
-defmodule Replay.Milestone2Test.Unbuilt.BriefinfoRegenmobCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x1C08
-end
-
 defmodule Replay.Milestone2Test do
   # The harness swaps the global clock source, so it cannot run async.
   use ExUnit.Case, async: false
@@ -123,8 +108,14 @@ defmodule Replay.Milestone2Test do
     {:payload, P.CharOptionGetShortcutsizeAck, :all, 6,
      "the stored shortcut sizes of the captured character (options)"},
     {:payload, P.CharOptionGetWindowposAck, :all, 6, "the stored window positions of the captured character (options)"},
-    {:absent, U.BriefinfoMobCmd, 2,
-     "the sight exchange: issue 109 builds it for NPCs and players, milestone 4 for mobs (the two captured are mobs)"},
+    {:mobs,
+     %{
+       appear: [{P.BriefinfoRegenmobCmd, :handle, :mob_id}],
+       lists: [{P.BriefinfoMobCmd, :mobs, :handle, :mob_id, 28}],
+       gone: [{P.BriefinfoBriefinfodeleteCmd, :handle}],
+       about: [],
+       npc?: &__MODULE__.npc?/2
+     }, 4, "the monsters of the map (mobs); the NPC elements of 0x1C09 are compared"},
     {:absent, U.BatAbstateinformNoeffectCmd, 4, "the abstates 345 and 291 of the captured character (abstates)"},
     {:absent, U.BatAbstateinformCmd, 4, "the title abstates and abstate 728 (abstates)"},
     {:absent, U.BriefinfoAbstateChangeCmd, 4, "the abstates of the captured character (abstates)"},
@@ -138,6 +129,14 @@ defmodule Replay.Milestone2Test do
     {:payload, P.KqJoiningAlarmList, :all, 10, "the Kingdom Quests open to join (Kingdom Quest)"},
     {:payload, P.CharClientNewbieGuideViewListCmd, :all, 11, "the newbie guides the captured character has seen"}
   ]
+
+  @doc false
+  @spec npc?(String.t() | nil, non_neg_integer()) :: boolean()
+  def npc?(map, mob_id) do
+    Enum.any?(GameData.lookup(GameData.ShineNpc, :map, map), fn row ->
+      Enum.any?(GameData.lookup(GameData.MobInfo, :inx_name, row.mob_name), &(&1.id == mob_id))
+    end)
+  end
 
   @prison_race "order race of the original: its 0x7C07 comes between 0x7005 and 0x700D; the rebuild answers in request order (test/map_entry_test.exs)"
   @kq_race "order race of the original (its 0x581C comes after the WorldManager burst) and the Kingdom Quest list 0x581D (Kingdom Quest); the answer is checked by test/map_entry_test.exs"
@@ -174,7 +173,6 @@ defmodule Replay.Milestone2Test do
 
   @linger "the original saves (and sets the KQ date) about 10 s after a session ends, the logout linger the rebuild leaves out by decision (issue 94); the lists at 429 and 574 show that time. No milestone removes it"
   @inventory_race "order race of the original: 0x302C and 0x3020 sent before the end of the 0x1803 burst are answered inside it; the rebuild answers after it (test/map_entry_test.exs)"
-  @mobs "mobs leaving and appearing in sight (mobs)"
 
   # Per world entry the two order races: the 0x7C06 with its 0x7C07, the 0x581B with its 0x581C and three 0x581D.
   @entries [{42, [45], 47, [60, 61, 62, 63]}, {206, [209], 210, [216, 217, 218, 219]}] ++
@@ -190,16 +188,14 @@ defmodule Replay.Milestone2Test do
                               ]
                             end) ++
                             [
-                              {:payload, P.UserLoginworldAck, [:avatars, :kq_date], 2, @linger},
-                              {:payload, P.UserLoginworldAck, [:avatars, :kq_date_sec], 2, @linger},
+                              {:payload, [429, 574], P.UserLoginworldAck, [:avatars, :kq_date], 2, @linger},
+                              {:payload, [429, 574], P.UserLoginworldAck, [:avatars, :kq_date_sec], 2, @linger},
                               {:unsent, 220, [283], 2, @inventory_race},
                               {:unsent, 221, [282], 2, @inventory_race},
                               {:unsent, 469, [541], 2, @inventory_race},
                               {:unsent, 470, [548], 2, @inventory_race},
                               {:unsent, 614, [687], 2, @inventory_race},
                               {:unsent, 615, [694], 2, @inventory_race},
-                              {:absent, U.BriefinfoBriefinfodeleteCmd, 4, @mobs},
-                              {:absent, U.BriefinfoRegenmobCmd, 4, @mobs},
                               {:absent, [137, 301, 317, 318, 352, 353, 390, 391, 698, 862], 4,
                                "the late 0x1035 of the abstate resets (parameters); the built one of each map entry stays"}
                             ]

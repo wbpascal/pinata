@@ -131,7 +131,8 @@ defmodule Replay.HarnessTest do
       do: {state, [{:send, %Reply{code: 1, token: rem(Clock.system_time(:millisecond), 4_294_967_296), handle: 7}}]}
   end
 
-  # answers, then closes the connection
+  # answers, then closes the connection a moment later: a close with the heartbeat of the harness unread resets the
+  # connection on Windows and the client loses the answer
   defmodule Refuser do
     @moduledoc false
     @behaviour Net.Handler
@@ -140,8 +141,13 @@ defmodule Replay.HarnessTest do
     def init(_settings), do: %{}
 
     @impl Net.Handler
-    def handle_packet(state, %MiscSeedAck{seed: 1}),
-      do: {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}, {:close, :info, "bye"}]}
+    def handle_packet(state, %MiscSeedAck{seed: 1}) do
+      Process.send_after(self(), {:cluster, :bye}, 200)
+      {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}]}
+    end
+
+    @impl Net.Handler
+    def handle_info(state, {:cluster, :bye}), do: {state, [{:close, :info, "bye"}]}
   end
 
   # a seed of 10, 11 or 12 enters a map; the handle of a later reply depends on the map entered
@@ -304,7 +310,7 @@ defmodule Replay.HarnessTest do
       assert run(Tokener, lines, conns: ["zone#1"]) == :ok
     end
 
-    test "an answer followed by a close by the server is still a transcript line" do
+    test "an answer followed by a close by the server is a transcript line and the close ends the replay" do
       lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 0100000000000700"
       assert run(Refuser, lines, conns: ["zone#1"]) == :ok
     end
@@ -420,6 +426,18 @@ defmodule Replay.HarnessTest do
       assert run(Stub, lines, deferrals: [{:payload, Reply, :token, 4, "r"}]) == :ok
     end
 
+    test "payload by index: a field or the payload of those server packets only" do
+      lines = @trigger <> "0100\n" <> @reply <> "0100aaaaaaaa0700"
+      assert run(Stub, lines, deferrals: [{:payload, [3], Reply, :token, 4, "r"}]) == :ok
+      assert run(Stub, lines, deferrals: [{:payload, [3], Reply, :all, 4, "r"}]) == :ok
+
+      packets = transcript(lines).packets
+
+      assert_raise ArgumentError, ~r/:payload 2 is not a/, fn ->
+        Replay.Deferrals.validate!([{:payload, [2], Reply, :token, 4, "r"}], packets)
+      end
+    end
+
     test "absent: the packet is taken out of the transcript" do
       lines = @good <> "\n100.700000 login#1 S 0x7F02 00"
       assert {:error, %Failure{kind: :missing}} = run(Stub, lines)
@@ -490,7 +508,7 @@ defmodule Replay.HarnessTest do
 
       %{
         appear: [{Reply, :handle, :code}],
-        lists: [{Box, :items, :id, :qty}],
+        lists: [{Box, :items, :id, :qty, 28}],
         gone: [{Gone, :handle}],
         about: [{About, :handle}, {MiscSeedAck, :seed}],
         npc?: fn map, id ->
@@ -515,6 +533,29 @@ defmodule Replay.HarnessTest do
       assert Enum.find(packets, &(&1.index == 4)).scope == "A"
       assert Enum.find(packets, &(&1.index == 14)).scope == nil
       assert_received {:npc, "A", 2}
+    end
+
+    test "consecutive reduced lists of one connection are cut again into lists of at most max" do
+      lines = """
+      100.100000 zone#1 S 0x7F03 #{@a}
+      100.110000 zone#1 S 0x7F02 00000000020a00010b0002
+      100.120000 zone#1 S 0x7F02 00000000030c00010d00010e0002
+      """
+
+      mobs = %{mobs() | lists: [{Box, :items, :id, :qty, 2}]}
+      transcript = transcript(String.trim(lines), ["zone#1"])
+      packets = Replay.Deferrals.apply(transcript.packets, [{:mobs, mobs, 3, "r"}], [{Enter, :map}])
+
+      # [a] and [b, c] become [a, b] and [c], in the places of the two packets
+      assert [{3, "00000000020a00010c0001"}, {4, "00000000010d0001"}] =
+               for(p <- packets, p.opcode == 0x7F02, do: {p.index, Base.encode16(p.payload, case: :lower)})
+
+      assert_raise ArgumentError, ~r/max/, fn ->
+        Replay.Deferrals.validate!(
+          [{:mobs, %{mobs | lists: [{Box, :items, :id, :qty, 0}]}, 3, "r"}],
+          transcript.packets
+        )
+      end
     end
 
     test "end to end through run/2" do

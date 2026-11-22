@@ -66,6 +66,8 @@ Lines an administrator acts on:
 | `WorldManager: Zone node <node> of world <n> lost, <a> maps reassigned, <b> not running` | warning | a Zone node is gone; `<b>` maps run nowhere until a Zone node offering them joins |
 | `Zone: WorldManager of world <n> lost, joining again when it returns` | warning | the Zone node joins again once a second |
 | `Zone: map <name>: block data loaded, <n> bytes` | info | the first player entered the map |
+| `Zone: map <name>: no MapInfo row, sight radius 0` | info | a map instance started for a map that `MapInfo.shn` does not list (`RouCos04` in the 2016 data): players on it see nobody and no NPC. Nothing to do unless you edited the data |
+| `Zone: map <name>: NPC <mob name> not shown: no MobInfo row` | info | a `ShineNPC` row names a mob that `MobInfo.shn` does not have (`KDSoccer_MctNPC` on `Eld` in the 2016 data): the NPC is not shown. Nothing to do unless you edited the data |
 | `Zone: map <name>: <file>: <reason>` | error | the block data of a map could not be read at the first entry; the entry is refused. Restore the file |
 | `Zone: map instance <name> of world <n> crashed (<reason>), started again empty` | error | a map process crashed; it runs again with nobody on it. Report the reason |
 | `<Part>: connection closed: oversized frame, peer <peer>` | info | the client sent a frame larger than the protocol allows; the server cut it off |

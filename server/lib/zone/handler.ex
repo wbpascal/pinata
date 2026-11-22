@@ -24,11 +24,17 @@ defmodule Zone.Handler do
   stopped. A lost map instance closes the connection without a save. From `0x1803` on the player is auto-saved every
   10 minutes; a failed auto-save writes an `error` line and the player stays. `0x1071` and `0x1072` are accepted
   without effect: there are no logout timers.
+
+  Sight (flow: `docs/technical/flows/sight.md`): in the world, `0x1C01` asks the map instance for the appear packet
+  of an object (`Zone.MapInstance.inform/3`); the client's own handle field is ignored and an object out of sight,
+  unknown or the requester itself gets no answer. The packets the map instance pushes for this player
+  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`) are sent in the world and dropped before.
   """
 
   @behaviour Net.Handler
 
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.BriefinfoInformCmd
   alias Proto.Packets.CharLogoutcancelCmd
   alias Proto.Packets.CharLogoutreadyCmd
   alias Proto.Packets.ItemChargedinvenopenReq
@@ -92,6 +98,9 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: step} = state, %CharLogoutcancelCmd{}) when step in [:loading, :in_world],
     do: {state, []}
 
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %BriefinfoInformCmd{handle: h}),
+    do: {state, [{:perform, {:inform, state.map, p.handle, h}}]}
+
   def handle_packet(state, _packet), do: {state, []}
 
   @impl Net.Handler
@@ -131,6 +140,14 @@ defmodule Zone.Handler do
 
   def handle_info(state, {:login_completed, {:error, :not_entered}}),
     do: {state, [{:close, :warning, "map login complete failed: not on the map"}]}
+
+  def handle_info(state, {:informed, packets}), do: {state, for(p <- packets, do: {:send, p})}
+
+  # a player not yet in the world (mode 0) receives nothing
+  def handle_info(%__MODULE__{step: :in_world} = state, {:cluster, {:packets, packets}}),
+    do: {state, for(p <- packets, do: {:send, p})}
+
+  def handle_info(state, {:cluster, {:packets, _packets}}), do: {state, []}
 
   def handle_info(%__MODULE__{session: pid} = state, {:down, pid}), do: {state, [{:close, :info, "session ended"}]}
 
@@ -223,6 +240,8 @@ defmodule Zone.Handler do
   end
 
   def perform({:leave, map, player, entered_at}), do: {:left, leave(map, player, entered_at)}
+
+  def perform({:inform, map, own, handle}), do: {:informed, Zone.MapInstance.inform(map, own, handle)}
 
   defp auto_save_timer,
     do: Process.send_after(self(), {:timer, :auto_save}, Application.get_env(:pinata, :auto_save_ms, 600_000))
