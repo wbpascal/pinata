@@ -51,6 +51,31 @@ The login flow is in [`flows/login.md`](flows/login.md).
 
 `WorldManager.World` is one process per world of `settings.world`, started by `WorldManager.Supervisor` and registered under `{:global, {:world_manager, n}}`. Login reads its presence as "the world is open". It also keeps the login reservations Login makes when a client selects the world (`Cluster.WorldManager.expect_login/2`): validate key to user number, user name and time, in memory, each good for one use (`WorldManager.World.take_login/3`) and for 30 s. Flow: [`flows/world-select.md`](flows/world-select.md).
 
+The world process also keeps the map table (ADR 0002): `zones` (Zone `pid` to host, port and the maps it offered) and `maps` (map name to the Zone `pid` that runs it). See "Map table" in [`cluster.md`](cluster.md).
+
+## Map instance
+
+`Zone.MapInstance` is one process per map instance (ADR 0009), registered in `Zone.MapRegistry` under `{world number, map name}`; `Zone.MapInstance.whereis/2` looks it up. The map name is `FieldList.map_id_client`, which is also the name of the `.shbd` file and of `ShineNPC.Map`. The state holds `npcs`, `block_data`, `players`, `ticks`, `tick_ref` and `next_tick`.
+
+- **NPCs.** At `init/1` the rows of `ShineNPC` with this map are placed in file order with the handles 17084, 17085, ... (the range 17084 to 17339 of `docs/knowledge/Z01.md` §3). Their mob id is not resolved yet.
+- **Block data** is read at the first `enter/2` with `GameData.BlockData.load/2` and logged (`Zone: map <name>: block data loaded, <n> bytes`). When the read fails (file removed or damaged after the start) the entry is refused with `{:error, :no_block_data}`, one `error` line is written and the instance keeps running. It is never unloaded.
+- **Players** are opaque ids (`enter/2`, `leave/2`) until map entry is built (issue 108).
+- **Tick.** Every 100 ms through `Clock.send_after/3`, only while the map has players. The first entry starts the chain; the last `leave/2` ends it by clearing `tick_ref`. Each tick message carries the ref of its chain, so a leave and a new entry inside 100 ms cannot run two chains; a message with another ref is ignored. The schedule is absolute (`next_tick` += 100, the delay is the difference to the clock), so a slow tick does not shift the following ones. A tick only counts (`ticks`); movement comes with issue 110.
+
+## Map supervisor and `Zone.Maps`
+
+```mermaid
+flowchart TD
+    Z[Zone.Supervisor, rest_for_one] --> R[Registry Zone.MapRegistry] & S[DynamicSupervisor Zone.MapSupervisor] & M[Zone.Maps] & L[Net.Listener]
+    S --> I["Zone.MapInstance, one per map"]
+```
+
+`Zone.Supervisor` starts four children in this order and restarts those after a failed child: the registry, `Zone.MapSupervisor`, `Zone.Maps`, the listener. `Zone.Maps` must start again when the map supervisor does, to start the map instances again; the listener is last so the node listens only when its maps run.
+
+`Zone.Maps` (registered under its module name) logs `Zone: <n> of <total> NPC rows skipped: their map does not run` (the `ShineNPC` rows whose map is not a plain field map; 12 of 537 in the 2016 data), then joins the WorldManager of each world of `settings.world` inside `init/1` (`Cluster.WorldManager.join_zone/4` with the names of all plain field maps), so in single-node mode the maps run before the listener starts. It starts the assigned maps under `Zone.MapSupervisor` and logs `Zone: world <n>: <m> map instances started`. When the WorldManager of a world is not registered yet it tries again after 1 s. It monitors the WorldManager: when it is lost it logs a warning and joins again every second until it returns (a map that still runs is kept). A message `{:run_maps, world, names}` from WorldManager (a lost Zone node's maps) starts those maps.
+
+Each map instance sends `Zone.Maps` a `{:watch, ...}` cast at start, and `Zone.Maps` monitors it. A crashed instance (any reason other than `normal` or `shutdown`) is started again by the `DynamicSupervisor` empty and with no block data (it reads it again at the next entry), and `Zone.Maps` writes one `error` line `Zone: map instance <name> of world <n> crashed (<reason>), started again empty`. Disconnecting its players is issue 111.
+
 ## World watch
 
 `Login.WorldWatch` (registered under its module name) runs in the Login part in multi-node mode only, started by `Login.Supervisor` before the listener. Once a second it looks every world of `settings.world` up in `Cluster.Registry` (the source of the world list) and logs `Login: world <n> (<name>) is available` (info) or `is unavailable` (warning) when a world changes. A world counts as unavailable at start, so nothing is logged until it appears.

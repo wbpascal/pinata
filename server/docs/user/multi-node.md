@@ -16,7 +16,7 @@ In multi-node mode the three parts (Login, WorldManager, Zone) run on separate n
 | node list | `cluster.nodes` in the settings file lists the nodes to connect to, for example `["pinata@login", "pinata@wm", "pinata@zone"]` (see [`settings.md`](settings.md)) |
 | node name | `RELEASE_NODE` (for example `pinata@wm`), with `RELEASE_DISTRIBUTION=sname` for short names (long names need host names with a dot) |
 | cookie | `RELEASE_COOKIE`; all nodes need the same one, and anyone who knows it can run code on the nodes. Change the cookie of the example and keep the nodes on a network only your machines can reach |
-| address clients use | `public_host` in the settings file, with the client ports (`login.port`, `world_manager.port`, `zone.port`) published or reachable on that address |
+| address clients use | `public_host` in the settings file (on the Zone node an IPv4 address, which it reports to WorldManager together with its `zone.port`), with the client ports (`login.port`, `world_manager.port`, `zone.port`) published or reachable on that address |
 
 `login.auto_create_accounts` defaults to off in multi-node mode. Create accounts with `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` (see [`accounts.md`](accounts.md)).
 

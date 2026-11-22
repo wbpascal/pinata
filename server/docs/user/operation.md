@@ -25,6 +25,8 @@ Logs go to standard output; under Docker Compose read them with `docker compose 
 |---|---|
 | `Invalid settings, the node does not start:` followed by one line per problem | the settings file or an environment variable is wrong; every problem is listed (see [`settings.md`](settings.md)) |
 | `Invalid game data, the node does not start:` followed by one line per problem | the data directory is missing or a table is damaged (see [`install.md`](install.md)) |
+| `map <name>: BlockInfo/<name>.shbd: file not found` or `map <name>: BlockInfo/<name>.shbd: damaged block data ...` under `Invalid game data` | a node with the Zone part needs the block data file of every field map; import the data directory again |
+| `public_host: a node with the Zone part needs an IPv4 address in text form ...` under `Invalid settings` | `public_host` is a host name; use an IPv4 address such as `203.0.113.7` |
 | the database messages in the next section | `database.url` is unusable or migrations are pending |
 | `Data directory digest mismatch, the node stops:` | multi-node mode: this node's data directory differs from that of the WorldManager node; the node stops with exit status 1 (see [`multi-node.md`](multi-node.md)) |
 | `<Part>: cannot listen on port <port>: address already in use. The node does not start.` (`<Part>` is `Login`, `WorldManager` or `Zone`) | the listener port of that part is already in use, for example by a node that is still running; stop it or change `login.port`, `world_manager.port` or `zone.port`. Other reasons (`permission denied`) use the same form. The OTP reports that follow it are not part of the message |
@@ -55,6 +57,15 @@ Lines an administrator acts on:
 |---|---|---|
 | `<Part>: listening on <address>:<port>` | info | the listener is bound; the address is the one the socket reports |
 | `Pinata: node started, parts <parts>, <single-node or multi-node> mode, database <sqlite or postgres>` | info | the node is up; this is the last start-up line |
+| `Zone: <n> of <total> NPC rows skipped: their map does not run` | info | the NPC rows of maps that are not field maps are not placed (12 of 537 in the original data) |
+| `WorldManager: Zone node <node> joined world <n> at <host>:<port>, <m> maps` | info | a Zone node joined; `<m>` maps are assigned to it |
+| `Zone: world <n>: <m> map instances started` | info | the Zone node runs its maps |
+| `Zone: world <n>: <m> map instances taken over from a lost Zone node` | info | this Zone node got the maps of a lost one |
+| `WorldManager: Zone node <node> of world <n> lost, <a> maps reassigned, <b> not running` | warning | a Zone node is gone; `<b>` maps run nowhere until a Zone node offering them joins |
+| `Zone: WorldManager of world <n> lost, joining again when it returns` | warning | the Zone node joins again once a second |
+| `Zone: map <name>: block data loaded, <n> bytes` | info | the first player entered the map |
+| `Zone: map <name>: <file>: <reason>` | error | the block data of a map could not be read at the first entry; the entry is refused. Restore the file |
+| `Zone: map instance <name> of world <n> crashed (<reason>), started again empty` | error | a map process crashed; it runs again with nobody on it. Report the reason |
 | `<Part>: connection closed: oversized frame, peer <peer>` | info | the client sent a frame larger than the protocol allows; the server cut it off |
 | `<Part>: connection closed: unknown opcode 0x<opcode>, peer <peer>` | info | the client sent a packet the server does not know; it was cut off |
 | `<Part>: connection closed: wrong first packet, peer <peer>` | info | the first packet was not the one the part expects (`0x0C65` at Login, `0x0C0F` at WorldManager) |
@@ -91,7 +102,14 @@ Measured on 2026-11-19: the single-node release (all three parts, SQLite, 2016 `
 | resident set size of the OS process | 202384 kB (198 MB) | `ps -o rss= -p $(bin/pinata pid)` |
 | memory the Erlang VM reports | 144122129 bytes (137 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The game data is held in memory, so the size follows the data directory.
+The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. Measured on 2026-11-22 on the same machine and release, with the block data of all 88 field maps loaded (`Zone.MapInstance.enter/2` once on every map), after about one minute:
+
+| Measure | Value | Command |
+|---|---|---|
+| resident set size of the OS process | 288432 kB (282 MB) | `ps -o rss= -p $(bin/pinata pid)` |
+| memory the Erlang VM reports | 224931376 bytes (215 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
+
+The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); :ok = Zone.MapInstance.enter(p, :memory_check) end'`. The idle figure with the map processes and no block data was 189536 kB resident. The budget is 512 MB.
 
 On Windows the two commands are `(Get-Process -Id (bin\pinata pid)).WorkingSet64` (PowerShell, bytes) and `bin\pinata rpc "IO.inspect(:erlang.memory(:total))"`.
 

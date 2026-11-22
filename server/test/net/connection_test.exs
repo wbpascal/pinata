@@ -13,9 +13,9 @@ defmodule Net.ConnectionTest do
     @impl Clock.Source
     def monotonic_time(_unit), do: :persistent_term.get({__MODULE__, :now}, 0)
     @impl Clock.Source
-    def send_after(_pid, _message, _ms), do: :ok
-    @impl Clock.Source
     def local_time(_seconds), do: {{2026, 1, 1}, {0, 0, 0}}
+    @impl Clock.Source
+    def send_after(_pid, _message, _ms), do: :ok
   end
 
   defmodule Big do

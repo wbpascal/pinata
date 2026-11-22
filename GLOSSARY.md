@@ -66,6 +66,10 @@ _Avoid_: config, server info
 One running copy of a map with everything on it: players, monsters, NPCs, drops. A field map has one for the life of its Zone node; instance content (Kingdom Quest, instance dungeon, mini-house) gets one per run.
 _Avoid_: map (alone, when the running copy is meant), field, room, channel
 
+**Map table**:
+WorldManager's record of which Zone node runs each map instance of its world.
+_Avoid_: zone list, map list
+
 **Map change**:
 A player leaving one map instance and entering another; the client reconnects.
 _Avoid_: link (alone), zone change, teleport

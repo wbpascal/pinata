@@ -11,10 +11,10 @@ defmodule ClockTest do
     def monotonic_time(_unit), do: 7
 
     @impl Clock.Source
-    def send_after(_pid, _message, _ms), do: :ok
+    def local_time(_seconds), do: {{2026, 1, 1}, {0, 0, 0}}
 
     @impl Clock.Source
-    def local_time(_seconds), do: {{2026, 1, 1}, {0, 0, 0}}
+    def send_after(_pid, _message, _ms), do: :ok
   end
 
   test "reads the system clock by default" do
@@ -23,9 +23,9 @@ defmodule ClockTest do
     assert {{_, _, _}, {_, _, _}} = Clock.local_time(0)
   end
 
-  test "send_after delivers through the system source" do
-    assert Clock.send_after(self(), :tick, 10) == :ok
-    assert_receive :tick
+  test "the system source delivers a timer" do
+    assert :ok = Clock.send_after(self(), :ping, 0)
+    assert_receive :ping
   end
 
   test "reads the injected source" do

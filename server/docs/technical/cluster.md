@@ -8,11 +8,17 @@ How the parts find each other and call each other (ADR 0002: fail simple).
 |---|---|
 | `{:global, {:login}}` | `Login.Tokens`, the login token process |
 | `{:global, {:world_manager, world_id}}` | `WorldManager.World` of a world; its presence means the world is open |
-| `:pg` group `{:zones, world_id}` | Zone processes of a world |
+| `:pg` group `{:zones, world_id}` | the `Zone.Maps` process of each Zone node of a world |
 | `:pg` group `{:players, world_id}` | WorldManager connections that logged in (`Cluster.Registry.join_players/2`, `player_count/1`) |
 | `:pg` group `{:session, user_no}` | the process that is the session of the account |
 
 The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs only when `cluster.nodes` is not empty, with `Cluster.Strategy.Epmd` and those hosts. `Cluster.Root` has that name because libcluster owns `Cluster.Supervisor`.
+
+## Map table
+
+WorldManager keeps which Zone node runs which map of its world (ADR 0002; `WorldManager.World`). A Zone node joins every world of `settings.world` with `Cluster.WorldManager.join_zone(world, zone_pid, {public_host, zone.port}, names)`: `names` are all plain field maps it can run (WorldManager does not load `FieldList`). The answer is the names it must run. The first joiner gets every map it offers; a later joiner only the maps no Zone node runs. A running map never moves.
+
+When a Zone node is lost (monitor), each of its maps goes to the remaining Zone node that offered it with the highest `:erlang.phash2({map name, zone pid})` (rendezvous hashing), and each such node gets one `{:run_maps, world, names}` message; a map nobody else offered stays out of the table. `WorldManager.World.zone_of/2` returns `{:ok, %{node, host, port}}` of the Zone node that runs a map, or `:error`; character select and map change use it. The wait for a configured number of Zone nodes of ADR 0002 is fixed at 1: there is no setting. `public_host` of a Zone node must be an IPv4 address in text form (it goes to the client in a 16-byte field).
 
 ## Sessions
 
@@ -20,7 +26,7 @@ The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs
 
 ## Facades
 
-A part reaches another part only through a facade module of `Cluster` (never a direct call). `Cluster.WorldManager.expect_login/2` is a `GenServer.call` of `{:expect_login, request}` to the `WorldManager.World` of the world; the process answers `:ok` and stores the reservation. It exits when the world is not registered. Flow: [`flows/world-select.md`](flows/world-select.md). `Cluster.Login.create_token/2` is a `GenServer.call` of `{:create_token, user_no, user_name}` to `Login.Tokens`; it returns `{:ok, token}` or `{:error, :pending}` and exits when Login is not registered. Flow: [`flows/return-to-world-list.md`](flows/return-to-world-list.md).
+A part reaches another part only through a facade module of `Cluster` (never a direct call). `Cluster.WorldManager.join_zone/4` is a `GenServer.call` of `{:join_zone, zone, address, offered}`, described under "Map table". `Cluster.WorldManager.expect_login/2` is a `GenServer.call` of `{:expect_login, request}` to the `WorldManager.World` of the world; the process answers `:ok` and stores the reservation. It exits when the world is not registered. Flow: [`flows/world-select.md`](flows/world-select.md). `Cluster.Login.create_token/2` is a `GenServer.call` of `{:create_token, user_no, user_name}` to `Login.Tokens`; it returns `{:ok, token}` or `{:error, :pending}` and exits when Login is not registered. Flow: [`flows/return-to-world-list.md`](flows/return-to-world-list.md).
 
 ## Node log
 

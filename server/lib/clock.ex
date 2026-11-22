@@ -13,12 +13,9 @@ defmodule Clock do
   @spec local_time(integer()) :: :calendar.datetime()
   def local_time(seconds), do: source().local_time(seconds)
 
-  @doc """
-  Sends `message` to `pid` after `milliseconds`. Only the tick of a map instance is scheduled this way, so the test
-  clock can fire it at a captured time; heartbeat, game time and auto-save stay real timers (ADR 0008).
-  """
+  @doc "Sends `message` to `pid` after `ms` milliseconds of this clock. Only the map tick is scheduled this way (ADR 0008)."
   @spec send_after(pid(), term(), non_neg_integer()) :: :ok
-  def send_after(pid, message, milliseconds), do: source().send_after(pid, message, milliseconds)
+  def send_after(pid, message, ms), do: source().send_after(pid, message, ms)
 
   @spec source() :: module()
   defp source, do: Application.get_env(:pinata, :clock_source, Clock.System)
