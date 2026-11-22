@@ -10,7 +10,7 @@ An object is in sight of another when all three hold:
 
 - **Distance:** `dist² < Sight²`, with `Sight` the column of the map's `MapInfo` row (128 maps 1600, the others 2000
   to 6000). A map without a row (`RouCos04` in the 2016 data) gets 0, as in the original (`so_FieldSightSquar` @
-  FUN_0043c330): nobody is in sight there.
+  FUN_0043c330): nobody is in sight there, except at map entry: a player standing on exactly the same point as the entrant is still sent, because the entry test is `dist² <= r²` (step 2 of the entry exchange below).
 - **Dimension:** both in the same dimension, or one of them in -1. Default 0 (`Zone.Player.dimension`,
   `Zone.Npc.dimension`).
 - **Sub-layer**, one way (`Zone.Sight.sees?/2`): table `SendMyBrief` of
@@ -46,11 +46,11 @@ centre object first towards smaller y, then towards larger y (`so_AllOfRangeNoma
 then 9934, 10005, … 10579. Objects with equal y are ordered by handle; the original's order of equal keys depends on
 the history of its list and cannot be reproduced.
 
-**Cost.** `test/zone/grid_test.exs` puts 1500 players spread over a 20 000 × 20 000 map with cell 1600 and compares
+**Cost.** `test/zone/grid_test.exs` puts 1500 players on a fixed lattice over a 20 000 × 20 000 map (x = i · 7919 mod 20 000, y = i · 104729 mod 20 000; deterministic, not random) with cell 1600 and compares
 every query at radius 1600 with a brute-force filter. Measured on 2026-11-22 (Apple M1 Pro, Erlang/OTP 29, Elixir
 1.20.5, `PINATA_BENCH=1 mix test test/zone/grid_test.exs`): **4.9 µs** mean per query. The test fails above 1000 µs.
 Many players on one spot cost more: every query then reads one full cell and every step reaches all of them (issue 90
-accepts this).
+accepts this). The benchmark does not measure that case; it belongs with the movement issues (110, 113 to 115).
 
 ## Map entry (`0x1803`)
 

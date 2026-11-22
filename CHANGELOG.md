@@ -14,6 +14,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A character that enters the world passes the loading screen and stands on its stored map at its stored position, wearing its equipment. Inventory, skills, quests, titles and the shortcut bar are empty until their milestones (#108).
 - A client packet that belongs to the protocol but is not built yet is ignored with a `debug` line; before, it closed the connection. A packet outside the protocol still closes it (#108).
 - Players on a map see each other and the standing NPCs: when they enter the map, when they come into or leave each other's sight, and when one leaves the map. A player in a crowd (29 or more objects within 500 units) gets the players of a smaller radius at entry, as in the original. A map without `MapInfo` row and an NPC without `MobInfo` row are logged with an `info` line at start-up (#109).
+- Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 - `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
@@ -24,6 +25,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A refused map login carries the real refusal code; the original sent another one (Z01-B1) (#107).
 - Objects in different dimensions no longer get an appear and a delete packet on every step (P02-B27) (#109).
 - A client request for the appear packet of an object (`0x1C01`) is answered only when the object is in sight (#109).
+- A whisper whose size does not match its item links is ignored; the original copied past its buffer and any player could stop WorldManager with it (W04-B2) (#114).
+- The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 
