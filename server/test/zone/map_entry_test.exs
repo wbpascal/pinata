@@ -73,9 +73,9 @@ defmodule Zone.MapEntryTest do
     assert byte_size(Proto.encode(ack)) == 2 + 242
   end
 
-  test "login_complete/1: the second burst in wire order" do
+  test "login_complete/2: the second burst in wire order" do
     p = player(%{equipment: [%{slot: 8, item_id: 35_740, upgrade: 0, class: 10}]})
-    packets = Zone.MapEntry.login_complete(p)
+    packets = Zone.MapEntry.login_complete(p, [])
 
     assert opcodes(packets) ==
              [0x10E4, 0x10E7, 0x10EA] ++
@@ -100,8 +100,15 @@ defmodule Zone.MapEntryTest do
     assert Enum.map(Enum.take(packets, -3), &hex/1) == ["0e24e30b00000100", "0f24230b0000", "5f2400000000"]
   end
 
+  test "login_complete/2: the sight packets go out directly after 0x583A" do
+    sight = [%Proto.Packets.BriefinfoCharacterCmd{chars: []}, %Proto.Packets.BriefinfoMobCmd{mobs: []}]
+    ops = player(%{}) |> Zone.MapEntry.login_complete(sight) |> opcodes()
+    at = Enum.find_index(ops, &(&1 == 0x583A))
+    assert Enum.slice(ops, at, 4) == [0x583A, 0x1C07, 0x1C09, 0x105B]
+  end
+
   test "an admin level sends 0x2011 and 0x10C6 at their positions" do
-    packets = Zone.MapEntry.login_complete(player(%{admin_level: 100}))
+    packets = Zone.MapEntry.login_complete(player(%{admin_level: 100}), [])
     ops = opcodes(packets)
 
     assert Enum.slice(ops, -12, 12) ==
@@ -125,7 +132,7 @@ defmodule Zone.MapEntryTest do
       %{slot: 14, item_id: 9999, upgrade: 0, class: :unknown}
     ]
 
-    briefs = player(%{equipment: equipment}) |> Zone.MapEntry.login_complete() |> Enum.slice(32, 4)
+    briefs = player(%{equipment: equipment}) |> Zone.MapEntry.login_complete([]) |> Enum.slice(32, 4)
 
     assert Enum.map(briefs, &hex/1) == [
              # weapon: upgrade, slot (Z18-B10: written), no licence mob

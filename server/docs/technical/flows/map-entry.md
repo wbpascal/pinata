@@ -9,6 +9,7 @@ sequenceDiagram
     participant P as Persistence
     participant I as Map instance
     participant M as WorldManager connection (session)
+    participant O as Zone connection of a player in sight
     Note over Z: 0x1801 accepted, the ticket redeemed (enter-world.md)
     Z->>P: load_character(world, user_no, character)
     Z->>I: whereis(world, map), then enter(player)
@@ -23,7 +24,8 @@ sequenceDiagram
         M->>C: 0x581C {server time} (first 0x581B only)
         C->>Z: 0x1803
         Z->>I: login_complete(handle)
-        I-->>Z: mode 1, the second burst
+        I->>O: 0x1C06 (the entrant's appear packet, sight.md)
+        I-->>Z: mode 1, the second burst with the sight exchange
         Z->>M: map_login_done
         Z->>C: 0x10E4 … 0x245F (second burst)
         M->>C: 0x1097, 0x1012, 0x9414, 0x5826, 0x10D9, 0x0849, 0x182A
@@ -52,14 +54,14 @@ sequenceDiagram
 | `quest_reset_time` | `0x441E` four zeros | empty | 5 |
 | `map_login_ack` | `0x1802 {handle, parameter block, x, y}`; the parameter block (`Placeholders.parameters/1`) has the stored HP and SP as maxima and 0 elsewhere | real, parameter block empty | 2, parameters 4 |
 
-## Second burst: `Zone.MapEntry.login_complete/1`
+## Second burst: `Zone.MapEntry.login_complete/2`
 
 | Step | Packets | Kind | Milestone |
 |---|---|---|---|
 | `card_collection` | `0x10E4`, `0x10E7`, `0x10EA`, each `{0, 0}` | empty | 11 |
 | `equipment_briefs` | `0x1C04` for slots 1 to 29, then per worn item in slot order by `ItemInfo.Class`: 5 → `0x1C05 {handle, item, upgrade, slot, 0xFFFF, 0xFF}`; 6, 7, 8 → `0x1C03`; 10, 26, 37 → `0x1C02`; 4, 38 → nothing; any other class or no `ItemInfo` row → `0x1C04` | real | 2 |
 | `kq_team_type` | `0x583A {2}` | empty | 10 |
-| – | sight exchange `0x1C07` / `0x1C09` | absent | issue 109 (NPCs, players), 4 (mobs) |
+| sight exchange | `0x1C09` / `0x1C07` batches of the standing NPCs and the players in sight (`Zone.Sight.entry/2`, [`sight.md`](sight.md)); the others in sight get `0x1C06` | real | 2 (mobs: 4) |
 | – | abstates `0x242A` / `0x1C18` (345, 291 with its reset after 5 s, 728) | absent | 4 |
 | `stat_points` | `0x105B {0}` | empty | 4 |
 | `move_speed` | `0x203E {WalkSpeed, RunSpeed}` of `ChrCommon` (33, 127) | real | 2 |
@@ -101,7 +103,7 @@ A map change (issue 112) repeats only `0x5826` and `0x182A`.
 
 ## Map instance
 
-The player enters in mode 0: it receives nothing and is shown to nobody. `0x1803` sets mode 1 (issue 109 adds the sight exchange there). The handle is the next free one from 8000 to 9499, counting on from the last handle given, wrapping to 8000; 1500 players fill the map. The instance monitors the Zone connection and removes its player when it ends; saving and `0x1805` are issue 111. See [`processes.md`](../processes.md).
+The player enters in mode 0: it receives nothing and is shown to nobody. `0x1803` sets mode 1 and runs the sight exchange ([`sight.md`](sight.md)). The handle is the next free one from 8000 to 9499, counting on from the last handle given, wrapping to 8000; 1500 players fill the map. The instance monitors the Zone connection and removes its player when it ends, announcing it with `0x1805` to the players in sight; saving is issue 111. See [`processes.md`](../processes.md).
 
 ## Codes
 

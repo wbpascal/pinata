@@ -192,6 +192,7 @@ defmodule MapEntryTest do
         # item 1250 (class 5, weapon) in slot 10, upgrade 0, no licence mob
         <<0x05, 0x1C, handle::little-16, 1250::little-16, 0, 10, 0xFF, 0xFF, 0xFF>>,
         <<0x3A, 0x58, 2>>,
+        :npcs,
         <<0x5B, 0x10, 0>>,
         <<0x3E, 0x20, 33::little-16, 127::little-16>>,
         <<0x10, 0x90, 5>>,
@@ -208,11 +209,34 @@ defmodule MapEntryTest do
   end
 
   defp expect_all(client, expected) do
-    Enum.reduce(expected, client, fn e, client ->
-      {body, client} = next!(client)
-      assert body == e
-      client
+    Enum.reduce(expected, client, fn
+      :npcs, client ->
+        npc_lists!(client)
+
+      e, client ->
+        {body, client} = next!(client)
+        assert body == e
+        client
     end)
+  end
+
+  # The 29 standing NPCs of RouN, all shown (no distance limit), in two 0x1C09 of 28 and 1 in walk order from the
+  # entrant at 6477, 9844.
+  defp npc_lists!(client) do
+    {:ok, map} = Zone.MapInstance.whereis(0, "RouN")
+    npcs = :sys.get_state(map).npc_index
+    order = npcs |> Enum.map(fn {h, n} -> {h, {n.x, n.y}} end) |> Zone.Grid.walk_order({6477, 9844}, 8000)
+    assert length(order) == 29
+    {first, client} = next!(client)
+    {second, client} = next!(client)
+
+    assert [first, second] ==
+             for(
+               chunk <- Enum.chunk_every(order, 28),
+               do: Proto.encode(%Proto.Packets.BriefinfoMobCmd{mobs: for(h <- chunk, do: npcs[h].brief)})
+             )
+
+    client
   end
 
   # returns the WorldManager session handle
