@@ -18,14 +18,22 @@ defmodule Replay do
   The replay harness (ADR 0008, `docs/technical/testing.md`): plays a transcript against listeners and compares
   the server packets byte for byte per connection.
 
-  Options: `stop:` (required, a packet index or `:end`), `endpoints:` (required, connection kind to `{host, port}`),
+  Options: `stop:` (required, a packet index, `:end` or `{:cut, seconds, reason}`: a replay cut, the lines at or after
+  `seconds` after the transcript's `start` are not played, the reason is a non-empty line of text), `endpoints:` (required, connection kind to `{host, port}`),
   `masks:` and `handles:` (per-test additions to `Replay.Masks`), `close_after:` (packet indices; the harness closes
   the connection of that packet right after it, as the client did; the transcript holds no TCP close), `sync_after:`
   (packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves
   on), `before:` (a map of packet index to a zero-arity function that runs before the harness sends that client
-  packet; for state a later issue's packets would create), `timeout:` (ms to wait for a packet, 2000).
+  packet; for state a later issue's packets would create), `timeout:` (ms to wait for a packet, 2000),
+  `deferrals:` (per-test additions to `Replay.Deferrals`), `map_names:` (`{module, path}` of server packets that carry
+  the map name, added to `Replay.Masks.map_names/0`), `tick_offset:` (ms, 0 or more, added to the first tick of a
+  train, see `TestClock`) and `drop_after:` (packet indices; the harness kills the server side of that connection
+  after the packet and expects the connection to close).
 
-  The test clock is set on every node of the topology (`Replay.Topology.all/3`).
+  The test clock is moved to the time of every transcript line on every node of the topology
+  (`Replay.Topology.all/3`); due ticks (`Clock.send_after/3`) fire in order. After every client packet of a Zone
+  connection (except a client `0x0804`) the harness runs a heartbeat round trip; the server packets it reads are
+  buffered and compared at their own transcript lines.
   """
 
   alias Replay.Failure
@@ -49,7 +57,11 @@ defmodule Replay do
         close_after: [],
         sync_after: [],
         before: %{},
-        timeout: 2000
+        timeout: 2000,
+        deferrals: [],
+        map_names: [],
+        tick_offset: 0,
+        drop_after: []
       ])
 
     masks = Masks.global() ++ port_masks(opts[:endpoints]) ++ opts[:masks]
@@ -57,8 +69,13 @@ defmodule Replay do
     :ok = Masks.validate!(masks)
     :ok = Masks.validate!(handles)
 
-    stop = Keyword.fetch!(opts, :stop)
-    packets = Enum.filter(transcript.packets, &(stop == :end or &1.index <= stop))
+    deferrals = Replay.Deferrals.global() ++ opts[:deferrals]
+    :ok = Replay.Deferrals.validate!(deferrals, transcript.packets)
+    masks = masks ++ for({:payload, mod, path, _m, reason} <- deferrals, path != :all, do: {mod, path, reason})
+    payload_all = for {:payload, mod, :all, _m, _r} <- deferrals, into: MapSet.new(), do: mod.opcode()
+
+    packets = transcript.packets |> Enum.filter(&played?(&1, Keyword.fetch!(opts, :stop), transcript.start))
+    packets = Replay.Deferrals.apply(packets, deferrals, Masks.map_names() ++ opts[:map_names])
 
     ctx = %{
       capture: transcript.capture,
@@ -68,12 +85,15 @@ defmodule Replay do
       close_after: opts[:close_after],
       sync_after: opts[:sync_after],
       before: opts[:before],
-      timeout: opts[:timeout]
+      timeout: opts[:timeout],
+      drop_after: opts[:drop_after],
+      payload_all: payload_all
     }
 
     previous = Application.fetch_env(:pinata, :clock_source)
     Replay.Topology.all(Application, :put_env, [:pinata, :clock_source, TestClock])
-    state = %{clients: %{}, order: [], bound: %{}, last: %{}}
+    Replay.Topology.all(TestClock, :tick_offset, [opts[:tick_offset]])
+    state = %{clients: %{}, order: [], bound: %{}, last: %{}, pending: %{}}
 
     try do
       with {:ok, state} <- walk(packets, state, ctx), do: drain_all(state, ctx)
@@ -82,7 +102,19 @@ defmodule Replay do
         {:ok, source} -> Replay.Topology.all(Application, :put_env, [:pinata, :clock_source, source])
         :error -> Replay.Topology.all(Application, :delete_env, [:pinata, :clock_source])
       end
+
+      Replay.Topology.all(TestClock, :reset, [])
     end
+  end
+
+  defp played?(packet, :end, _start), do: packet.index > 0
+  defp played?(packet, index, _start) when is_integer(index), do: packet.index <= index
+
+  defp played?(packet, {:cut, seconds, reason}, start) do
+    if not (is_binary(reason) and reason != "" and not String.contains?(reason, "\n")),
+      do: raise(ArgumentError, "a replay cut needs a reason of one line")
+
+    packet.time - start < seconds * 1_000_000
   end
 
   # The captures hold the default WorldManager port; the test ports come from the OS and almost never equal it.
@@ -108,47 +140,55 @@ defmodule Replay do
   defp walk([], state, _ctx), do: {:ok, state}
 
   defp walk([packet | rest], state, ctx) do
+    Replay.Topology.all(TestClock, :set, [packet.time])
     state = open(packet, state, ctx)
     Map.get(ctx.before, packet.index, fn -> :ok end).()
     state = %{state | last: Map.put(state.last, packet.conn, packet.index)}
 
-    case step(packet, state, ctx) do
-      {:ok, state} ->
-        case sync_if_due(state, packet, ctx) do
-          {:ok, state} -> walk(rest, close_if_due(state, packet, ctx), ctx)
-          {:error, _failure} = error -> close_all(state, error)
-        end
-
-      {:error, _failure} = error ->
-        close_all(state, error)
-    end
-  end
-
-  # A heartbeat round trip: the server has handled the packet before the clock moves on. Needed where the server
-  # sends nothing and the replay leaves out the answer of a later issue.
-  defp sync_if_due(state, packet, ctx) do
-    with true <- packet.index in ctx.sync_after,
-         {:ok, client} <- TestClient.send_raw(Map.fetch!(state.clients, packet.conn), <<0x04, 0x08>>),
-         {:ok, client} <- sync_ack(client, packet, ctx) do
-      {:ok, put_client(state, packet.conn, client)}
+    with {:ok, after_step} <- step(packet, state, ctx),
+         {:ok, after_sync} <- round_trip_if_due(after_step, packet, ctx),
+         {:ok, after_drop} <- drop_if_due(close_if_due(after_sync, packet, ctx), packet, ctx) do
+      walk(rest, after_drop, ctx)
     else
-      false -> {:ok, state}
-      {:error, :closed} -> {:error, failure(:missing, ctx, packet, "the server closed the connection", [])}
-      {:error, _failure} = error -> error
+      {:error, _failure} = error -> close_all(state, error)
     end
   end
 
-  defp sync_ack(client, packet, ctx) do
-    case next_body(client, ctx.timeout) do
-      {:ok, <<0x05, 0x08>>, client} ->
-        {:ok, client}
+  # A heartbeat round trip: the server has handled the packet before the clock moves on. Automatic after every client
+  # packet of a Zone connection; `sync_after:` asks for it elsewhere, where the server sends nothing and the replay
+  # leaves out the answer of a later issue.
+  defp round_trip_if_due(state, %{dir: :client} = packet, ctx) do
+    asked? = packet.index in ctx.sync_after
+    zone? = String.starts_with?(packet.conn, "zone#") and packet.opcode != 0x0804
 
-      {:ok, <<opcode::little-16, payload::binary>>, _client} ->
-        lines = ["extra packet: #{opcode_text(opcode)}", "payload: #{hex(payload)}"]
-        {:error, failure(:extra, ctx, %{packet | opcode: opcode}, "extra packet", lines)}
+    if asked? or zone?,
+      do: round_trip(state, packet, ctx, asked?),
+      else: {:ok, state}
+  end
 
-      {:error, _reason, _client} ->
-        {:error, failure(:missing, ctx, packet, "no answer to the heartbeat", [])}
+  defp round_trip_if_due(state, _packet, _ctx), do: {:ok, state}
+
+  defp round_trip(state, packet, ctx, strict?) do
+    client = Map.fetch!(state.clients, packet.conn)
+
+    with {:ok, client} <- TestClient.send_raw(client, <<0x04, 0x08>>),
+         {:ok, client, bodies} <- collect(client, [], ctx.timeout) do
+      state = put_client(state, packet.conn, client)
+      {:ok, %{state | pending: Map.update(state.pending, packet.conn, bodies, &(&1 ++ bodies))}}
+    else
+      {:error, :timeout} -> {:error, failure(:missing, ctx, packet, "no answer to the heartbeat", [])}
+      {:error, :closed} when strict? -> {:error, failure(:missing, ctx, packet, "the server closed the connection", [])}
+      {:error, :closed} -> {:ok, state}
+    end
+  end
+
+  # reads up to the heartbeat answer; timer-driven bodies are dropped, the others are returned in order
+  defp collect(client, bodies, timeout) do
+    case TestClient.recv_raw(client, timeout) do
+      {:ok, <<0x05, 0x08>>, client} -> {:ok, client, Enum.reverse(bodies)}
+      {:ok, <<opcode::little-16, _::binary>>, client} when opcode in @timer_driven -> collect(client, bodies, timeout)
+      {:ok, body, client} -> collect(client, [body | bodies], timeout)
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -156,17 +196,73 @@ defmodule Replay do
   defp close_if_due(state, packet, ctx) do
     if packet.index in ctx.close_after do
       TestClient.close(Map.fetch!(state.clients, packet.conn))
-      %{state | clients: Map.delete(state.clients, packet.conn), order: List.delete(state.order, packet.conn)}
+      remove(state, packet.conn)
     else
       state
     end
   end
 
-  defp open(%{conn: conn} = packet, state, ctx) do
+  defp remove(state, conn) do
+    %{
+      state
+      | clients: Map.delete(state.clients, conn),
+        order: List.delete(state.order, conn),
+        pending: Map.delete(state.pending, conn)
+    }
+  end
+
+  # The server side of the connection is killed; the client must see the close and nothing else.
+  defp drop_if_due(state, packet, ctx) do
+    if packet.index in ctx.drop_after and Map.has_key?(state.clients, packet.conn) do
+      client = Map.fetch!(state.clients, packet.conn)
+      [kind | _] = String.split(packet.conn, "#")
+      {:ok, local_port} = :inet.port(client.socket)
+      :ok = kill_server_side(local_port, Map.fetch!(%{"login" => :login, "wm" => :wm, "zone" => :zone}, kind))
+
+      with :ok <- read_until_closed(client, packet, ctx) do
+        TestClient.close(client)
+        {:ok, remove(state, packet.conn)}
+      end
+    else
+      {:ok, state}
+    end
+  end
+
+  # The test VM first (hand-made listeners live there), then the node of the part; stops at the first match.
+  defp kill_server_side(local_port, part) do
+    Enum.reduce_while([&apply/3, &Replay.Topology.call(part, &1, &2, &3)], :ok, fn call, :ok ->
+      killed =
+        for port <- call.(Port, :list, []),
+            call.(Port, :info, [port, :name]) == {:name, ~c"tcp_inet"},
+            match?({:ok, {_address, ^local_port}}, call.(:inet, :peername, [port])),
+            {:connected, pid} <- [call.(Port, :info, [port, :connected])],
+            do: call.(Process, :exit, [pid, :kill])
+
+      if killed == [], do: {:cont, :ok}, else: {:halt, :ok}
+    end)
+  end
+
+  defp read_until_closed(client, packet, ctx) do
+    case TestClient.recv_raw(client, ctx.timeout) do
+      {:error, :closed} ->
+        :ok
+
+      {:error, :timeout} ->
+        {:error, failure(:missing, ctx, packet, "the connection was not dropped", [])}
+
+      {:ok, <<opcode::little-16, _::binary>>, client} when opcode in @timer_driven ->
+        read_until_closed(client, packet, ctx)
+
+      {:ok, <<opcode::little-16, payload::binary>>, _client} ->
+        lines = ["extra packet: #{opcode_text(opcode)}", "payload: #{hex(payload)}"]
+        {:error, failure(:extra, ctx, %{packet | opcode: opcode}, "extra packet", lines)}
+    end
+  end
+
+  defp open(%{conn: conn}, state, ctx) do
     if Map.has_key?(state.clients, conn) do
       state
     else
-      Replay.Topology.all(TestClock, :set, [packet.time])
       [kind | _] = String.split(conn, "#")
       {host, port} = Map.fetch!(ctx.endpoints, kind)
       client = TestClient.connect(host, port)
@@ -174,25 +270,29 @@ defmodule Replay do
     end
   end
 
+  # a payload deferral of the whole packet: accepted without comparison, no handle binding
+  defp compared(packet, received, state, ctx) do
+    if MapSet.member?(ctx.payload_all, packet.opcode) do
+      {:ok, state}
+    else
+      with {:ok, bound} <- compare(packet, received, state.bound, ctx), do: {:ok, %{state | bound: bound}}
+    end
+  end
+
   defp step(%{dir: :server, opcode: opcode}, state, _ctx) when opcode in @timer_driven, do: {:ok, state}
 
   defp step(%{dir: :server} = packet, state, ctx) do
-    case next_body(Map.fetch!(state.clients, packet.conn), ctx.timeout) do
-      {:error, reason, _client} ->
+    case take_body(state, packet.conn, ctx.timeout) do
+      {:error, reason} ->
         what =
           if reason == :timeout, do: "packet missing (timed out)", else: "packet missing (server closed the connection)"
 
         {:error, failure(:missing, ctx, packet, what, [])}
 
-      {:ok, <<opcode::little-16, received::binary>>, client} when opcode == packet.opcode ->
-        state = put_client(state, packet.conn, client)
+      {:ok, <<opcode::little-16, received::binary>>, state} when opcode == packet.opcode ->
+        compared(packet, received, state, ctx)
 
-        case compare(packet, received, state.bound, ctx) do
-          {:ok, bound} -> {:ok, %{state | bound: bound}}
-          {:error, _failure} = error -> error
-        end
-
-      {:ok, <<opcode::little-16, received::binary>>, _client} ->
+      {:ok, <<opcode::little-16, received::binary>>, _state} ->
         lines = [
           "expected: #{opcode_text(packet.opcode)}",
           "received: #{opcode_text(opcode)}",
@@ -204,8 +304,6 @@ defmodule Replay do
   end
 
   defp step(%{dir: :client} = packet, state, ctx) do
-    Replay.Topology.all(TestClock, :set, [packet.time])
-
     with {:ok, payload} <- rewrite(packet, state.bound, ctx),
          {:ok, client} <-
            send_or_missing(Map.fetch!(state.clients, packet.conn), packet, payload, ctx) do
@@ -221,6 +319,20 @@ defmodule Replay do
   end
 
   defp put_client(state, conn, client), do: %{state | clients: Map.put(state.clients, conn, client)}
+
+  # next body of the connection: the buffered ones of a round trip first, then the socket
+  defp take_body(state, conn, timeout) do
+    case state.pending do
+      %{^conn => [body | rest]} ->
+        {:ok, body, %{state | pending: Map.put(state.pending, conn, rest)}}
+
+      %{} ->
+        case next_body(Map.fetch!(state.clients, conn), timeout) do
+          {:ok, body, client} -> {:ok, body, put_client(state, conn, client)}
+          {:error, reason, _client} -> {:error, reason}
+        end
+    end
+  end
 
   # next body of the connection, timer-driven packets dropped
   defp next_body(client, timeout) do
@@ -239,13 +351,22 @@ defmodule Replay do
         client = Map.fetch!(state.clients, conn)
         packet = %{conn: conn, index: Map.fetch!(state.last, conn), opcode: 0x0804}
 
-        case drain(client, packet, ctx) do
-          :ok -> {:cont, :ok}
+        with :ok <- drain_pending(Map.get(state.pending, conn, []), packet, ctx),
+             :ok <- drain(client, packet, ctx) do
+          {:cont, :ok}
+        else
           {:error, _failure} = error -> {:halt, error}
         end
       end)
 
     close_all(state, result)
+  end
+
+  defp drain_pending([], _packet, _ctx), do: :ok
+
+  defp drain_pending([<<opcode::little-16, payload::binary>> | _], packet, ctx) do
+    lines = ["extra packet: #{opcode_text(opcode)}", "payload: #{hex(payload)}"]
+    {:error, failure(:extra, ctx, %{packet | opcode: opcode}, "extra packet", lines)}
   end
 
   defp drain(%TestClient{cipher: nil}, _packet, _ctx), do: :ok
@@ -361,7 +482,7 @@ defmodule Replay do
           do: {path, ns, off, size}
 
     Enum.reduce_while(ranges, {:ok, bound}, fn {path, ns, off, size}, {:ok, bound} ->
-      case bind_one(bound, ns, slice(packet.payload, off, size), slice(received, off, size)) do
+      case bind_one(bound, scoped_ns(ns, packet), slice(packet.payload, off, size), slice(received, off, size)) do
         {:ok, bound} ->
           {:cont, {:ok, bound}}
 
@@ -370,6 +491,18 @@ defmodule Replay do
       end
     end)
   end
+
+  # the namespace :object is bound per map, every other one is global
+  defp scoped_ns(:object, packet), do: {:object, packet.scope}
+  defp scoped_ns(ns, _packet), do: ns
+
+  # 0xFFFF in a 2-byte :object field is "no object": it must be received as it was captured and binds nothing
+  defp bind_one(bound, {:object, _scope}, <<0xFF, 0xFF>> = orig, new) do
+    if new == orig, do: {:ok, bound}, else: {:error, "original ffff must stay ffff, got #{hex(new)}"}
+  end
+
+  defp bind_one(_bound, {:object, _scope}, orig, <<0xFF, 0xFF>> = new),
+    do: {:error, "original #{hex(orig)} must not become ffff, got #{hex(new)}"}
 
   defp bind_one(bound, ns, orig, new) do
     map = Map.get(bound, ns, %{})
@@ -399,7 +532,10 @@ defmodule Replay do
     Enum.reduce_while(ranges, {:ok, packet.payload}, fn {path, ns, off, size}, {:ok, payload} ->
       orig = slice(payload, off, size)
 
-      case bound |> Map.get(ns, %{}) |> Map.fetch(orig) do
+      case bound |> Map.get(scoped_ns(ns, packet), %{}) |> Map.fetch(orig) do
+        _ when ns == :object and orig == <<0xFF, 0xFF>> ->
+          {:cont, {:ok, payload}}
+
         {:ok, new} ->
           {:cont, {:ok, replace(payload, off, size, new)}}
 
