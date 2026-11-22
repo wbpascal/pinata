@@ -426,6 +426,12 @@ defmodule Replay.HarnessTest do
       assert run(Stub, lines, deferrals: [{:absent, Box, 4, "r"}]) == :ok
     end
 
+    test "absent by index: only those server packets are taken out" do
+      lines = @good <> "\n100.700000 login#1 S 0x7F02 00\n100.800000 login#1 S 0x7F02 00"
+      assert {:error, %Failure{kind: :missing}} = run(Stub, lines, deferrals: [{:absent, [4], 4, "r"}])
+      assert run(Stub, lines, deferrals: [{:absent, [4, 5], 4, "r"}]) == :ok
+    end
+
     test "unsent: a client packet and its answers are left out, the replay continues" do
       lines =
         "100.400000 login#1 C 0x0807 0200\n" <>
@@ -450,6 +456,10 @@ defmodule Replay.HarnessTest do
 
       assert_raise ArgumentError, ~r/not a server packet/, fn ->
         Replay.Deferrals.validate!([{:unsent, 2, [2], 3, "r"}], packets)
+      end
+
+      assert_raise ArgumentError, ~r/:absent 2 is not a server packet/, fn ->
+        Replay.Deferrals.validate!([{:absent, [2], 3, "r"}], packets)
       end
 
       assert_raise ArgumentError, ~r/malformed/, fn -> Replay.Deferrals.validate!([{:bogus, 1}], packets) end

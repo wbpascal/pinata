@@ -18,6 +18,7 @@ defmodule MapEntryTest do
 
   setup do
     wait_until(fn -> match?({:ok, _}, WorldManager.World.zone_of(0, "RouN")) end)
+    :ok = TestSessions.wait_none()
     Persistence.Repo.active().query!("DELETE FROM accounts")
     {:ok, id} = Persistence.create_account("admin", "pw")
 

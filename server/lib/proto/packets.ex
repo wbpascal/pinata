@@ -50,6 +50,8 @@ defmodule Proto.Packets do
     0x1049 => Proto.Packets.CharClientChartitleCmd,
     0x104A => Proto.Packets.CharClientChargedbuffCmd,
     0x105B => Proto.Packets.CharStatRemainpointCmd,
+    0x1071 => Proto.Packets.CharLogoutreadyCmd,
+    0x1072 => Proto.Packets.CharLogoutcancelCmd,
     0x1097 => Proto.Packets.CharGuildAcademyCmd,
     0x10C6 => Proto.Packets.CharAdminLevelInformCmd,
     0x10CE => Proto.Packets.CharClientQuestReadCmd,

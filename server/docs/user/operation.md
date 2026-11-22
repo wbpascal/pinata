@@ -97,7 +97,15 @@ Lines an administrator acts on:
 | `Zone: connection closed: map login refused: <reason>, peer <peer>` | info | `no session for the handle`, `no map-login ticket`, `reserved for another Zone node` or `not the reserved character`: the client came to the Zone without a fresh character login |
 | `Zone: connection closed: map entry failed: <reason>, peer <peer>` | warning | the character could not be placed on its map after the map login (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`); the client is told `0x142`. For a database failure or unreadable block data look for the `Persistence` or `Zone: map` line before it |
 | `Zone: connection closed: map login complete failed: not on the map, peer <peer>` | warning | the client reported the map loaded for a player the map does not hold; report it |
-| `Zone: connection closed: session ended, peer <peer>` | info | the WorldManager connection of the player ended, so the Zone connection was closed |
+| `Zone: connection closed: session ended, peer <peer>` | info | the WorldManager connection of the player ended, so the Zone connection was closed (the character is saved) |
+| `Zone: left the world: character <id>, map <map>, peer <peer>` | info | a character left the world and was saved |
+| `Zone: auto-save failed: character <id>, <reason>, peer <peer>` | error | the 10-minute save failed (`character not found`, `database failure`, `not on the map`); the character stays in the world. For a database failure look for the `Persistence` line before it |
+| `Zone: save at leave failed: character <id>, <reason>, peer <peer>` | error | the save when the character left failed; what happened since the last save is lost. For a database failure look for the `Persistence` line before it |
+| `Zone: connection closed: map instance lost, peer <peer>` | warning | the map process of the player crashed (see the `crashed` line); the client is disconnected, nothing is saved |
+| `Zone: connection closed: map instance stopped, peer <peer>` | info | the map was stopped in order; the character was saved first |
+| `<Part>: connection closed: listener stopped, peer <peer>` | info | the part is stopping; on a Zone node the character is saved first |
+| `Login: connection closed: login refused, account "<name>", the old session did not end in time, peer <peer>` / `WorldManager: connection closed: world login refused, the old session did not end in time, peer <peer>` | error | a second login of the account waited 5 s for the first session to end and save, in vain; the client is told the login failed. Look for a stuck Zone node or a slow database |
+| `WorldManager: the Zone connection did not confirm the leave within 5 s, peer <peer>` | error | "back to character select" did not get the save answer of the Zone node in time; the character cannot enter the world until the Zone connection ends. Look for a stuck Zone node or a slow database |
 | `Cluster: node <node> connected` | info | multi-node mode: another node joined |
 | `Cluster: node <node> lost` | warning | multi-node mode: a node went away |
 | `Login: world <number> (<name>) is available` | info | multi-node mode: the WorldManager of the world is reachable from Login |
@@ -108,6 +116,16 @@ Lines an administrator acts on:
 The four cluster lines appear in multi-node mode only. Login looks the worlds up once a second; a world is reported unavailable only after it was available, so a Login node that starts before the WorldManager node logs nothing until the world appears. A close by the client is logged at `debug` only.
 
 With export on, the OpenTelemetry libraries write lines of their own without a part, for example `OTLP exporter successfully initialized`, and a line for a failed export when the Collector is unreachable.
+
+## When a character is saved
+
+The Zone node saves a character's map, position, HP and SP:
+
+- at every leave: back to character select, quit, a lost connection, a second login of the account (the leave also adds the play time and the logout time);
+- every 10 minutes while the character is in the world;
+- when the server stops in order (a node stop, a map stopped in order): every player is saved first, then disconnected.
+
+A crashed map process disconnects its players without a save: what happened since their last save (at most 10 minutes) is lost. A second login of an account waits until the first session has ended and its character is saved, 5 s at most; after that it is refused with an `error` line (see "Server log").
 
 ## Client data check
 

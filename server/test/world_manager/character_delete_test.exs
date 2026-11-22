@@ -114,7 +114,7 @@ defmodule WorldManager.CharacterDeleteTest do
     assert body == @fail
     {body, client} = erase(client, 255)
     assert body == @fail
-    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{})
+    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{unset: 0})
     assert {:ok, %UserLoginworldAck{avatars: [%{name: "Stay"}]}, _} = TestClient.recv(client)
   end
 
@@ -124,7 +124,7 @@ defmodule WorldManager.CharacterDeleteTest do
     Factory.item(gone.id, 3, 4)
     {body, client} = world_login() |> erase(0)
     assert body == <<0x0C, 0x14, 0>>
-    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{})
+    {:ok, client} = TestClient.send_packet(client, %UserAvatarListReq{unset: 0})
     assert {:ok, %UserLoginworldAck{avatars: [%{name: "Stay", slot: 1}]}, client} = TestClient.recv(client)
     {body, _client} = erase(client, 0)
     assert body == @fail

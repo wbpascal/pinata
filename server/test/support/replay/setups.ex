@@ -86,6 +86,51 @@ defmodule Replay.Setups do
     })
   end
 
+  @doc """
+  Setup of `re-data/captures/26_11_16_38_session-loss-kicks-char-select.md`. The account `admin` and the three
+  characters its first 0x0C14 lists; `Test1235` with the stored values its first 0x1038 shows.
+  """
+  @spec session_loss_kicks_char_select() :: :ok
+  def session_loss_kicks_char_select do
+    account_id = accounts()
+
+    :ok =
+      test1235(
+        account_id,
+        %{
+          kq_x: 5763,
+          kq_y: 8762,
+          kq_date: ~U[2026-11-15 19:00:42Z],
+          exp: 13,
+          login_x: 5763,
+          login_y: 8762,
+          hp: 3033,
+          sp: 2794,
+          money: 99_999_634_524,
+          hp_stones: 386,
+          sp_stones: 364
+        },
+        [{10, 1250}]
+      )
+
+    :ok = test2(account_id, %{level: 33, kq_x: 5758, kq_y: 8789, kq_date: ~U[2026-11-15 18:51:23Z]})
+
+    _ =
+      Factory.character(account_id, %{
+        id: 7,
+        slot: 2,
+        name: "X37Del",
+        race: 1,
+        class: 21,
+        gender: 1,
+        hair: 4,
+        tutorial_state: 0,
+        kq_date: ~U[2026-11-15 16:08:48Z]
+      })
+
+    :ok
+  end
+
   defp test2(account_id, attrs) do
     character =
       Factory.character(
@@ -101,6 +146,7 @@ defmodule Replay.Setups do
   end
 
   defp accounts do
+    :ok = TestSessions.wait_none()
     Persistence.Repo.active().query!("DELETE FROM accounts")
     {:ok, id} = Persistence.create_account("admin", "21232f297a57a5a743894a0e4a801fc3")
     id

@@ -15,7 +15,9 @@ defmodule Zone.Supervisor do
   def init(settings) do
     children = [
       {Registry, keys: :unique, name: Zone.MapRegistry},
-      {DynamicSupervisor, name: Zone.MapSupervisor, strategy: :one_for_one},
+      # One map instance that keeps crashing must not take the other maps and the listener down; only a crash loop in
+      # init/1 reaches the limit.
+      {DynamicSupervisor, name: Zone.MapSupervisor, strategy: :one_for_one, max_restarts: 1000, max_seconds: 1},
       {Zone.Maps, settings},
       {Net.Listener, {"Zone", Zone.Handler, settings.zone.port, settings}}
     ]

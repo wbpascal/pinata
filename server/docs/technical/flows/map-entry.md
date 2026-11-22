@@ -101,7 +101,7 @@ A map change (issue 112) repeats only `0x5826` and `0x182A`.
 
 ## Map instance
 
-The player enters in mode 0: it receives nothing and is shown to nobody. `0x1803` sets mode 1 (issue 109 adds the sight exchange there). The handle is the next free one from 8000 to 9499, counting on from the last handle given, wrapping to 8000; 1500 players fill the map. The instance monitors the Zone connection and removes its player when it ends; saving and `0x1805` are issue 111. See [`processes.md`](../processes.md).
+The player enters in mode 0: it receives nothing and is shown to nobody. `0x1803` sets mode 1 (issue 109 adds the sight exchange there). The handle is the next free one from 8000 to 9499, counting on from the last handle given, wrapping to 8000; 1500 players fill the map. The instance monitors the Zone connection and removes its player when it ends; saving and leaving are in [`leave-world.md`](leave-world.md), `0x1805` comes with issue 109. See [`processes.md`](../processes.md).
 
 ## Codes
 

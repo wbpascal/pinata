@@ -195,7 +195,7 @@ defmodule WorldManager.CharacterListTest do
   test "0x0C1F lists again", %{id: id} do
     {<<0x14, 0x0C, handle::little-16, 0>>, client} = world_login() |> list()
     Factory.character(id, %{name: "Late"})
-    client = send!(client, %UserAvatarListReq{})
+    client = send!(client, %UserAvatarListReq{unset: 0})
     {ack, _client} = decoded(client)
     assert ack.worldmanager == handle
     assert [%{name: "Late"}] = ack.avatars

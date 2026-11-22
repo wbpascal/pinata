@@ -5,6 +5,8 @@ defmodule Replay.Deferrals do
 
   Forms (`entry/0`): `{:payload, module, path | :all, milestone, reason}` (a field, or the whole payload, of a
   server packet is not compared), `{:absent, module, milestone, reason}` (the server packet is not sent yet),
+  `{:absent, [index, ...], milestone, reason}` (these server packets are left out, by transcript index: for an opcode
+  that built code also sends),
   `{:unsent, client_index, answer_indices, milestone, reason}` (a client packet and its answers are left out, by
   transcript index) and `{:mobs, mobs, milestone, reason}` (the monsters of a map are left out per object).
   """
@@ -22,6 +24,7 @@ defmodule Replay.Deferrals do
   @type entry ::
           {:payload, module(), Masks.path() | :all, milestone :: pos_integer(), reason :: String.t()}
           | {:absent, module(), pos_integer(), String.t()}
+          | {:absent, [pos_integer()], pos_integer(), String.t()}
           | {:unsent, client_index :: pos_integer(), answer_indices :: [pos_integer()], pos_integer(), String.t()}
           | {:mobs, mobs(), pos_integer(), String.t()}
 
@@ -56,6 +59,14 @@ defmodule Replay.Deferrals do
   defp check_shape!({:payload, mod, path, _m, r}, _packets) when is_atom(mod), do: Masks.validate!([{mod, path, r}])
   defp check_shape!({:absent, mod, _m, _r}, _packets) when is_atom(mod), do: :ok
 
+  defp check_shape!({:absent, indices, _m, _r}, packets) when is_list(indices) do
+    for index <- indices,
+        not Enum.any?(packets, &(&1.index == index and &1.dir == :server)),
+        do: raise(ArgumentError, "deferral :absent #{inspect(index)} is not a server packet of the transcript")
+
+    :ok
+  end
+
   defp check_shape!({:unsent, client, answers, _m, _r}, packets) when is_list(answers) do
     if not Enum.any?(packets, &(&1.index == client and &1.dir == :client)),
       do: raise(ArgumentError, "deferral :unsent #{client} is not a client packet of the transcript")
@@ -88,10 +99,11 @@ defmodule Replay.Deferrals do
   @spec apply([Replay.Transcript.packet()], [entry()], [{module(), Masks.path()}]) :: [map()]
   def apply(packets, entries, map_names) do
     unsent = for {:unsent, c, answers, _, _} <- entries, i <- [c | answers], into: MapSet.new(), do: i
-    absent = for {:absent, mod, _, _} <- entries, into: MapSet.new(), do: mod.opcode()
+    absent_at = for {:absent, indices, _, _} when is_list(indices) <- entries, i <- indices, into: unsent, do: i
+    absent = for {:absent, mod, _, _} when is_atom(mod) <- entries, into: MapSet.new(), do: mod.opcode()
     mobs = for {:mobs, m, _, _} <- entries, do: m
     names = for {mod, path} <- map_names, do: {mod.opcode(), mod, path}
-    ctx = %{unsent: unsent, absent: absent, mobs: mobs, names: names}
+    ctx = %{unsent: absent_at, absent: absent, mobs: mobs, names: names}
 
     {kept, _state} =
       Enum.reduce(packets, {[], %{scope: %{}, excluded: %{}}}, fn packet, {kept, state} ->

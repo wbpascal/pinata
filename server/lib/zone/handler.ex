@@ -15,11 +15,22 @@ defmodule Zone.Handler do
   Zone sends the burst of `Zone.MapEntry.login_complete/1` and the WorldManager session sends its own
   (`Cluster.Sessions.map_login_done/1`). `0x200B` is accepted without an answer; `0x302C` and `0x3020` get the
   empty answers of `Zone.MapEntry.Placeholders`.
+
+  The leave path (flow: `docs/technical/flows/leave-world.md`): the player is removed from the map instance and
+  saved (`Persistence.save_character/4`, with the play minutes since the map entry and the logout time). It runs when
+  the session asks (`0x0C18 {1}`, `Cluster.Sessions.leave_world/1`; the connection stays open in step `:left`) and
+  when the connection ends for any reason but a kill (`terminate/1`): the client closed it, the session ended or was
+  replaced, the map instance stopped in order (the connection saves the snapshot the map sent) or the listener
+  stopped. A lost map instance closes the connection without a save. From `0x1803` on the player is auto-saved every
+  10 minutes; a failed auto-save writes an `error` line and the player stays. `0x1071` and `0x1072` are accepted
+  without effect: there are no logout timers.
   """
 
   @behaviour Net.Handler
 
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.CharLogoutcancelCmd
+  alias Proto.Packets.CharLogoutreadyCmd
   alias Proto.Packets.ItemChargedinvenopenReq
   alias Proto.Packets.ItemRewardinvenopenReq
   alias Proto.Packets.MapLogincompleteCmd
@@ -28,15 +39,16 @@ defmodule Zone.Handler do
   alias Zone.MapEntry.Placeholders
 
   @enforce_keys [:checksums]
-  defstruct [:checksums, step: :login, session: :none, entry: :none, map: :none, player: :none]
+  defstruct [:checksums, step: :login, session: :none, entry: :none, map: :none, player: :none, entered_at: :none]
 
   @type t :: %__MODULE__{
           checksums: [GameData.ClientData.checksum()],
-          step: :login | :loading | :in_world,
+          step: :login | :loading | :in_world | :left,
           session: :none | pid(),
           entry: :none | Cluster.Sessions.entry(),
-          map: :none | pid(),
-          player: :none | Zone.Player.t()
+          map: :none | pid() | :stopped,
+          player: :none | Zone.Player.t(),
+          entered_at: :none | integer()
         }
 
   @type entry_failure :: :not_found | :database | :no_map | :game_data | :no_block_data | :full
@@ -73,6 +85,13 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: step} = state, %ItemChargedinvenopenReq{}) when step in [:loading, :in_world],
     do: {state, [{:send, Placeholders.charged_inventory()}]}
 
+  # Accepted without effect: no logout timers (issue 94).
+  def handle_packet(%__MODULE__{step: step} = state, %CharLogoutreadyCmd{}) when step in [:loading, :in_world],
+    do: {state, []}
+
+  def handle_packet(%__MODULE__{step: step} = state, %CharLogoutcancelCmd{}) when step in [:loading, :in_world],
+    do: {state, []}
+
   def handle_packet(state, _packet), do: {state, []}
 
   @impl Net.Handler
@@ -93,8 +112,10 @@ defmodule Zone.Handler do
          {:close, :info, "map login refused: " <> text(reason)}
        ]}
 
-  def handle_info(state, {:entered, {:ok, map, player}}),
-    do: {%{state | step: :loading, map: map, player: player}, for(p <- Zone.MapEntry.login(player), do: {:send, p})}
+  def handle_info(state, {:entered, {:ok, map, player, entered_at}}),
+    do:
+      {%{state | step: :loading, map: map, player: player, entered_at: entered_at},
+       for(p <- Zone.MapEntry.login(player), do: {:send, p})}
 
   # 0x142: the original's code when the player cannot be placed on the map.
   def handle_info(state, {:entered, {:error, reason}}),
@@ -112,12 +133,55 @@ defmodule Zone.Handler do
     do: {state, [{:close, :warning, "map login complete failed: not on the map"}]}
 
   def handle_info(%__MODULE__{session: pid} = state, {:down, pid}), do: {state, [{:close, :info, "session ended"}]}
+
+  # terminate/1 then finds the map dead and saves nothing.
+  def handle_info(%__MODULE__{map: pid} = state, {:down, pid}), do: {state, [{:close, :warning, "map instance lost"}]}
   def handle_info(state, {:down, _other}), do: {state, []}
+
+  def handle_info(%__MODULE__{step: step} = state, {:cluster, {:map_stopped, player}})
+      when step in [:loading, :in_world],
+      do: {%{state | map: :stopped, player: player}, [{:close, :info, "map instance stopped"}]}
+
+  def handle_info(state, {:cluster, {:map_stopped, _player}}), do: {state, []}
+
+  def handle_info(state, {:cluster, :session_replaced}), do: {state, [{:close, :info, "session replaced"}]}
+
+  def handle_info(%__MODULE__{step: :in_world, map: map, player: %Zone.Player{} = p} = state, {:timer, :auto_save})
+      when is_pid(map),
+      do: {state, [{:perform, {:auto_save, map, p}}]}
+
+  def handle_info(state, {:timer, :auto_save}), do: {state, []}
+
+  def handle_info(state, {:auto_saved, _id, :ok}), do: {state, []}
+
+  def handle_info(state, {:auto_saved, id, {:error, reason}}),
+    do: {state, [{:log, :error, "auto-save failed: character #{id}, " <> save_text(reason)}]}
+
+  def handle_info(state, {:left, lines}), do: {%{state | step: :left, map: :none, player: :none}, lines}
+
+  # The session leaves the world (0x0C18 {1}); the reply goes out after the save.
+  @impl Net.Handler
+  def handle_call(%__MODULE__{step: step} = state, :leave) when step in [:loading, :in_world],
+    do: {:ok, state, [{:perform, {:leave, state.map, state.player, state.entered_at}}]}
+
+  def handle_call(state, :leave), do: {:ok, state, []}
+
+  @impl Net.Handler
+  def terminate(%__MODULE__{step: step, player: %Zone.Player{} = p} = state) when step in [:loading, :in_world],
+    do: leave(state.map, p, state.entered_at)
+
+  def terminate(_state), do: []
 
   @impl Net.Handler
   def perform({:redeem, h, name}) do
     result = Cluster.Sessions.redeem(h, name)
-    _ = with {:ok, pid, _entry} <- result, do: Process.monitor(pid)
+
+    _ =
+      with {:ok, pid, entry} <- result do
+        _ = Process.monitor(pid)
+        Cluster.Sessions.join(entry.user_no)
+      end
+
     {:redeemed, result}
   end
 
@@ -127,7 +191,8 @@ defmodule Zone.Handler do
            {:ok, map} <- whereis(entry),
            {:ok, player} <- Zone.Player.new(character, entry, address(), self()),
            {:ok, handle} <- Zone.MapInstance.enter(map, player) do
-        {:ok, map, %{player | handle: handle}}
+        _ = Process.monitor(map)
+        {:ok, map, %{player | handle: handle}, Clock.monotonic_time(:millisecond)}
       end
 
     {:entered, result}
@@ -135,9 +200,70 @@ defmodule Zone.Handler do
 
   def perform({:login_complete, map, handle, session}) do
     result = Zone.MapInstance.login_complete(map, handle)
-    _ = with {:ok, _packets} <- result, do: Cluster.Sessions.map_login_done(session)
+
+    _ =
+      with {:ok, _packets} <- result do
+        :ok = Cluster.Sessions.map_login_done(session)
+        auto_save_timer()
+      end
+
     {:login_completed, result}
   end
+
+  def perform({:auto_save, map, p}) do
+    _ = auto_save_timer()
+
+    result =
+      case current(map, p.handle) do
+        {:ok, player} -> Persistence.save_character(p.world_no, p.character.id, saved(player), :auto)
+        :error -> {:error, :not_on_map}
+      end
+
+    {:auto_saved, p.character.id, result}
+  end
+
+  def perform({:leave, map, player, entered_at}), do: {:left, leave(map, player, entered_at)}
+
+  defp auto_save_timer,
+    do: Process.send_after(self(), {:timer, :auto_save}, Application.get_env(:pinata, :auto_save_ms, 600_000))
+
+  defp current(map, handle) do
+    Zone.MapInstance.player(map, handle)
+  catch
+    :exit, _ -> :error
+  end
+
+  # The one leave path: removed from the map (or the snapshot of a map stopped in order), then saved.
+  defp leave(:stopped, player, entered_at), do: save_at_leave(player, entered_at)
+
+  defp leave(map, player, entered_at) when is_pid(map) do
+    case remove(map, player.handle) do
+      {:ok, current} -> save_at_leave(current, entered_at)
+      :error -> []
+    end
+  end
+
+  defp remove(map, handle) do
+    Zone.MapInstance.leave(map, handle)
+  catch
+    :exit, _ -> :error
+  end
+
+  defp save_at_leave(p, entered_at) do
+    # max/2: a test clock can be set back while a connection is still in the world.
+    minutes = max(div(Clock.monotonic_time(:millisecond) - entered_at, 60_000), 0)
+
+    case Persistence.save_character(p.world_no, p.character.id, saved(p), {:leave, minutes}) do
+      :ok -> [{:log, :info, "left the world: character #{p.character.id}, map #{p.map}"}]
+      {:error, reason} -> [{:log, :error, "save at leave failed: character #{p.character.id}, " <> save_text(reason)}]
+    end
+  end
+
+  defp saved(p), do: %{map: p.map, x: p.x, y: p.y, hp: p.character.hp, sp: p.character.sp}
+
+  defp save_text(:not_found), do: "character not found"
+  defp save_text(:database), do: "database failure"
+  defp save_text(:not_on_map), do: "not on the map"
 
   defp whereis(entry) do
     case Zone.MapInstance.whereis(entry.world_no, entry.map) do

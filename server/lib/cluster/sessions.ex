@@ -15,16 +15,68 @@ defmodule Cluster.Sessions do
         }
   @type refusal :: :no_session | :no_ticket | :wrong_character | :wrong_node
 
-  @doc "Makes the calling process the session of the account. Every older session process gets `{:cluster, :session_replaced}`."
-  @spec take_over(pos_integer()) :: :ok
+  @doc """
+  Makes the calling process the session of the account. The other members of the account's group (the older
+  session and its Zone connection) get `{:cluster, :session_replaced}`; the call returns when they have all ended,
+  so the character of the older session is saved, or `{:error, :timeout}` after the replace timeout (5 s).
+  """
+  @spec take_over(pos_integer()) :: :ok | {:error, :timeout}
   def take_over(user_no) do
     scope = Cluster.Registry.scope()
     group = {:session, user_no}
     me = self()
     members = :pg.get_members(scope, group)
-    Enum.each(members, fn pid -> if pid != me, do: send(pid, {:cluster, :session_replaced}) end)
+
+    refs =
+      for pid <- members, pid != me do
+        ref = Process.monitor(pid)
+        send(pid, {:cluster, :session_replaced})
+        ref
+      end
+
     # Two logins of one account at the same instant on two nodes can miss each other.
-    if me in members, do: :ok, else: :pg.join(scope, group, me)
+    :ok = if me in members, do: :ok, else: :pg.join(scope, group, me)
+    timer = make_ref()
+    timer_ref = Process.send_after(self(), {timer, :timeout}, Application.get_env(:pinata, :replace_timeout_ms, 5_000))
+    result = await_down(refs, timer)
+    _ = Process.cancel_timer(timer_ref)
+
+    receive do
+      {^timer, :timeout} -> :ok
+    after
+      0 -> :ok
+    end
+
+    result
+  end
+
+  @doc "The calling process (a Zone connection) joins the group of the account, so a take-over tells it and waits for it."
+  @spec join(pos_integer()) :: :ok
+  def join(user_no), do: :pg.join(Cluster.Registry.scope(), {:session, user_no}, self())
+
+  @doc """
+  Asks the Zone connection to leave the world (save, remove from the map) and waits for it, 5 s at most. A Zone
+  connection that has ended counts as left: it saves before it ends.
+  """
+  @spec leave_world(pid()) :: :ok | {:error, :timeout}
+  def leave_world(pid) do
+    GenServer.call(pid, {:cluster, :leave}, 5_000)
+  catch
+    :exit, {:timeout, _} -> {:error, :timeout}
+    :exit, _ended -> :ok
+  end
+
+  defp await_down([], _timer), do: :ok
+
+  defp await_down([ref | rest] = refs, timer) do
+    receive do
+      {:DOWN, ^ref, :process, _pid, _reason} ->
+        await_down(rest, timer)
+
+      {^timer, :timeout} ->
+        Enum.each(refs, &Process.demonitor(&1, [:flush]))
+        {:error, :timeout}
+    end
   end
 
   @doc "The calling process stops being the session of the account."

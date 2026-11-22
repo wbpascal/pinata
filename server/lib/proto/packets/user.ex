@@ -227,8 +227,12 @@ defmodule Proto.Packets.UserLoginworldfailAck do
 end
 
 defmodule Proto.Packets.UserAvatarListReq do
-  @moduledoc "0x0C1F NC_USER_AVATAR_LIST_REQ, empty, client to server."
+  @moduledoc """
+  0x0C1F NC_USER_AVATAR_LIST_REQ, client to server. The official struct is empty; the 2016 client sends one unset
+  byte (capture-validation §22.5), and the server does not read it.
+  """
   use Proto.Packet, opcode: 0x0C1F
+  field :unset, :u8
 end
 
 defmodule Proto.Packets.UserConnectcutCmd do

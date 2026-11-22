@@ -6,7 +6,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `load_character/3`, `create_character/1`, `delete_character/3`, `rename_character/4`, `skip_tutorial/3`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `load_character/3`, `create_character/1`, `delete_character/3`, `rename_character/4`, `skip_tutorial/3`, `save_character/4`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
@@ -62,15 +62,17 @@ The name key models SQL Server's default comparison, case-insensitive and blind 
 | `hair`, `hair_color`, `face` | integer | 0 to 255 |
 | `kq_map` | string, default `""` | at most 12 characters |
 | `kq_x`, `kq_y` | bigint, default 0 | 0 to 4294967295 |
-| `kq_date` | utc_datetime | |
+| `kq_date` | utc_datetime | the time of the last save (the character list shows it) |
 | `tutorial_state` | integer | 0 to 3 |
 | `tutorial_step` | integer, default 0 | 0 to 255 |
 | `exp` | bigint, default 0 | at least 0 |
 | `login_x`, `login_y` | bigint, default 0 | 0 to 4294967295; the position the character logs in at |
 | `hp`, `sp`, `money` | bigint, default 0 | at least 0 |
 | `hp_stones`, `sp_stones` | integer, default 0 | at least 0 |
+| `play_minutes` | bigint, default 0 | at least 0; whole minutes in the world, added at each leave |
+| `logout_at` | utc_datetime, nullable | the last leave; none for a character that never left the world |
 
-Unique indexes: `(world_id, account_id, slot)` and `(world_id, name_key)`.
+Unique indexes: `(world_id, account_id, slot)` and `(world_id, name_key)`. `play_minutes` and `logout_at` come from the second migration of the table (`20261122000000_add_character_play_time`), which adds both columns and the check of `play_minutes` the same way.
 
 Checks work on both adapters through one list per table in the migration: SQLite takes a check only as the `check:` option of a column, PostgreSQL ignores that option and gets a `create constraint` per check when the adapter is PostgreSQL (SQLite cannot add constraints later).
 
@@ -102,6 +104,10 @@ Unique index `(character_id, storage, slot)`. Storage 9 is the inventory; only c
 ## Map entry
 
 `load_character/3` (the Zone at map entry) is one transaction with two reads: the character by `(world_id, account_id, id)` and its items with storage 8 ordered by slot. It returns the stored values the map-entry burst sends (level, experience, position, HP, SP, money, stones, look) with the equipment; no row is `{:error, :not_found}`, a failure `{:error, :database}`.
+
+## Save
+
+`save_character/4` (the Zone, flow: [`flows/leave-world.md`](flows/leave-world.md)) is one transaction with one guarded `update_all` on `characters` by `(world_id, id)`. It sets `login_map`, `login_x`, `login_y`, `hp`, `sp` and `kq_date` (now, as the original's `p_Char_SaveLocation` sets `dKQDate`). The kind `:auto` (auto-save) stops there; `{:leave, minutes}` also sets `logout_at` to now and adds `minutes` to `play_minutes` (`inc:`). No other column is touched, so columns a later issue adds keep their values. One affected row is `:ok`, none (the row was deleted) `{:error, :not_found}`, any other failure `{:error, :database}` with a logged line. It runs in the Zone connection process, never in the map instance.
 
 ## Tutorial skip
 

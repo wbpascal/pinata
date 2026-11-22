@@ -410,6 +410,16 @@ defmodule Proto.Packets.ActEndoftradeCmd do
   use Proto.Packet, opcode: 0x200B
 end
 
+defmodule Proto.Packets.CharLogoutreadyCmd do
+  @moduledoc "0x1071 NC_CHAR_LOGOUTREADY_CMD, empty, client to server: the exit countdown started."
+  use Proto.Packet, opcode: 0x1071
+end
+
+defmodule Proto.Packets.CharLogoutcancelCmd do
+  @moduledoc "0x1072 NC_CHAR_LOGOUTCANCEL_CMD, empty, client to server."
+  use Proto.Packet, opcode: 0x1072
+end
+
 defmodule Proto.Packets.ItemRewardinvenopenReq do
   @moduledoc "0x302C NC_ITEM_REWARDINVENOPEN_REQ, client to server: open a page of the reward inventory."
   use Proto.Packet, opcode: 0x302C

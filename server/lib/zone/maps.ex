@@ -4,7 +4,8 @@ defmodule Zone.Maps do
 
   It joins inside `init/1`, so in single-node mode the maps run before the listener starts. When the WorldManager of
   a world is not registered yet, or is lost, it tries again every second. A crashed map instance is started again,
-  empty, by `Zone.MapSupervisor`; this process only logs it.
+  empty, by `Zone.MapSupervisor`; this process only logs it. Started again itself, it watches the instances that
+  kept running.
   """
 
   use GenServer
@@ -44,7 +45,7 @@ defmodule Zone.Maps do
         _ = Process.send_after(self(), {:join, number}, @retry_ms)
         {:noreply, %{state | worlds: worlds}}
 
-      {_worlds, {{world, name}, maps}} ->
+      {_worlds, {{world, name, _pid}, maps}} ->
         unless graceful?(reason) do
           Logger.error("Zone: map instance #{name} of world #{world} crashed (#{inspect(reason)}), started again empty")
         end
@@ -57,8 +58,12 @@ defmodule Zone.Maps do
   end
 
   @impl GenServer
-  def handle_cast({:watch, world, name, pid}, state),
-    do: {:noreply, %{state | maps: Map.put(state.maps, Process.monitor(pid), {world, name})}}
+  # A join again (a WorldManager that returned) re-watches the running instances: one monitor per instance.
+  def handle_cast({:watch, world, name, pid}, state) do
+    if Enum.any?(state.maps, &match?({_ref, {_world, _name, ^pid}}, &1)),
+      do: {:noreply, state},
+      else: {:noreply, %{state | maps: Map.put(state.maps, Process.monitor(pid), {world, name, pid})}}
+  end
 
   defp graceful?(reason), do: reason in [:normal, :shutdown] or match?({:shutdown, _}, reason)
 
@@ -81,7 +86,8 @@ defmodule Zone.Maps do
     for name <- names do
       case DynamicSupervisor.start_child(Zone.MapSupervisor, {Zone.MapInstance, {world, name, settings.data_dir}}) do
         {:ok, _pid} -> :ok
-        {:error, {:already_started, _pid}} -> :ok
+        # A restarted Zone.Maps watches the instances that kept running.
+        {:error, {:already_started, pid}} -> GenServer.cast(self(), {:watch, world, name, pid})
       end
     end
   end

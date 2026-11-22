@@ -281,6 +281,44 @@ defmodule Persistence do
     with {:ok, :skipped} <- result, do: :ok
   end
 
+  @type saved_character :: %{
+          map: String.t(),
+          x: non_neg_integer(),
+          y: non_neg_integer(),
+          hp: non_neg_integer(),
+          sp: non_neg_integer()
+        }
+
+  @doc """
+  Saves the map, position, HP and SP of a character in the world (Zone) and sets its KQ date (`kq_date`, the
+  last save time the character list shows) to now. A leave (`{:leave, minutes}`) also adds the
+  play minutes and sets the logout time; an auto-save (`:auto`) does not. Other columns are not touched.
+  """
+  @spec save_character(non_neg_integer(), pos_integer(), saved_character(), :auto | {:leave, non_neg_integer()}) ::
+          :ok | {:error, :not_found | :database}
+  def save_character(world_id, id, saved, kind) do
+    repo = Repo.active()
+    now = DateTime.from_unix!(Clock.system_time(:second))
+    # kq_date: the original's p_Char_SaveLocation sets dKQDate to the save time (db-backup); 0x0C14 shows it.
+    set = [login_map: saved.map, login_x: saved.x, login_y: saved.y, hp: saved.hp, sp: saved.sp, kq_date: now]
+
+    changes =
+      case kind do
+        :auto -> [set: set]
+        {:leave, minutes} -> [set: [logout_at: now] ++ set, inc: [play_minutes: minutes]]
+      end
+
+    result =
+      transact(repo, "save_character", fn ->
+        case repo.update_all(from(c in Character, where: c.world_id == ^world_id and c.id == ^id), changes) do
+          {1, _} -> {:ok, :saved}
+          {0, _} -> {:error, :not_found}
+        end
+      end)
+
+    with {:ok, :saved} <- result, do: :ok
+  end
+
   @doc """
   Renames the character in a slot of an account and world. The name is unique per world without regard to ASCII
   letter case (P02-B42 fixed).

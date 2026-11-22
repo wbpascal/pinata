@@ -16,6 +16,8 @@ defmodule Persistence.MigrationsTest do
     :code.delete(Persistence.Repo.Migrations.CreateAccounts)
     :code.purge(Persistence.Repo.Migrations.CreateCharacters)
     :code.delete(Persistence.Repo.Migrations.CreateCharacters)
+    :code.purge(Persistence.Repo.Migrations.AddCharacterPlayTime)
+    :code.delete(Persistence.Repo.Migrations.AddCharacterPlayTime)
 
     on_exit(fn ->
       System.put_env("DATABASE_URL", url)
