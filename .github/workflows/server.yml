@@ -313,7 +313,7 @@ jobs:
           $R/bin/pinata rpc 'IO.inspect(Enum.sort(for {a, _, _} <- Application.started_applications(), a in [:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter], do: a))' | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
           printf 'smoke-password\n' | $R/bin/pinata eval 'Persistence.Release.create_account("smoke")'
           mix run --no-start test/support/smoke.exs 9010
-          $R/bin/pinata rpc '{:ok, p} = Zone.MapInstance.whereis(0, ~s(Rou)); :ok = Zone.MapInstance.enter(p, :otel_smoke)'
+          $R/bin/pinata rpc '{:ok, p} = Zone.MapInstance.whereis(0, ~s(Rou)); conn = spawn(fn -> Process.sleep(:infinity) end); {:ok, _} = Zone.MapInstance.enter(p, %Zone.Player{character: :otel_smoke, world_no: 0, map: 0, x: 0, y: 0, walk_speed: 0, run_speed: 0, map_type: 0, equipment: [], address: {127, 0, 0, 1}, conn: conn})'
           sleep 2
           $R/bin/pinata rpc ':otel_tracer_provider.force_flush(); :otel_meter_server.force_flush()'
           grep -F "Pinata: OpenTelemetry export on" "$RUNNER_TEMP/on.out"
