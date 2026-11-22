@@ -1,5 +1,10 @@
 defmodule Zone.Supervisor do
-  @moduledoc "Root supervisor of `Zone`. It starts the client listener."
+  @moduledoc """
+  Root supervisor of `Zone`: the map registry, the map supervisor, `Zone.Maps` and the client listener, in this order.
+
+  The strategy is `:rest_for_one`: `Zone.Maps` must start again when the map supervisor does, to start the map
+  instances again, and the listener starts last so the node listens only when its maps run.
+  """
 
   use Supervisor
 
@@ -7,6 +12,14 @@ defmodule Zone.Supervisor do
   def start_link(settings), do: Supervisor.start_link(__MODULE__, settings, name: __MODULE__)
 
   @impl Supervisor
-  def init(settings),
-    do: Supervisor.init([{Net.Listener, {"Zone", Zone.Handler, settings.zone.port, settings}}], strategy: :one_for_one)
+  def init(settings) do
+    children = [
+      {Registry, keys: :unique, name: Zone.MapRegistry},
+      {DynamicSupervisor, name: Zone.MapSupervisor, strategy: :one_for_one},
+      {Zone.Maps, settings},
+      {Net.Listener, {"Zone", Zone.Handler, settings.zone.port, settings}}
+    ]
+
+    Supervisor.init(children, strategy: :rest_for_one)
+  end
 end

@@ -33,8 +33,12 @@ defmodule Settings do
     {parts, part_problems} = parts(env)
 
     case file_problems ++ value_problems ++ part_problems do
-      [] -> values |> Map.put(:parts, parts) |> derive(env) |> check_database()
-      [_ | _] = problems -> {:error, problems}
+      [] ->
+        settings = values |> Map.put(:parts, parts) |> derive(env)
+        with {:ok, settings} <- check_public_host(settings), do: check_database(settings)
+
+      [_ | _] = problems ->
+        {:error, problems}
     end
   end
 
@@ -69,6 +73,21 @@ defmodule Settings do
   @doc "True when all parts run on this node and `cluster.nodes` is empty."
   @spec single_node?(%{:parts => [part()], :cluster => %{nodes: [String.t()]}, optional(atom()) => term()}) :: boolean()
   def single_node?(settings), do: settings.parts == @parts and settings.cluster.nodes == []
+
+  # The Zone node reports it to WorldManager, which sends it to the client in a char[16] field.
+  defp check_public_host(settings) do
+    host = settings.public_host
+
+    if :zone not in settings.parts or match?({:ok, _}, :inet.parse_ipv4strict_address(String.to_charlist(host))) do
+      {:ok, settings}
+    else
+      {:error,
+       [
+         "public_host: a node with the Zone part needs an IPv4 address in text form, " <>
+           "for example \"203.0.113.7\" (the client field is char[16]), got: #{inspect(host)}"
+       ]}
+    end
+  end
 
   # SQLite is one file on one machine (ADR 0004). The tests run several nodes on one machine against one file
   # and set `config :pinata, :sqlite_in_multi_node, true`; nothing else may.

@@ -63,6 +63,10 @@ defmodule Pinata.StartTest do
     assert log =~ "[info] Login: listening on 0.0.0.0:#{login}\n"
     assert log =~ "[info] WorldManager: listening on 0.0.0.0:#{wm}\n"
     assert log =~ "[info] Zone: listening on 0.0.0.0:#{zone}\n"
+    assert log =~ "[info] Zone: 12 of 537 NPC rows skipped: their map does not run\n"
+    assert log =~ "[info] WorldManager: Zone node #{node()} joined world 0 at 127.0.0.1:#{zone}, 88 maps\n"
+    assert log =~ "[info] Zone: world 0: 88 map instances started\n"
+    assert Registry.count(Zone.MapRegistry) == 88
 
     assert log =~
              "[info] Pinata: node started, parts login, world_manager, zone, single-node mode, database #{database()}\n"
@@ -96,6 +100,28 @@ defmodule Pinata.StartTest do
 
     assert output =~ "bogus: unknown key"
     assert output =~ "login.port: "
+    assert running() == []
+  end
+
+  test "a missing or damaged block data file of a field map stops the start", %{tmp_dir: tmp_dir} do
+    use_file(tmp_dir, ports())
+    path = GameData.DataFile.path(System.fetch_env!("PINATA_TEST_DATA_DIR"), "BlockInfo/Rou.shbd")
+    off = path <> ".off"
+
+    on_exit(fn ->
+      File.rm(path)
+      File.rename!(off, path)
+    end)
+
+    File.rename!(path, off)
+    output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
+    assert output =~ "Invalid game data, the node does not start:"
+    assert output =~ "map Rou: BlockInfo/Rou.shbd: file not found"
+    assert running() == []
+
+    File.write!(path, <<1, 2, 3>>)
+    output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
+    assert output =~ "map Rou: BlockInfo/Rou.shbd: damaged block data"
     assert running() == []
   end
 

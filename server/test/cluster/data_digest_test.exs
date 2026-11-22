@@ -17,10 +17,15 @@ defmodule Cluster.DataDigestTest do
     File.mkdir_p!(bad_dir)
     good_dir = System.fetch_env!("PINATA_TEST_DATA_DIR")
 
-    for schema <- Zone.game_data() do
-      {_format, rel} = schema.__schema__().source
-      File.mkdir_p!(Path.dirname(Path.join(bad_dir, rel)))
-      File.cp!(Path.join(good_dir, rel), Path.join(bad_dir, rel))
+    # plus the block data the start-up check of the Zone part wants
+    block_data = for %{map_id_client: name} <- GameData.plain_field_maps(), do: "BlockInfo/#{name}.shbd"
+    sources = for schema <- Zone.game_data(), do: elem(schema.__schema__().source, 1)
+
+    for rel <- sources ++ block_data do
+      source = GameData.DataFile.path(good_dir, rel)
+      target = Path.join(bad_dir, Path.relative_to(source, good_dir))
+      File.mkdir_p!(Path.dirname(target))
+      File.cp!(source, target)
     end
 
     File.write!(Path.join(bad_dir, "x.txt"), "x")

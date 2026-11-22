@@ -18,7 +18,7 @@ with no file the node starts in single-node mode on the data directory `./data`,
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `data_dir` | string | `"./data"` | The data directory, written by `bin/pinata eval "GameData.Release.import_data(...)"`, from a source checkout by `mix pinata.import_data` (see install.md). The node does not start without it. |
-| `public_host` | string, at most 15 bytes | `"127.0.0.1"` | The address the client is told to connect to. Login sends it together with its own `world_manager.port` when a world is selected, so in multi-node mode set both on the Login node to where the WorldManager node is reached. |
+| `public_host` | string, at most 15 bytes | `"127.0.0.1"` | The address the client is told to connect to. Login sends it together with its own `world_manager.port` when a world is selected, so in multi-node mode set both on the Login node to where the WorldManager node is reached. On a node with the Zone part it must be an IPv4 address in text form (`203.0.113.7`), not a host name: the Zone node reports it to WorldManager, which sends it to the client in a 16-byte field. |
 | `client_version_key` | string | `"20151116141627"` | The version key a client must send at login. The default is the key of the 2016 client. |
 | `login.port` | integer 1 to 65535 | `9010` | Client listener of the Login part. |
 | `login.auto_create_accounts` | boolean | see description | Create an account at the first login with an unknown name. Default: `true` when all parts run on this node and `cluster.nodes` is empty, else `false`. |

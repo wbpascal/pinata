@@ -51,6 +51,7 @@ defmodule TestPeers do
     true = :peer.call(login, Node, :connect, [wm_node])
     true = :peer.call(zone, Node, :connect, [wm_node])
     _ = :peer.call(login, :global, :sync, [], @call_timeout)
+    wait_for_map_table(wm)
 
     %{
       login: login,
@@ -73,6 +74,15 @@ defmodule TestPeers do
     Enum.each(peers, &:peer.stop/1)
     File.rm(config)
     :ok
+  end
+
+  # The Zone peer started before it was connected and joins by its 1 s retry.
+  defp wait_for_map_table(wm, tries \\ 100) do
+    case :peer.call(wm, WorldManager.World, :zone_of, [0, "Rou"]) do
+      {:ok, _} -> :ok
+      :error when tries > 0 -> Process.sleep(100) && wait_for_map_table(wm, tries - 1)
+      :error -> raise "the Zone peer did not join the WorldManager"
+    end
   end
 
   defp boot_peer(label, parts, config) do

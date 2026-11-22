@@ -112,6 +112,10 @@ defmodule GameData do
     Logger.info("GameData: #{map_size(tables)} tables, #{rows} rows, #{took} ms, #{bytes} bytes")
   end
 
+  @doc "The number of rows of `schema`. Raises when the table was not loaded."
+  @spec count(module()) :: non_neg_integer()
+  def count(schema), do: map_size(table(schema).rows)
+
   @doc "The row of `schema` with this key. Raises when the table was not loaded (the part forgot to declare it)."
   @spec fetch(module(), term()) :: {:ok, struct()} | :error
   def fetch(schema, key), do: Map.fetch(table(schema).rows, key)

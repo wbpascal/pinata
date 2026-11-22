@@ -7,6 +7,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 ### New
 
 - A node with the Zone part reads the map and NPC tables of the data directory at start-up (`FieldList`, `ShineNPC`, `LinkTable`, `Common` of `ChrCommon`, `MobInfo.shn`, `TownPortal.shn`, `SpamerPenalty.shn`, `SpamerPenaltyRule.shn`) and does not start when one is missing or damaged. Files of the data directory are found whatever the letter case of their names (#105).
+- A node with the Zone part runs one map instance per field map (88 with the original data), places the NPCs of `ShineNPC` and logs how many rows it skipped. It does not start when the `.shbd` file of a field map is missing or damaged; the error names the map (#106).
+- In multi-node mode each Zone node reports its own `public_host` and `zone.port` to WorldManager (#106).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 
 ### Differences from the original server
@@ -16,6 +18,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 
 ### Moving from the previous version
 
+- `public_host` must be an IPv4 address in text form on a node with the Zone part (every single-node setup): a node with a host name there does not start (#106).
 - The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
 
 ## 0.1.0 – Login to character select (2026-11-21)
