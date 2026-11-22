@@ -92,7 +92,22 @@ defmodule Replay.Masks do
         {Proto.Packets.MapLoginReq, :wm_handle, :wm_session,
          "session handle: the client sends back the handle of 0x0C14"},
         {Proto.Packets.MapLoginAck, :handle, :object, "object handle: the map instance gives the next free handle"}
-      ] ++ brief_handles()
+      ] ++ brief_handles() ++ sight_handles()
+
+  defp sight_handles,
+    do: [
+      {Proto.Packets.BriefinfoMobCmd, [:mobs, :handle], :object, "object handle: the map instance places its NPCs"},
+      {Proto.Packets.BriefinfoRegenmobCmd, :handle, :object, "object handle: the map instance places its NPCs"},
+      {Proto.Packets.BriefinfoLogincharacterCmd, :handle, :object,
+       "object handle: the handle of 0x1802 of the other player"},
+      {Proto.Packets.BriefinfoCharacterCmd, [:chars, :handle], :object,
+       "object handle: the handles of 0x1802 of the players in sight"},
+      {Proto.Packets.BriefinfoBriefinfodeleteCmd, :handle, :object, "object handle: the object that left sight"},
+      {Proto.Packets.MapLogoutCmd, :handle, :object, "object handle: the player that left the map"},
+      {Proto.Packets.BriefinfoInformCmd, :my_handle, :object,
+       "object handle: the client sends its own handle of 0x1802"},
+      {Proto.Packets.BriefinfoInformCmd, :handle, :object, "object handle: the client sends back a handle it was shown"}
+    ]
 
   defp brief_handles do
     for mod <- [

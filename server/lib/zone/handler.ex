@@ -15,11 +15,17 @@ defmodule Zone.Handler do
   Zone sends the burst of `Zone.MapEntry.login_complete/1` and the WorldManager session sends its own
   (`Cluster.Sessions.map_login_done/1`). `0x200B` is accepted without an answer; `0x302C` and `0x3020` get the
   empty answers of `Zone.MapEntry.Placeholders`.
+
+  Sight (flow: `docs/technical/flows/sight.md`): in the world, `0x1C01` asks the map instance for the appear packet
+  of an object (`Zone.MapInstance.inform/3`); the client's own handle field is ignored and an object out of sight,
+  unknown or the requester itself gets no answer. The packets the map instance pushes for this player
+  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`) are sent in the world and dropped before.
   """
 
   @behaviour Net.Handler
 
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.BriefinfoInformCmd
   alias Proto.Packets.ItemChargedinvenopenReq
   alias Proto.Packets.ItemRewardinvenopenReq
   alias Proto.Packets.MapLogincompleteCmd
@@ -73,6 +79,9 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: step} = state, %ItemChargedinvenopenReq{}) when step in [:loading, :in_world],
     do: {state, [{:send, Placeholders.charged_inventory()}]}
 
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %BriefinfoInformCmd{handle: h}),
+    do: {state, [{:perform, {:inform, state.map, p.handle, h}}]}
+
   def handle_packet(state, _packet), do: {state, []}
 
   @impl Net.Handler
@@ -111,6 +120,14 @@ defmodule Zone.Handler do
   def handle_info(state, {:login_completed, {:error, :not_entered}}),
     do: {state, [{:close, :warning, "map login complete failed: not on the map"}]}
 
+  def handle_info(state, {:informed, packets}), do: {state, for(p <- packets, do: {:send, p})}
+
+  # a player not yet in the world (mode 0) receives nothing
+  def handle_info(%__MODULE__{step: :in_world} = state, {:cluster, {:packets, packets}}),
+    do: {state, for(p <- packets, do: {:send, p})}
+
+  def handle_info(state, {:cluster, {:packets, _packets}}), do: {state, []}
+
   def handle_info(%__MODULE__{session: pid} = state, {:down, pid}), do: {state, [{:close, :info, "session ended"}]}
   def handle_info(state, {:down, _other}), do: {state, []}
 
@@ -138,6 +155,8 @@ defmodule Zone.Handler do
     _ = with {:ok, _packets} <- result, do: Cluster.Sessions.map_login_done(session)
     {:login_completed, result}
   end
+
+  def perform({:inform, map, own, handle}), do: {:informed, Zone.MapInstance.inform(map, own, handle)}
 
   defp whereis(entry) do
     case Zone.MapInstance.whereis(entry.world_no, entry.map) do

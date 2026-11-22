@@ -1,9 +1,4 @@
 # Stand-ins for the packets nobody defines yet: the `:absent` deferral needs a module with `opcode/0`.
-defmodule Replay.Milestone2Test.Unbuilt.BriefinfoMobCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x1C09
-end
-
 defmodule Replay.Milestone2Test.Unbuilt.BatAbstateinformNoeffectCmd do
   @spec opcode() :: 0..0xFFFF
   def opcode, do: 0x242A
@@ -85,8 +80,14 @@ defmodule Replay.Milestone2Test do
     {:payload, P.CharOptionGetWindowposAck, :all, 6, "the stored window positions of the captured character (options)"},
     {:unsent, 52, [127, 128, 129, 130], 10,
      "order race of the original (its 0x581C comes after the WorldManager burst) and the Kingdom Quest list 0x581D (Kingdom Quest); the answer is checked by test/map_entry_test.exs"},
-    {:absent, U.BriefinfoMobCmd, 2,
-     "the sight exchange: issue 109 builds it for NPCs and players, milestone 4 for mobs (the two captured are mobs)"},
+    {:mobs,
+     %{
+       appear: [{P.BriefinfoRegenmobCmd, :handle, :mob_id}],
+       lists: [{P.BriefinfoMobCmd, :mobs, :handle, :mob_id, 28}],
+       gone: [{P.BriefinfoBriefinfodeleteCmd, :handle}],
+       about: [],
+       npc?: &__MODULE__.npc?/2
+     }, 4, "the monsters of the map (mobs); the NPC elements of 0x1C09 are compared"},
     {:absent, U.BatAbstateinformNoeffectCmd, 4, "the abstates 345 and 291 of the captured character (abstates)"},
     {:absent, U.BatAbstateinformCmd, 4, "the title abstates and abstate 728 (abstates)"},
     {:absent, U.BriefinfoAbstateChangeCmd, 4, "the abstates of the captured character (abstates)"},
@@ -100,6 +101,14 @@ defmodule Replay.Milestone2Test do
     {:payload, P.KqJoiningAlarmList, :all, 10, "the Kingdom Quests open to join (Kingdom Quest)"},
     {:payload, P.CharClientNewbieGuideViewListCmd, :all, 11, "the newbie guides the captured character has seen"}
   ]
+
+  @doc false
+  @spec npc?(String.t() | nil, non_neg_integer()) :: boolean()
+  def npc?(map, mob_id) do
+    Enum.any?(GameData.lookup(GameData.ShineNpc, :map, map), fn row ->
+      Enum.any?(GameData.lookup(GameData.MobInfo, :inx_name, row.mob_name), &(&1.id == mob_id))
+    end)
+  end
 
   # Stop point 140: the last packet of map entry (0x3021). Behind it: mob moves from 141 (milestone 4), the reset of
   # abstate 291 with its 0x1035 at 145 and 146 (milestone 4), the expiry of the pick-up mini-mon at 161 to 168

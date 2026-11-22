@@ -2,16 +2,25 @@ defmodule Zone.MapInstance do
   @moduledoc """
   One process per map instance (ADR 0009), registered in `Zone.MapRegistry` under `{world number, map name}`.
 
-  The state holds the NPCs placed from `ShineNPC` (in file order, with their handles), the block data (`nil` until
-  the first entry), the players by object handle (`Zone.Player`), the tick count and the tick schedule. A player
+  The state holds the sight radius (`MapInfo.Sight`; 0 for a map without a row), the NPCs placed from `ShineNPC`
+  (`Zone.Npc`, in file order, with their handles) and the shown ones by handle, the grid of every object position
+  (`Zone.Grid`, cell size = the sight radius, 1600 when it is 0), the block data (`nil` until the first entry), the
+  players by object handle (`Zone.Player`), the tick count and the tick schedule. A player
   gets the next free handle from 8000 to 9499, counting on from the last one given and wrapping to 8000, so a freed
   handle is not reused before the wrap; 1500 players fill the map. A player enters in mode 0 (receives nothing,
   shown to nobody) and is in mode 1 after `login_complete/2`. The instance monitors the connection of each player
   and removes its players when it ends. The map ticks every 100 ms through `Clock.send_after/3`, only while it has
   players. Each tick is the telemetry span `[:pinata, :tick]` (`docs/technical/telemetry.md`).
+
+  Sight (`Zone.Sight`, `docs/technical/sight.md`): `login_complete/2` runs the entry exchange, `step/3` sends the
+  appears and disappears of a position change, `inform/3` answers `0x1C01`, a player that leaves is announced with
+  `0x1805` to the players in sight. Packets for other players go to their connections as
+  `{:cluster, {:packets, packets}}`.
   """
 
   use GenServer
+
+  alias Proto.Packets.MapLogoutCmd
 
   require Logger
 
@@ -48,13 +57,47 @@ defmodule Zone.MapInstance do
   @spec leave(pid(), 8000..9499) :: :ok
   def leave(pid, handle), do: GenServer.call(pid, {:leave, handle})
 
+  @doc """
+  The player of the handle stands at a new point: the appear and disappear packets go to the players concerned.
+  Called by the movement of issue 110; the caller has checked the point.
+  """
+  @spec step(pid(), 8000..9499, Zone.Grid.point()) :: :ok | {:error, :not_entered}
+  def step(pid, handle, {x, y}) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
+    do: GenServer.call(pid, {:step, handle, {x, y}})
+
+  @doc "Sets the dimension and the sub-layer of the player of the handle; sends nothing."
+  @spec set_layer(pid(), 8000..9499, integer(), 0..5) :: :ok | {:error, :not_entered}
+  def set_layer(pid, handle, dimension, sub_layer) when is_integer(dimension) and sub_layer in 0..5,
+    do: GenServer.call(pid, {:set_layer, handle, dimension, sub_layer})
+
+  @doc "The answer to `0x1C01` of the player of `requester` for an object handle; `[]` when it is not on the map."
+  @spec inform(pid(), 8000..9499, non_neg_integer()) :: [struct()]
+  def inform(pid, requester, handle), do: GenServer.call(pid, {:inform, requester, handle})
+
   @impl GenServer
   def init({world_id, name, data_dir}) do
+    radius =
+      case GameData.fetch(GameData.MapInfo, name) do
+        {:ok, %{sight: sight}} ->
+          sight
+
+        :error ->
+          Logger.info("Zone: map #{name}: no MapInfo row, sight radius 0")
+          0
+      end
+
     npcs =
       GameData.ShineNpc
       |> GameData.lookup(:map, name)
       |> Enum.with_index(@first_npc_handle)
-      |> Enum.map(fn {row, handle} -> %{handle: handle, row: row} end)
+      |> Enum.map(fn {row, handle} -> Zone.Npc.new(row, handle) end)
+
+    _ =
+      for %Zone.Npc{brief: :none} = npc <- npcs,
+          do: Logger.info("Zone: map #{name}: NPC #{npc.row.mob_name} not shown: no MobInfo row")
+
+    shown = for %Zone.Npc{brief: %{}} = npc <- npcs, do: npc
+    grid = Enum.reduce(shown, Zone.Grid.new(if(radius > 0, do: radius, else: 1600)), &put_grid(&2, &1))
 
     # A cast to a name nobody holds is dropped (an instance started alone).
     GenServer.cast(Zone.Maps, {:watch, world_id, name, self()})
@@ -64,7 +107,10 @@ defmodule Zone.MapInstance do
        world: world_id,
        name: name,
        data_dir: data_dir,
+       radius: radius,
        npcs: npcs,
+       npc_index: Map.new(shown, &{&1.handle, &1}),
+       grid: grid,
        block_data: nil,
        players: %{},
        next_handle: @first_handle,
@@ -84,6 +130,7 @@ defmodule Zone.MapInstance do
       state = %{
         state
         | players: Map.put(state.players, handle, player),
+          grid: put_grid(state.grid, player),
           next_handle: if(handle == @last_handle, do: @first_handle, else: handle + 1)
       }
 
@@ -96,9 +143,11 @@ defmodule Zone.MapInstance do
   def handle_call({:login_complete, handle}, _from, state) do
     case state.players do
       %{^handle => %Zone.Player{mode: 0} = player} ->
-        # issue 109 adds the sight exchange here: the player is shown to the others and sees them
         player = %{player | mode: 1}
-        {:reply, {:ok, Zone.MapEntry.login_complete(player)}, put_in(state.players[handle], player)}
+        state = put_in(state.players[handle], player)
+        {packets, deliveries} = Zone.Sight.entry(view(state), player)
+        deliver(deliveries)
+        {:reply, {:ok, Zone.MapEntry.login_complete(player, packets)}, state}
 
       %{} ->
         {:reply, {:error, :not_entered}, state}
@@ -106,6 +155,38 @@ defmodule Zone.MapInstance do
   end
 
   def handle_call({:leave, handle}, _from, state), do: {:reply, :ok, remove(state, &(&1 == handle))}
+
+  def handle_call({:step, handle, {x, y} = point}, _from, state) do
+    case state.players do
+      %{^handle => %Zone.Player{} = player} ->
+        deliveries = Zone.Sight.step(view(state), player, point)
+        moved = %{player | x: x, y: y}
+        grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
+        deliver(deliveries)
+        {:reply, :ok, %{state | players: Map.put(state.players, handle, moved), grid: grid}}
+
+      %{} ->
+        {:reply, {:error, :not_entered}, state}
+    end
+  end
+
+  def handle_call({:set_layer, handle, dimension, sub_layer}, _from, state) do
+    case state.players do
+      %{^handle => %Zone.Player{} = player} ->
+        player = %{player | dimension: dimension, sub_layer: sub_layer}
+        {:reply, :ok, put_in(state.players[handle], player)}
+
+      %{} ->
+        {:reply, {:error, :not_entered}, state}
+    end
+  end
+
+  def handle_call({:inform, requester, handle}, _from, state) do
+    case state.players do
+      %{^requester => %Zone.Player{} = player} -> {:reply, Zone.Sight.inform(view(state), player, handle), state}
+      %{} -> {:reply, [], state}
+    end
+  end
 
   # The ref ends a tick chain: a leave and a new entry inside 100 ms would otherwise run two chains.
   @impl GenServer
@@ -121,14 +202,42 @@ defmodule Zone.MapInstance do
 
   def handle_info({:tick, _stale}, state), do: {:noreply, state}
 
-  # The connection of a player ended: its players leave (saving and 0x1805 are issue 111).
+  # The connection of a player ended: its players leave and are announced with 0x1805 (saving is issue 111).
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state),
     do: {:noreply, remove(state, fn handle -> state.players[handle].conn == pid end)}
 
   defp remove(state, leaves?) do
-    state = %{state | players: Map.reject(state.players, fn {handle, _player} -> leaves?.(handle) end)}
+    state =
+      for {handle, player} <- state.players, leaves?.(handle), reduce: state do
+        state ->
+          broadcast(state, player, [%MapLogoutCmd{handle: handle}])
+
+          %{
+            state
+            | players: Map.delete(state.players, handle),
+              grid: Zone.Grid.delete(state.grid, handle, {player.x, player.y})
+          }
+      end
+
     if map_size(state.players) == 0, do: %{state | tick_ref: nil}, else: state
   end
+
+  # The one "to players in sight" function, at the full radius, for the relays of later issues.
+  defp broadcast(state, %Zone.Player{} = sender, packets),
+    do: state |> view() |> Zone.Sight.receivers(sender) |> Enum.map(&{&1, packets}) |> deliver()
+
+  defp view(state), do: %{radius: state.radius, grid: state.grid, npcs: state.npc_index, players: state.players}
+
+  defp deliver(deliveries) do
+    _ =
+      for {%Zone.Player{conn: conn}, packets} <- deliveries,
+          is_pid(conn),
+          do: send(conn, {:cluster, {:packets, packets}})
+
+    :ok
+  end
+
+  defp put_grid(grid, %{handle: handle, x: x, y: y}), do: Zone.Grid.put(grid, handle, {x, y})
 
   # The next free handle from next_handle on, wrapping from 9499 to 8000.
   defp free_handle(state) do

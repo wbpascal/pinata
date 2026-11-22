@@ -480,7 +480,7 @@ defmodule Replay.HarnessTest do
 
       %{
         appear: [{Reply, :handle, :code}],
-        lists: [{Box, :items, :id, :qty}],
+        lists: [{Box, :items, :id, :qty, 28}],
         gone: [{Gone, :handle}],
         about: [{About, :handle}, {MiscSeedAck, :seed}],
         npc?: fn map, id ->
@@ -505,6 +505,29 @@ defmodule Replay.HarnessTest do
       assert Enum.find(packets, &(&1.index == 4)).scope == "A"
       assert Enum.find(packets, &(&1.index == 14)).scope == nil
       assert_received {:npc, "A", 2}
+    end
+
+    test "consecutive reduced lists of one connection are cut again into lists of at most max" do
+      lines = """
+      100.100000 zone#1 S 0x7F03 #{@a}
+      100.110000 zone#1 S 0x7F02 00000000020a00010b0002
+      100.120000 zone#1 S 0x7F02 00000000030c00010d00010e0002
+      """
+
+      mobs = %{mobs() | lists: [{Box, :items, :id, :qty, 2}]}
+      transcript = transcript(String.trim(lines), ["zone#1"])
+      packets = Replay.Deferrals.apply(transcript.packets, [{:mobs, mobs, 3, "r"}], [{Enter, :map}])
+
+      # [a] and [b, c] become [a, b] and [c], in the places of the two packets
+      assert [{3, "00000000020a00010c0001"}, {4, "00000000010d0001"}] =
+               for(p <- packets, p.opcode == 0x7F02, do: {p.index, Base.encode16(p.payload, case: :lower)})
+
+      assert_raise ArgumentError, ~r/max/, fn ->
+        Replay.Deferrals.validate!(
+          [{:mobs, %{mobs | lists: [{Box, :items, :id, :qty, 0}]}, 3, "r"}],
+          transcript.packets
+        )
+      end
     end
 
     test "end to end through run/2" do

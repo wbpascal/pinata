@@ -5,6 +5,12 @@ defmodule Zone.Player do
   instance sets `handle` and `mode` (0 after the entry, 1 after `0x1803`).
 
   `admin_level` is always 0 when loaded: the column is issue 116.
+
+  `dir` is the direction the player faces (90 after the entry, the original's `0x1803` handler sets it; no column
+  holds one). `dimension` and `sub_layer` decide with the sight radius who sees whom (`Zone.Sight`): objects see each
+  other only in the same dimension or when one of them is in dimension -1, and the sub-layer (0 Base, 1 RangerStealth,
+  2 Observer, 3 AdminHide, 4 GMDoor, 5 GMPlayer) decides one way whether an object is shown to another. Both are 0
+  after the entry and are set by `Zone.MapInstance.set_layer/4`.
   """
 
   @type equipment :: %{
@@ -15,7 +21,7 @@ defmodule Zone.Player do
         }
 
   @enforce_keys [:character, :world_no, :map, :x, :y, :walk_speed, :run_speed, :map_type, :equipment, :address]
-  defstruct @enforce_keys ++ [handle: :none, conn: :none, mode: 0, admin_level: 0]
+  defstruct @enforce_keys ++ [handle: :none, conn: :none, mode: 0, admin_level: 0, dir: 90, dimension: 0, sub_layer: 0]
 
   @type t :: %__MODULE__{
           character: Persistence.loaded_character(),
@@ -31,7 +37,10 @@ defmodule Zone.Player do
           handle: :none | 8000..9499,
           conn: :none | pid(),
           mode: 0 | 1,
-          admin_level: non_neg_integer()
+          admin_level: non_neg_integer(),
+          dir: 0..255,
+          dimension: integer(),
+          sub_layer: 0..5
         }
 
   @doc """

@@ -5,7 +5,9 @@ defmodule Zone.MapEntry do
   functions here, placeholder steps are in `Zone.MapEntry.Placeholders`, tagged with the milestone that owns them.
   A packet the rebuild does not send yet has a comment at its original position.
 
-  `login/1` is the answer to an accepted `0x1801` (`0x1038` … `0x1802`), `login_complete/1` the answer to `0x1803`.
+  `login/1` is the answer to an accepted `0x1801` (`0x1038` … `0x1802`), `login_complete/2` the answer to `0x1803`;
+  its second argument are the packets of the sight exchange (`0x1C07` / `0x1C09`, `Zone.Sight.entry/2`), which the
+  map instance computes and which go out after `0x583A`.
   """
 
   alias Proto.Packets.ActMovespeedCmd
@@ -22,16 +24,14 @@ defmodule Zone.MapEntry do
   alias Proto.Packets.MapLoginAck
   alias Zone.MapEntry.Placeholders
 
-  # the direction the original's 0x1803 handler sets; no column holds one
-  @dir 90
-
   @doc "The burst after an accepted `0x1801`, in wire order."
   @spec login(Zone.Player.t()) :: [struct()]
   def login(%Zone.Player{} = player), do: Enum.flat_map(login_steps(), & &1.(player))
 
   @doc "The burst after `0x1803`, in wire order."
-  @spec login_complete(Zone.Player.t()) :: [struct()]
-  def login_complete(%Zone.Player{} = player), do: Enum.flat_map(login_complete_steps(), & &1.(player))
+  @spec login_complete(Zone.Player.t(), [struct()]) :: [struct()]
+  def login_complete(%Zone.Player{} = player, sight_packets),
+    do: Enum.flat_map(login_complete_steps(sight_packets), & &1.(player))
 
   defp login_steps do
     [
@@ -53,12 +53,13 @@ defmodule Zone.MapEntry do
     ]
   end
 
-  defp login_complete_steps do
+  defp login_complete_steps(sight_packets) do
     [
       &Placeholders.card_collection/1,
       &equipment_briefs/1,
       &Placeholders.kq_team_type/1,
-      # absent: the sight exchange 0x1C07 / 0x1C09 (issue 109 for NPCs and players, milestone 4 for mobs)
+      # the sight exchange 0x1C07 / 0x1C09 of the players and NPCs; mobs: milestone 4
+      fn _player -> sight_packets end,
       # absent: the abstates 0x242A / 0x1C18 (345, 291 with its reset after 5 s; 728 after the burst), milestone 4
       &Placeholders.stat_points/1,
       &move_speed/1,
@@ -99,7 +100,7 @@ defmodule Zone.MapEntry do
         map: p.map,
         x: p.x,
         y: p.y,
-        dir: @dir,
+        dir: p.dir,
         stat_distribute: <<0::48>>,
         pk_yellow_time: 0,
         pk_count: 0,
