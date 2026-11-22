@@ -26,6 +26,7 @@ From a source checkout each of these has a `mix` task; they are listed in [`from
 | [`settings.md`](settings.md) | every setting |
 | [`accounts.md`](accounts.md) | creating, blocking and unblocking accounts |
 | [`operation.md`](operation.md) | start, stop, logs, start-up failures, memory, time zone, database and migrations, moving to a new version |
+| [`security.md`](security.md) | what to open, which secrets to change, account and connection settings, log lines to watch, limits of the client protocol |
 | [`multi-node.md`](multi-node.md) | PostgreSQL, the node list, which part runs where, the data directory check, a Docker Compose example |
 
 ## Not written yet

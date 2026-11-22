@@ -26,6 +26,18 @@ CI also runs `mix deps.audit`. A noisy Credo check is switched off on its own in
 - **ETS:** no named tables.
 - **Packet docs:** after a change to a packet definition run `mix pinata.packets_doc`; `mix check` fails on a stale `docs/technical/packets.md`.
 
+## Untrusted input
+
+Every byte from a client connection is untrusted input (ADR 0012; terms in `GLOSSARY.md`, "Security"). These rules apply to every handler:
+
+- **Check at the trust boundary.** The packet handler turns each client value into a checked value (a table row, an owned object, a number in range) before it calls anything else. Code behind the handler never receives a text or a number a client wrote. A name is looked up in its table, never joined into a path or a statement.
+- **Intent, not outcome.** Check that the packet is valid in the current step of the connection, that the objects it names belong to the sender or are reachable by them, and that claimed values (position, distance, count) are possible.
+- **Two answers.** Impossible input closes the connection with a server log line and a telemetry event. A refused request gets the error code of the original server and the connection stays open.
+- **Compatibility covers only input the unmodified client can produce.** Do not copy an exploitable original-server bug; fix it and cite its bug id.
+- **Issued values** (tokens, keys) come from the cryptographic random source, work once and expire.
+- **Isolation.** Untrusted input may crash only its own connection process, never a shared one.
+- **Judging a finding.** Ask first: can a client reach this code today? If yes, fix it before merge. If no, it is ordinary work.
+
 ## Persistence: the portable subset
 
 Schema and queries must run on PostgreSQL and SQLite (ADR 0004). No tool checks these rules; CI runs the tests on both.
@@ -71,7 +83,7 @@ Nothing outside `Persistence` names a Repo, a schema or a query. A text compared
 
 ## Documentation checklist
 
-A reviewer passes or fails a PR on these six points:
+A reviewer passes or fails a PR on these seven points:
 
 1. Every setting, `mix` task, command, GM command or start-up error added or changed in the diff appears in the user documentation.
 2. Every new part, boundary or process type appears in the technical documentation.
@@ -79,6 +91,7 @@ A reviewer passes or fails a PR on these six points:
 4. For everything the diff renames or removes, the reviewer greps `server/docs/` for the old name and finds no hits.
 5. A PR that changes no documentation says why in its description.
 6. Every new failure branch, server-initiated close and start-up step in the diff writes a server log line, or the PR says why not.
+7. Every change to what an administrator must do to keep the server secure (a new port, a secret, a setting that opens or limits access, a new accepted limit) appears in `server/docs/user/security.md`.
 
 ## Changelog checklist
 

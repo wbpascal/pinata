@@ -243,3 +243,21 @@ _Avoid_: spread test, world test
 **Crowd scenario**:
 The load run that puts the full player count of one map instance on a single map instance, spread over the whole map.
 _Avoid_: zone test, single-map test
+
+### Security
+
+**Untrusted input**:
+Every byte received from a client connection, before and after login, whatever program sent it.
+_Avoid_: user input, client data, external input
+
+**Trust boundary**:
+The place where untrusted input becomes checked values: the packet handler. Nothing behind it receives a value a client wrote.
+_Avoid_: validation layer, sanitiser, firewall
+
+**Impossible input**:
+Untrusted input that the unmodified 2016 client cannot produce. The server owes it no compatible behaviour.
+_Avoid_: invalid packet, malformed packet (that is one kind of it), hack attempt
+
+**Refused request**:
+Input the unmodified client can produce but the server declines at that moment, answered with the error code of the original server.
+_Avoid_: error, rejection, failure
