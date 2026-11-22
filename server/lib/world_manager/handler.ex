@@ -14,6 +14,12 @@ defmodule WorldManager.Handler do
   `0x140F` renames the character of a slot and answers `0x1410` (`0xD0` or `0xD1`); `0xB409` always answers `0xB40C`
   with `0x20C3`, no rename right (flow: `docs/technical/flows/character-rename.md`).
 
+  `0x1001` enters the world with the character of a slot: it keeps a reservation (the map-login ticket) for the Zone
+  node that runs the character's stored map and answers `0x1003` with that node's address, or `0x1002`. A character
+  with tutorial state 0 is first asked `0x1110`; a skip (`0x1111`) saves state 2 and goes on. The Zone redeems the
+  ticket with `handle_call/2` on `0x1801`; from then on the session monitors the Zone connection (flow:
+  `docs/technical/flows/enter-world.md`).
+
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
   `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
   with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
@@ -29,6 +35,11 @@ defmodule WorldManager.Handler do
   alias Proto.Packets.AvatarErasesuccAck
   alias Proto.Packets.AvatarRenameAck
   alias Proto.Packets.AvatarRenameReq
+  alias Proto.Packets.CharLoginAck
+  alias Proto.Packets.CharLoginfailAck
+  alias Proto.Packets.CharLoginReq
+  alias Proto.Packets.CharTutorialPopupAck
+  alias Proto.Packets.CharTutorialPopupReq
   alias Proto.Packets.MiscGametimeAck
   alias Proto.Packets.MiscGametimeReq
   alias Proto.Packets.UserAvatarListReq
@@ -43,7 +54,10 @@ defmodule WorldManager.Handler do
   alias Proto.Packets.UserWillWorldSelectReq
 
   @enforce_keys [:worlds]
-  defstruct [:worlds, :world_no, :handle, step: :login, user_no: :none, user_name: :none]
+  defstruct [:worlds, :world_no, :handle] ++
+              [step: :login, user_no: :none, user_name: :none, tutorial: :none, reservation: :none, zone: :none]
+
+  @type reservation :: %{character_id: pos_integer(), name: binary(), map: String.t(), node: node()}
 
   @type t :: %__MODULE__{
           worlds: [Cluster.Registry.world_id()],
@@ -51,7 +65,10 @@ defmodule WorldManager.Handler do
           handle: 0..0xFFFF | nil,
           step: :login | :open,
           user_no: :none | pos_integer(),
-          user_name: :none | String.t()
+          user_name: :none | String.t(),
+          tutorial: :none | Persistence.character(),
+          reservation: :none | reservation(),
+          zone: :none | pid()
         }
 
   @impl Net.Handler
@@ -90,6 +107,28 @@ defmodule WorldManager.Handler do
 
   def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}),
     do: {state, [{:close, :debug, "client logged out"}]}
+
+  # As the original's "PlayingCharNo" refusal: the session already has a character in the world.
+  def handle_packet(%__MODULE__{step: :open, zone: zone} = state, %CharLoginReq{}) when is_pid(zone),
+    do: {state, [{:send, %CharLoginfailAck{error: 0x145}}]}
+
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %CharLoginReq{slot: slot})
+      when is_integer(user_no) and slot > 5,
+      do: {state, [{:send, %CharLoginfailAck{error: 0x143}}]}
+
+  # A new 0x1001 voids an open reservation and an open question.
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %CharLoginReq{slot: slot})
+      when is_integer(user_no),
+      do:
+        {%{state | tutorial: :none, reservation: :none},
+         [{:perform, {:select_character, state.world_no, user_no, slot}}]}
+
+  def handle_packet(%__MODULE__{step: :open, tutorial: %{}} = state, %CharTutorialPopupAck{is_skip: 0}),
+    do: {%{state | tutorial: :none}, [{:send, %CharLoginfailAck{error: 0x145}}]}
+
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no, tutorial: %{} = c} = state, %CharTutorialPopupAck{})
+      when is_integer(user_no),
+      do: {%{state | tutorial: :none}, [{:perform, {:skip_tutorial, state.world_no, user_no, c}}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
@@ -149,8 +188,71 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:game_time, {hour, minute, second}}),
     do: {state, [{:send, %MiscGametimeAck{hour: hour, minute: minute, second: second}}]}
 
+  def handle_info(state, {:character_selected, {:ok, %{tutorial_state: 0} = c}}),
+    do: {%{state | tutorial: c}, [{:send, %CharTutorialPopupReq{unused: 0}}]}
+
+  def handle_info(state, {:character_selected, {:ok, c}}), do: {state, [{:perform, {:find_zone, state.world_no, c}}]}
+
+  # W01-B6 kept: the original answers an empty slot with 0x31EB.
+  def handle_info(state, {:character_selected, {:error, :empty_slot}}),
+    do: {state, [{:send, %CharLoginfailAck{error: 0x31EB}}]}
+
+  def handle_info(state, {:character_selected, {:error, :database}}),
+    do:
+      {state, [{:send, %CharLoginfailAck{error: 0x145}}, {:log, :warning, "character login failed, database failure"}]}
+
+  def handle_info(state, {:zone_found, c, {:ok, zone}}),
+    do:
+      {%{state | reservation: %{character_id: c.id, name: c.name, map: c.login_map, node: zone.node}},
+       [{:send, %CharLoginAck{zone_ip: zone.host, zone_port: zone.port}}]}
+
+  def handle_info(state, {:zone_found, c, :error}),
+    do:
+      {state,
+       [
+         {:send, %CharLoginfailAck{error: 0x145}},
+         {:log, :info, "character login refused: map #{c.login_map} is not running"}
+       ]}
+
+  # P02-B33 fixed narrowly: a skip enters the world on the stored map.
+  def handle_info(state, {:tutorial_skipped, c, :ok}), do: {state, [{:perform, {:find_zone, state.world_no, c}}]}
+
+  def handle_info(state, {:tutorial_skipped, _c, {:error, :not_found}}),
+    do: {state, [{:send, %CharLoginfailAck{error: 0x145}}]}
+
+  def handle_info(state, {:tutorial_skipped, _c, {:error, :database}}),
+    do: {state, [{:send, %CharLoginfailAck{error: 0x145}}, {:log, :warning, "tutorial skip failed, database failure"}]}
+
+  def handle_info(state, {:zone_connected, pid}), do: {%{state | zone: pid}, []}
+  def handle_info(%__MODULE__{zone: pid} = state, {:down, pid}), do: {%{state | zone: :none}, []}
+  def handle_info(state, {:down, _other}), do: {state, []}
+
   def handle_info(state, {:cluster, :session_replaced}),
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, {:close, :info, "session replaced"}]}
+
+  # A Zone connection redeems the map-login ticket (Cluster.Sessions.redeem/2); only a success uses it up.
+  @impl Net.Handler
+  def handle_call(%__MODULE__{reservation: %{name: name, node: node} = r} = state, {:redeem, name, node, zone_pid}) do
+    entry = %{
+      kind: :first_entry,
+      world_no: state.world_no,
+      user_no: state.user_no,
+      character_id: r.character_id,
+      name: name,
+      map: r.map
+    }
+
+    {{:ok, entry}, %{state | reservation: :none}, [{:perform, {:watch_zone, zone_pid}}]}
+  end
+
+  def handle_call(%__MODULE__{reservation: %{name: name}} = state, {:redeem, name, _node, _zone_pid}),
+    do: {{:error, :wrong_node}, state, []}
+
+  def handle_call(%__MODULE__{reservation: %{}} = state, {:redeem, _name, _node, _zone_pid}),
+    do: {{:error, :wrong_character}, state, []}
+
+  def handle_call(%__MODULE__{reservation: :none} = state, {:redeem, _name, _node, _zone_pid}),
+    do: {{:error, :no_ticket}, state, []}
 
   @impl Net.Handler
   def perform({:create_token, user_no, user_name}),
@@ -168,6 +270,7 @@ defmodule WorldManager.Handler do
     case taken do
       {world_no, user_no, handle} ->
         :ok = Cluster.Sessions.take_over(user_no)
+        :ok = Cluster.Sessions.register_handle(handle)
         :ok = Cluster.Registry.join_players(world_no, self())
         {:login_taken, {:ok, world_no, user_no, name, handle}}
 
@@ -192,6 +295,28 @@ defmodule WorldManager.Handler do
         else: {:error, :name}
 
     {:character_renamed, slot, name, result}
+  end
+
+  def perform({:select_character, world_no, user_no, slot}) do
+    result =
+      with {:ok, characters} <- Persistence.list_characters(world_no, user_no) do
+        case Enum.find(characters, &(&1.slot == slot)) do
+          nil -> {:error, :empty_slot}
+          c -> {:ok, c}
+        end
+      end
+
+    {:character_selected, result}
+  end
+
+  def perform({:find_zone, world_no, c}), do: {:zone_found, c, WorldManager.World.zone_of(world_no, c.login_map)}
+
+  def perform({:skip_tutorial, world_no, user_no, c}),
+    do: {:tutorial_skipped, c, Persistence.skip_tutorial(world_no, user_no, c.slot)}
+
+  def perform({:watch_zone, pid}) do
+    _ = Process.monitor(pid)
+    {:zone_connected, pid}
   end
 
   def perform(:game_time) do

@@ -17,7 +17,8 @@ defmodule Pinata.Application do
         tables = settings.parts |> Enum.flat_map(&part(&1).game_data()) |> Enum.uniq()
 
         with :ok <- GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references),
-             :ok <- check_maps(settings) do
+             :ok <- check_maps(settings),
+             :ok <- client_checksums(settings) do
           start_tree(settings)
         else
           {:error, problems} ->
@@ -32,6 +33,9 @@ defmodule Pinata.Application do
   end
 
   defp check_maps(settings), do: if(:zone in settings.parts, do: Zone.check_maps(settings.data_dir), else: :ok)
+
+  defp client_checksums(settings),
+    do: if(:zone in settings.parts, do: GameData.load_client_checksums(settings.data_dir), else: :ok)
 
   defp start_tree(settings) do
     always = [{Persistence.Supervisor, settings}, {Cluster.Root, settings}] ++ digest_check(settings)

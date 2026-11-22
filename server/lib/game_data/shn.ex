@@ -31,6 +31,11 @@ defmodule GameData.Shn do
     end
   end
 
+  @doc "The file with its body (from 0x24) decrypted, whatever its flag says: what the Client data check hashes."
+  @spec decrypt(binary()) :: {:ok, binary()} | {:error, String.t()}
+  def decrypt(file) when byte_size(file) < 0x24, do: @truncated
+  def decrypt(<<head::binary-size(0x24), body::binary>>), do: {:ok, head <> decipher(body)}
+
   defp decipher(body) do
     n = byte_size(body)
 

@@ -9,10 +9,14 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A node with the Zone part reads the map and NPC tables of the data directory at start-up (`FieldList`, `ShineNPC`, `LinkTable`, `Common` of `ChrCommon`, `MobInfo.shn`, `TownPortal.shn`, `SpamerPenalty.shn`, `SpamerPenaltyRule.shn`) and does not start when one is missing or damaged. Files of the data directory are found whatever the letter case of their names (#105).
 - A node with the Zone part runs one map instance per field map (88 with the original data), places the NPCs of `ShineNPC` and logs how many rows it skipped. It does not start when the `.shbd` file of a field map is missing or damaged; the error names the map (#106).
 - In multi-node mode each Zone node reports its own `public_host` and `zone.port` to WorldManager (#106).
+- Selecting a character on the character list hands the client to the Zone node that runs the character's stored map; when that map runs nowhere, the client is told "The Map is under maintenance" and an `info` line names the map. A character that has not started the tutorial is asked first; skipping it enters the world (#107).
+- The Client data check: a client whose copy of one of 49 client tables differs from the server's is refused at the map login with "The client has been illegally manipulated…", and a `warning` line names the table and both hashes. A node with the Zone part does not start when one of the 49 files is missing; the error names the file (#107).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 
 ### Differences from the original server
 
+- Skipping the tutorial enters the world on the character's stored map; the original refused the login after the skip (P02-B33) (#107).
+- A refused map login carries the real refusal code; the original sent another one (Z01-B1) (#107).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 

@@ -26,7 +26,9 @@ sequenceDiagram
 
 The login flow is in [`flows/login.md`](flows/login.md).
 
-**Handler contract.** `Net.Handler` has `init/1` (session state of a new connection, from the settings), `handle_packet/2` and `handle_info/2` (state and packet or message in, new state and effects out; both pure) and `perform/1` (impure). The effects are `{:send, packet}`, `{:log, level, message}` (write a server log line), `{:close, level, reason}` (write the close line and close the socket; later effects are not run) and `{:perform, request}`: the connection process calls `perform/1` and hands the result to `handle_info/2`. A message `{:cluster, term}` sent to the connection process goes to `handle_info/2`. A handler does not call `Logger`: it does not know the peer. Heartbeat packets never reach the handler. `Zone.Handler` is a stub that answers nothing.
+**Handler contract.** `Net.Handler` has `init/1` (session state of a new connection, from the settings), `handle_packet/2` and `handle_info/2` (state and packet or message in, new state and effects out; both pure) and `perform/1` (impure). The effects are `{:send, packet}`, `{:log, level, message}` (write a server log line), `{:close, level, reason}` (write the close line and close the socket; later effects are not run) and `{:perform, request}`: the connection process calls `perform/1` and hands the result to `handle_info/2`. A message `{:cluster, term}` sent to the connection process goes to `handle_info/2`. `GenServer.call(connection, {:cluster, request})` goes to the optional `handle_call/2` (state and request in, reply, new state and effects out); the reply is sent after the effects ran, so another connection process can ask a session synchronously (the map-login redeem, [`flows/enter-world.md`](flows/enter-world.md)). A `:DOWN` of a process the handler monitored in `perform/1` goes to `handle_info/2` as `{:down, pid}`. A handler does not call `Logger`: it does not know the peer. Heartbeat packets never reach the handler. `Zone.Handler` handles the map login `0x1801`.
+
+**Monitors between a session and its Zone connection.** From an accepted `0x1801` on, the WorldManager connection (the session) monitors the Zone connection and the Zone connection monitors the session. When the Zone connection ends, the session forgets it and a new `0x1001` works again; when the session ends, the Zone connection closes (`info`, `session ended`). Saving and the leave path are issue 111.
 
 **Seed.** `Random.uniform(499) - 1` per connection. The original uses a counter per process; the client cannot tell the difference and a per-connection draw needs no shared state.
 
@@ -44,7 +46,7 @@ The login flow is in [`flows/login.md`](flows/login.md).
 | `connection.max_packets_per_second` | warning, `packet rate exceeded` | more frames than this in a fixed 1 s window; heartbeats count |
 | `connection.max_unsent_bytes` | warning, `unsent bytes exceeded` | the VM send queue (`send_pend` of `:inet.getstat/1`), read after every send; the listener sets `high_watermark` to twice the limit so a send never blocks before the check |
 | Failed send | warning, `send failed` | the socket send returns an error |
-| `{:close, level, reason}` of a handler | its own | wrong first packet, wrong version key, refused login, session replaced, world login refused, character list failed, client logged out (debug) |
+| `{:close, level, reason}` of a handler | its own | wrong first packet, wrong version key, refused login, session replaced, world login refused, character list failed, client logged out (debug), Client data check failed (warning), map login refused (info), session ended (info) |
 | Closed by the client | debug, `connection closed by the client` | not a server decision |
 
 ## World process

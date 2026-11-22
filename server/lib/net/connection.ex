@@ -96,6 +96,21 @@ defmodule Net.Connection do
     effects(socket, effects, %{state | handler_state: handler_state}) |> reply(socket)
   end
 
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, {socket, state}) do
+    {handler_state, effects} = state.handler.handle_info(state.handler_state, {:down, pid})
+    effects(socket, effects, %{state | handler_state: handler_state}) |> reply(socket)
+  end
+
+  @impl GenServer
+  def handle_call({:cluster, request}, _from, {socket, state}) do
+    {reply, handler_state, effects} = state.handler.handle_call(state.handler_state, request)
+
+    case effects(socket, effects, %{state | handler_state: handler_state}) do
+      {:continue, state} -> {:reply, reply, {socket, state}}
+      {:close, state} -> {:stop, {:shutdown, :local_closed}, reply, {socket, state}}
+    end
+  end
+
   defp reply({:continue, state}, socket), do: {:noreply, {socket, state}}
   defp reply({:close, state}, socket), do: {:stop, {:shutdown, :local_closed}, {socket, state}}
 

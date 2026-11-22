@@ -26,6 +26,7 @@ Logs go to standard output; under Docker Compose read them with `docker compose 
 | `Invalid settings, the node does not start:` followed by one line per problem | the settings file or an environment variable is wrong; every problem is listed (see [`settings.md`](settings.md)) |
 | `Invalid game data, the node does not start:` followed by one line per problem | the data directory is missing or a table is damaged (see [`install.md`](install.md)) |
 | `map <name>: BlockInfo/<name>.shbd: file not found` or `map <name>: BlockInfo/<name>.shbd: damaged block data ...` under `Invalid game data` | a node with the Zone part needs the block data file of every field map; import the data directory again |
+| `shn/<file>: file not found (needed for the Client data check)` under `Invalid game data` | a node with the Zone part needs the 49 client tables of the Client data check (below); import the data directory again |
 | `public_host: a node with the Zone part needs an IPv4 address in text form ...` under `Invalid settings` | `public_host` is a host name; use an IPv4 address such as `203.0.113.7` |
 | the database messages in the next section | `database.url` is unusable or migrations are pending |
 | `Data directory digest mismatch, the node stops:` | multi-node mode: this node's data directory differs from that of the WorldManager node; the node stops with exit status 1 (see [`multi-node.md`](multi-node.md)) |
@@ -86,12 +87,23 @@ Lines an administrator acts on:
 | `Login: connection closed: login refused, account "<name>", not login-able, peer <peer>` | info | the account may not log in |
 | `Login: connection closed: login refused, account "<name>", database failure, peer <peer>` | info | the database failed; look for the `Persistence` line before it. The client is told "unknown account" |
 | `Login: connection closed: login refused, unknown or expired login token, peer <peer>` | info | the client used a login token that does not exist, was used or is older than 10 s |
+| `GameData: Client data check: 49 tables hashed, <n> ms` | info | a node with the Zone part hashed the client tables at start |
+| `WorldManager: character login refused: map <map> is not running, peer <peer>` | info | a character's stored map runs on no Zone node; the client is told "The Map is under maintenance" |
+| `WorldManager: character login failed, database failure, peer <peer>` / `WorldManager: tutorial skip failed, database failure, peer <peer>` | warning | the database failed; look for the `Persistence` line before it |
+| `Zone: connection closed: Client data check failed: character "<name>", table <table>, server <hash>, client "<hash>", peer <peer>` | warning | the client's copy of a table differs from the server's (see "Client data check" below) |
+| `Zone: map login accepted: character <id>, map <map>, peer <peer>` | info | the client entered the Zone node |
+| `Zone: connection closed: map login refused: <reason>, peer <peer>` | info | `no session for the handle`, `no map-login ticket`, `reserved for another Zone node` or `not the reserved character`: the client came to the Zone without a fresh character login |
+| `Zone: connection closed: session ended, peer <peer>` | info | the WorldManager connection of the player ended, so the Zone connection was closed |
 | `Cluster: node <node> connected` | info | multi-node mode: another node joined |
 | `Cluster: node <node> lost` | warning | multi-node mode: a node went away |
 | `Login: world <number> (<name>) is available` | info | multi-node mode: the WorldManager of the world is reachable from Login |
 | `Login: world <number> (<name>) is unavailable` | warning | multi-node mode: the world was available and is not any more |
 
 The four cluster lines appear in multi-node mode only. Login looks the worlds up once a second; a world is reported unavailable only after it was available, so a Login node that starts before the WorldManager node logs nothing until the world appears. A close by the client is logged at `debug` only.
+
+## Client data check
+
+Always on, with no setting. On `0x1801` the client sends a checksum of each of 49 of its tables (`ItemInfo.shn`, `MapViewInfo.shn`, ...; the list is in the technical documentation, `flows/enter-world.md`). A node with the Zone part hashes its own copies at start. A client whose copy of one of them differs is refused and sees "The client has been illegally manipulated…"; the server writes one `warning` line with the table and both hashes. So a changed table must be shipped to the clients, and the Zone nodes must be started again, since they hash the tables only at start.
 
 ## Memory
 

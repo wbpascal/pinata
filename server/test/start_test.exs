@@ -129,6 +129,19 @@ defmodule Pinata.StartTest do
     assert running() == []
   end
 
+  test "a missing table of the Client data check stops the start and names the file", %{tmp_dir: tmp_dir} do
+    use_file(tmp_dir, ports())
+    path = GameData.DataFile.path(System.fetch_env!("PINATA_TEST_DATA_DIR"), "shn/View/MapViewInfo.shn")
+    off = path <> ".off"
+    on_exit(fn -> File.rename!(off, path) end)
+
+    File.rename!(path, off)
+    output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
+    assert output =~ "Invalid game data, the node does not start:"
+    assert output =~ "shn/View/MapViewInfo.shn: file not found (needed for the Client data check)"
+    assert running() == []
+  end
+
   test "a missing data directory stops the start and names the import task", %{tmp_dir: tmp_dir} do
     missing = Path.join(tmp_dir, "nope")
     path = Path.join(tmp_dir, "pinata.toml")

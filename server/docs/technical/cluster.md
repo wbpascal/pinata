@@ -11,6 +11,7 @@ How the parts find each other and call each other (ADR 0002: fail simple).
 | `:pg` group `{:zones, world_id}` | the `Zone.Maps` process of each Zone node of a world |
 | `:pg` group `{:players, world_id}` | WorldManager connections that logged in (`Cluster.Registry.join_players/2`, `player_count/1`) |
 | `:pg` group `{:session, user_no}` | the process that is the session of the account |
+| `:pg` group `{:wm_handle, handle}` | the sessions with this session handle (`worldmanager` of `0x0C14`) |
 
 The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs only when `cluster.nodes` is not empty, with `Cluster.Strategy.Epmd` and those hosts. `Cluster.Root` has that name because libcluster owns `Cluster.Supervisor`.
 
@@ -23,6 +24,8 @@ When a Zone node is lost (monitor), each of its maps goes to the remaining Zone 
 ## Sessions
 
 `Cluster.Sessions.take_over/1` makes the calling process the session of an account and sends every older member `{:cluster, :session_replaced}`; the connection handlers answer it with `0x0C17 {0x683}` and close. `Cluster.Sessions.leave/1` ends it: Login's connection calls it when it hands the client to WorldManager, so the later WorldManager login does not cut the Login link. A token login (`0x0C37`) calls `take_over/1` too.
+
+`Cluster.Sessions.register_handle/1` puts the calling WorldManager session into the group `{:wm_handle, handle}` at world login. `Cluster.Sessions.redeem/2` is called by a Zone connection on `0x1801`: it calls every member with `{:cluster, {:redeem, name, node(), self()}}` (`handle_call/2` of the handler; an exit counts as no session). The first success returns `{:ok, session_pid, entry}`; otherwise the first refusal that is not `:no_session`, else `{:error, :no_session}`. A handle repeats after 65536 logins; the character name and the node decide. Flow: [`flows/enter-world.md`](flows/enter-world.md).
 
 ## Facades
 

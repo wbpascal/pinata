@@ -93,6 +93,10 @@ RFC 4180 with a header row: comma separator, `"` quoting with `""`, quoted cells
 
 SHA-256, lower-case hex, over every regular file below the data directory in sorted relative-path order. Per file the hash gets the relative path, a zero byte, the size as 64 bits and the content, so renaming, adding, removing or changing a file changes the digest. Top-level entries whose name starts with `pinata.db` (the default SQLite database and its WAL files) are left out. A symlinked directory is not entered (a link loop would never end), so files behind it are not part of the digest; a symlink to a file is hashed by its content. Only multi-node mode computes it, once at start-up (`Cluster.DataDigest`, see [`cluster.md`](cluster.md)). The imported 2016 `9Data` (222 MB) took 0.4 s on an Apple M1 Pro.
 
+## Client data check (`GameData.ClientData`)
+
+The 49 tables whose checksums the client sends in `0x1801` (`GameData.ClientData.files/0`), each hashed with MD5 over the whole file after its body (from 0x24) is decrypted with the SHN cipher (`GameData.Shn.decrypt/1`), whatever its flag says. Only a node with the Zone part hashes them, once at start (`GameData.load_client_checksums/1`, kept in `persistent_term` under `{GameData, :client_checksums}`, read with `GameData.client_checksums/0`) and logs `GameData: Client data check: 49 tables hashed, <n> ms` (about 0.9 s on an Apple M1 Pro). A missing or unreadable file stops the start (`Invalid game data`). Flow: [`flows/enter-world.md`](flows/enter-world.md).
+
 ## Import without Mix (`GameData.Release.import_data/2`)
 
 `bin/pinata eval 'GameData.Release.import_data("<9Data folder>", "<new data directory>")'` does what the Mix task does (the task calls it): it runs `GameData.Import.run/2`, prints each warning, the summary line and the `Next:` line with `IO.puts`, and raises `RuntimeError` with the problems joined by newlines, so the exit status is non-zero.
