@@ -29,6 +29,7 @@ defmodule Zone.MapInstance do
   slice runs the block check and the sight rule (`step/3`); a mover stuck in blocked cells is pulled back to its last
   good position (`0x2013` to the players in sight, `0x204A` to the player). Packets for the requesting player go to
   its connection like all others, so their order holds.
+
   Chat (`Zone.Chat`, `docs/technical/flows/chat.md`): `chat/4` checks a line of a player in mode 1 against the map's
   rules and the player's `chat` state, sends a passed line to the other receivers (the players in sight for normal
   chat, every player in mode 1 for a shout) and returns the speaker's own packets: its copy of the line, `0x0848`

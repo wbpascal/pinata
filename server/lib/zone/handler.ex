@@ -28,7 +28,8 @@ defmodule Zone.Handler do
   Sight (flow: `docs/technical/flows/sight.md`): in the world, `0x1C01` asks the map instance for the appear packet
   of an object (`Zone.MapInstance.inform/3`); the client's own handle field is ignored and an object out of sight,
   unknown or the requester itself gets no answer. The packets the map instance pushes for this player
-  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`) are sent in the world and dropped before.
+  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`, chat lines) are sent in the world and dropped
+  before.
 
   Movement (flow: `docs/technical/flows/movement.md`): in the world, `0x2017` walk, `0x2019` run and `0x2012` stop go
   to the map instance (`Zone.MapInstance.move/5`, `stop/3`), which checks them against the server position and the
@@ -36,8 +37,6 @@ defmodule Zone.Handler do
   `{:cluster, {:packets, packets}}`; the map sends them before it replies, so the connection takes them from its
   mailbox right after the call and sends them before it reads the next frame (a heartbeat in the same TCP read would
   otherwise be answered first). Before the world these packets get no answer.
-  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`, chat lines) are sent in the world and dropped
-  before.
 
   Chat (flow: `docs/technical/flows/chat.md`): in the world, `0x2001` (normal chat) and `0x201E` (shout) go to the
   map instance (`Zone.MapInstance.chat/4`), which checks them with `Zone.Chat` and relays `0x2002` to the speaker and
