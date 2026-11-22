@@ -197,9 +197,10 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:character_selected, {:error, :empty_slot}}),
     do: {state, [{:send, %CharLoginfailAck{error: 0x31EB}}]}
 
+  # The line comes before the answer: a reader of the answer (a test, an administrator) finds the line already written.
   def handle_info(state, {:character_selected, {:error, :database}}),
     do:
-      {state, [{:send, %CharLoginfailAck{error: 0x145}}, {:log, :warning, "character login failed, database failure"}]}
+      {state, [{:log, :warning, "character login failed, database failure"}, {:send, %CharLoginfailAck{error: 0x145}}]}
 
   def handle_info(state, {:zone_found, c, {:ok, zone}}),
     do:
@@ -210,8 +211,8 @@ defmodule WorldManager.Handler do
     do:
       {state,
        [
-         {:send, %CharLoginfailAck{error: 0x145}},
-         {:log, :info, "character login refused: map #{c.login_map} is not running"}
+         {:log, :info, "character login refused: map #{c.login_map} is not running"},
+         {:send, %CharLoginfailAck{error: 0x145}}
        ]}
 
   # P02-B33 fixed narrowly: a skip enters the world on the stored map.
@@ -221,7 +222,7 @@ defmodule WorldManager.Handler do
     do: {state, [{:send, %CharLoginfailAck{error: 0x145}}]}
 
   def handle_info(state, {:tutorial_skipped, _c, {:error, :database}}),
-    do: {state, [{:send, %CharLoginfailAck{error: 0x145}}, {:log, :warning, "tutorial skip failed, database failure"}]}
+    do: {state, [{:log, :warning, "tutorial skip failed, database failure"}, {:send, %CharLoginfailAck{error: 0x145}}]}
 
   def handle_info(state, {:zone_connected, pid}), do: {%{state | zone: pid}, []}
   def handle_info(%__MODULE__{zone: pid} = state, {:down, pid}), do: {%{state | zone: :none}, []}

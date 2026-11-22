@@ -95,6 +95,8 @@ The client sends the MD5 (lower-case hex text) of 49 of its tables, each over th
 
 Slot above 5, empty slot, "yes", a skip whose character changed in the meantime and "already in the world" write no line: they are refusals with an answer, like the rename refusals.
 
+The three WorldManager lines are written before their `0x1002` is sent. Telemetry: the handling of each packet of this flow is a `[:pinata, :packet]` span (`part`, `opcode`; see [`telemetry.md`](../telemetry.md)); a close has no event of its own, here as in the rest of the server. The issue rules one out for the Client data check.
+
 ## Original-server bugs
 
 - P02-B33 fixed narrowly: the character list still says "RouT" for tutorial state 0 and `0x1110` is still asked; a skip saves state 2 and enters the world on the stored map.

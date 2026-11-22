@@ -3,6 +3,7 @@ defmodule EnterWorldTest do
 
   @moduletag capture_log: true
 
+  alias Proto.Packets.CharLoginfailAck
   alias Proto.Packets.MapLoginfailAck
   alias Proto.Packets.UserAvatarListReq
   alias Proto.Packets.UserClientVersionCheckReq
@@ -296,6 +297,20 @@ defmodule EnterWorldTest do
 
     defp wm_state(fields),
       do: struct!(WorldManager.Handler, Map.merge(%{worlds: [0], world_no: 0, step: :open, user_no: 1}, fields))
+
+    test "a refusal with a log line writes the line before it sends 0x145" do
+      state = wm_state(%{})
+      fail = %CharLoginfailAck{error: 0x145}
+
+      assert {^state, [{:log, :warning, "character login failed, database failure"}, {:send, ^fail}]} =
+               WorldManager.Handler.handle_info(state, {:character_selected, {:error, :database}})
+
+      assert {^state, [{:log, :info, "character login refused: map GuildT01 is not running"}, {:send, ^fail}]} =
+               WorldManager.Handler.handle_info(state, {:zone_found, %{login_map: "GuildT01"}, :error})
+
+      assert {^state, [{:log, :warning, "tutorial skip failed, database failure"}, {:send, ^fail}]} =
+               WorldManager.Handler.handle_info(state, {:tutorial_skipped, %{}, {:error, :database}})
+    end
 
     test "a redeem from another node is :wrong_node and keeps the reservation" do
       state = wm_state(%{reservation: @reservation})
