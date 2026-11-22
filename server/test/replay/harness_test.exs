@@ -431,6 +431,10 @@ defmodule Replay.HarnessTest do
       assert run(Stub, lines, deferrals: [{:payload, [3], Reply, :token, 4, "r"}]) == :ok
       assert run(Stub, lines, deferrals: [{:payload, [3], Reply, :all, 4, "r"}]) == :ok
 
+      two = @trigger <> "0200\n" <> @reply <> "0100aaaaaaaa0700\n" <> @reply <> "0100aaaaaaaa0700"
+      assert {:error, %Failure{kind: :mismatch}} = run(Stub, two, deferrals: [{:payload, [3], Reply, :token, 4, "r"}])
+      assert run(Stub, two, deferrals: [{:payload, [3, 4], Reply, :token, 4, "r"}]) == :ok
+
       packets = transcript(lines).packets
 
       assert_raise ArgumentError, ~r/:payload 2 is not a/, fn ->
