@@ -53,6 +53,7 @@ defmodule Settings.Doc do
     | `PINATA_CONFIG` | `pinata.toml` in the working directory | Path of the settings file. The default file may be missing; a path set here must exist. |
     | `PINATA_PARTS` | `login,world_manager,zone` | The parts this node starts, separated by commas. A part that is not listed opens no port. |
     | `DATABASE_URL` | not set | Overrides `database.url`, so the secret can stay out of the file. |
+    | `OTEL_EXPORTER_OTLP_ENDPOINT` | not set | The OTLP endpoint when `telemetry.otlp_enabled` is true and `telemetry.otlp_endpoint` is not set. |
 
     ## Keys
 
@@ -72,6 +73,14 @@ defmodule Settings.Doc do
     number = 0
     name = "INITIO"
     ```
+
+    ## OpenTelemetry variables
+
+    With `telemetry.otlp_enabled = true` the standard variables of the OpenTelemetry SDK work as upstream documents them:
+    `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_SERVICE_NAME` (default
+    `pinata`) and the others ([SDK configuration](https://opentelemetry.io/docs/languages/sdk-configuration/),
+    [`opentelemetry_exporter`](https://hexdocs.pm/opentelemetry_exporter/)). `OTEL_TRACES_SAMPLER`, when set, replaces
+    `telemetry.trace_ratio`. With `telemetry.otlp_enabled = false` none of them has an effect.
 
     ## Start-up errors
 

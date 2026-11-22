@@ -64,6 +64,8 @@ In the two-client captures (scenarios 14, 45, 52) the connections are numbered i
 
 `server/test/support/` holds test-only code: `TestClock`, `TestClient`, `TestPorts`, `Replay` and the `Replay.*` modules. `server/test/test_helper.exs` loads it. It is not part of the application, so the `boundary` compiler and Dialyzer do not see it.
 
+The telemetry tests are in `server/test/pinata/`: `figures_test.exs` (buckets, percentiles, merge, the printed text), `figures_peers_test.exs` (`Pinata.Figures.collect/0` over the three peer nodes) and `otel_test.exs`. `otel_test.exs` restarts the OpenTelemetry applications of the test VM and changes its `OTEL_TRACES_EXPORTER`, `OTEL_METRIC_READERS` and `OTEL_EXPORTER_OTLP_ENDPOINT` variables, so it is `async: false`; it restores both when it ends.
+
 ## Ports
 
 No test listens on or connects to a fixed port. Every port comes from the operating system through `TestPorts` (`test/support/test_ports.ex`): `TestPorts.free(n)` binds `n` sockets on all addresses with port 0, reads the ports back and closes them. A port where a connect to `127.0.0.1` still succeeds afterwards is dropped and replaced: on Windows another program can listen on `127.0.0.1:9010` while our listener binds `0.0.0.0:9010` without an error, and the connections then reach the other program (Logitech G HUB does this on 9010).
@@ -237,6 +239,8 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
   ```
 
 - `windows-smoke` against a release built on Windows in single-node mode with SQLite (see "Windows").
+
+The job `otel-smoke` (Linux) runs the release with OpenTelemetry ([`telemetry.md`](telemetry.md)). With export off and `OTEL_TRACES_EXPORTER=otlp` set it checks that the three OpenTelemetry applications run, that `Pinata.Figures.print()` answers and that the node output has no line containing `OTLP`, `opentelemetry` or `CA(s)`. Then it starts an OpenTelemetry Collector container (`otel/opentelemetry-collector`, configuration `test/support/otel-collector.yaml`, debug exporter), starts the release with `telemetry.otlp_enabled = true` and `trace_ratio = 1.0`, runs the smoke script, enters one map so that it ticks, flushes both providers and waits until the Collector log holds the span `pinata.packet` and the metrics `pinata.packet.duration` and `pinata.tick.duration`. Locally, in `server/` after `MIX_ENV=prod mix release`, with the data directory in `data`, run the commands of the job's steps with `R=_build/prod/rel/pinata` and a temporary directory for `$RUNNER_TEMP`; afterwards remove `data`, `otel.toml` and the container (`docker rm -f otelcol`).
 
 `test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
 

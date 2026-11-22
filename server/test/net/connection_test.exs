@@ -234,6 +234,30 @@ defmodule Net.ConnectionTest do
     one_close(log, "[info] Net: connection closed: heartbeat timeout, peer 127.0.0.1:")
   end
 
+  @doc false
+  @spec forward([atom()], map(), map(), pid()) :: term()
+  def forward(event, measurements, metadata, test), do: send(test, {:telemetry, event, measurements, metadata})
+
+  test "each handled packet is a telemetry span with part and opcode" do
+    id = "connection-test-#{inspect(self())}"
+    events = [[:pinata, :packet, :start], [:pinata, :packet, :stop]]
+    :ok = :telemetry.attach_many(id, events, &__MODULE__.forward/4, self())
+    on_exit(fn -> :telemetry.detach(id) end)
+
+    {_listener, port} = listen(QuietHandler)
+    {socket, cipher} = connect(port)
+    {ack, _cipher} = frame(cipher, <<0x05, 0x08>>)
+    :ok = :gen_tcp.send(socket, ack)
+
+    assert_receive {:telemetry, [:pinata, :packet, :start], _, %{part: "Net", opcode: "MiscHeartbeatAck"}}, 1000
+
+    assert_receive {:telemetry, [:pinata, :packet, :stop], %{duration: duration},
+                    %{part: "Net", opcode: "MiscHeartbeatAck"}},
+                   1000
+
+    assert is_integer(duration) and duration >= 0
+  end
+
   test "client heartbeat request in the first state" do
     {_listener, port} = listen(QuietHandler)
     {socket, cipher} = connect(port)

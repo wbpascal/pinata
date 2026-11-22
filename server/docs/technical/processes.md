@@ -10,7 +10,7 @@ One process per client socket ([ADR 0009](../../../docs/adr/0009-one-process-per
 
 1. `handle_connection/2` keeps the part and the peer address (`ip:port`) in its state and as Logger metadata (`part`, `peer`), logs the accept at debug, draws the seed and sends `0x0807 {seed}` right after accept.
 2. `handle_data/3` cuts frames (`Proto.Framing.split/1`), decrypts them (`Proto.Cipher.crypt/2`) and decodes them (`Proto.decode/1`).
-3. Heartbeats are answered in the process; every other packet goes to the part handler.
+3. Heartbeats are answered in the process; every other packet goes to the part handler. The handling of each decoded packet, up to its effects handed to the socket, is the telemetry span `[:pinata, :packet]` ([`telemetry.md`](telemetry.md)).
 4. The effects the handler returns are carried out in order: sends are encoded and sent (`Proto.encode/1`, `Proto.Framing.frame/1`), `{:log, level, message}` writes a server log line, `{:close, level, reason}` ends the connection and writes the close line, `{:perform, request}` is run (below). Every line gets the part and the peer address.
 5. The heartbeat and the limits below close the socket.
 
@@ -60,7 +60,7 @@ The world process also keeps the map table (ADR 0002): `zones` (Zone `pid` to ho
 - **NPCs.** At `init/1` the rows of `ShineNPC` with this map are placed in file order with the handles 17084, 17085, ... (the range 17084 to 17339 of `docs/knowledge/Z01.md` §3). Their mob id is not resolved yet.
 - **Block data** is read at the first `enter/2` with `GameData.BlockData.load/2` and logged (`Zone: map <name>: block data loaded, <n> bytes`). When the read fails (file removed or damaged after the start) the entry is refused with `{:error, :no_block_data}`, one `error` line is written and the instance keeps running. It is never unloaded.
 - **Players** are opaque ids (`enter/2`, `leave/2`) until map entry is built (issue 108).
-- **Tick.** Every 100 ms through `Clock.send_after/3`, only while the map has players. The first entry starts the chain; the last `leave/2` ends it by clearing `tick_ref`. Each tick message carries the ref of its chain, so a leave and a new entry inside 100 ms cannot run two chains; a message with another ref is ignored. The schedule is absolute (`next_tick` += 100, the delay is the difference to the clock), so a slow tick does not shift the following ones. A tick only counts (`ticks`); movement comes with issue 110.
+- **Tick.** Every 100 ms through `Clock.send_after/3`, only while the map has players. The first entry starts the chain; the last `leave/2` ends it by clearing `tick_ref`. Each tick message carries the ref of its chain, so a leave and a new entry inside 100 ms cannot run two chains; a message with another ref is ignored. The schedule is absolute (`next_tick` += 100, the delay is the difference to the clock), so a slow tick does not shift the following ones. A tick only counts (`ticks`); movement comes with issue 110. Each tick is the telemetry span `[:pinata, :tick]` ([`telemetry.md`](telemetry.md)).
 
 ## Map supervisor and `Zone.Maps`
 
