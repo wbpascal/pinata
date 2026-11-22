@@ -15,9 +15,11 @@ defmodule GameData.BlockData do
   @type t :: %__MODULE__{bytes_per_row: pos_integer(), rows: pos_integer(), bits: binary()}
   @type point :: {integer(), integer()}
 
-  @doc "Checks that the `.shbd` of the map exists and has a well-formed header (for the node start). The `.shab` is not looked at."
+  @doc "Checks that the `.shbd` of the map exists and has a well-formed header (for the node start). The `.shab` is not looked at. A name that is not made of letters, digits, `_` and `-` is refused with an error before any file is touched."
   @spec check(Path.t(), binary()) :: :ok | {:error, String.t()}
-  def check(data_dir, map_name) do
+  def check(data_dir, map_name), do: with(:ok <- map_name(map_name), do: do_check(data_dir, map_name))
+
+  defp do_check(data_dir, map_name) do
     path = file_path(data_dir, map_name, ".shbd")
     file = name(path)
 
@@ -30,9 +32,11 @@ defmodule GameData.BlockData do
     end
   end
 
-  @doc "Loads the block data of the map: the `.shbd` with the `.shab` OR-ed in; a missing `.shab` is not an error."
+  @doc "Loads the block data of the map: the `.shbd` with the `.shab` OR-ed in; a missing `.shab` is not an error. A name that is not made of letters, digits, `_` and `-` is refused with an error before any file is touched."
   @spec load(Path.t(), binary()) :: {:ok, t()} | {:error, String.t()}
-  def load(data_dir, map_name) do
+  def load(data_dir, map_name), do: with(:ok <- map_name(map_name), do: do_load(data_dir, map_name))
+
+  defp do_load(data_dir, map_name) do
     path = file_path(data_dir, map_name, ".shbd")
     file = name(path)
 
@@ -86,6 +90,14 @@ defmodule GameData.BlockData do
   defp name(path), do: "BlockInfo/" <> Path.basename(path)
 
   # The name on disk when found, the asked name when not.
+  # The only place a map name becomes a path. One segment of letters, digits, `_` and `-`: no `..`, no separator, no
+  # NUL, no drive, so a name from a client cannot leave BlockInfo/. Every name of the 2016 tables passes.
+  defp map_name(name) do
+    if name =~ ~r/\A[A-Za-z0-9_-]+\z/,
+      do: :ok,
+      else: {:error, "BlockInfo: #{inspect(name)} is not a map name"}
+  end
+
   defp file_path(data_dir, map_name, ext), do: GameData.DataFile.path(data_dir, "BlockInfo/" <> map_name <> ext)
 
   # Cell of a coordinate. mbi_IsMoveBlock FUN_0049df70: u32 arithmetic of the original, so a negative or huge

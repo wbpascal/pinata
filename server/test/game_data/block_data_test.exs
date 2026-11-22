@@ -100,4 +100,18 @@ defmodule GameData.BlockDataTest do
     refute BlockData.line_blocked?(full(), {10, 10}, {10, 10}, 2)
     refute BlockData.line_blocked?(full(), {10, 10}, {30, 10}, 100)
   end
+
+  test "a name that is not a map name is refused, a valid one loads", %{tmp_dir: dir} do
+    put(dir, "Ok_1-a.shbd", 2, 16, :binary.copy(<<0>>, 32))
+    assert BlockData.check(dir, "Ok_1-a") == :ok
+    assert {:ok, %BlockData{rows: 16}} = BlockData.load(dir, "Ok_1-a")
+
+    # a well-formed file outside BlockInfo/ that "../secret" would reach
+    File.write!(Path.join(dir, "secret.shbd"), <<2::little-32, 16::little-32, 0::256>>)
+
+    for name <- ["../secret", "..", ".", "", "a/b", "a\\b", "a\0", "/etc/passwd", "C:x", "Ok_1-a\n"],
+        f <- [&BlockData.check/2, &BlockData.load/2] do
+      assert {:error, "BlockInfo: " <> _} = f.(dir, name)
+    end
+  end
 end

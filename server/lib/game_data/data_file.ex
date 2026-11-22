@@ -8,6 +8,9 @@ defmodule GameData.DataFile do
   The path of `rel` below `data_dir`. Per segment: an entry with exactly that name wins, else the first entry of the
   sorted listing that matches without regard to ASCII letter case, else the segment as written (the caller's read then
   fails with `:enoent`).
+
+  `rel` is a path written in the code (a schema's source file); it is not checked. A name from outside the code goes
+  through `GameData.BlockData`, which checks it.
   """
   @spec path(Path.t(), Path.t()) :: Path.t()
   def path(data_dir, rel) do

@@ -32,10 +32,12 @@ The shipped `.shbd` files hold every door open: 107 of the 128 door rectangles e
 
 - `check(data_dir, map_name)`: the `.shbd` exists and its header is well formed (for the node start); the `.shab` is not looked at.
 - `load(data_dir, map_name)`: the `.shbd` with the `.shab` OR-ed in; only the merged bitmap is kept (struct `bytes_per_row`, `rows`, `bits`). A missing `.shab` is not an error. `.sbi` and `.aid` are not read. Nothing is cached and nothing logged here; the caller does both.
+- A map name is letters, digits, `_` and `-` only (every `MapIDClient` of the 2016 data is); any other name, for example one with `..` or a path separator, is refused before a file is touched, so a name that one day comes from a client cannot leave `BlockInfo/`. `GameData.DataFile.path/2` itself does not check its path; it is called with paths from the code only.
 - A header is valid when both numbers are above 0 and the file size is `8 + bytesPerRow × rows`; the `.shab` must have the dimensions of the `.shbd`. Errors are `{:error, message}`; `<file>` is `BlockInfo/` and the name on disk (the asked name when not found):
 
 | Message | When |
 |---|---|
+| `BlockInfo: <name> is not a map name` | the name has a byte other than a letter, a digit, `_` or `-`, or is empty |
 | `<file>: file not found` | the `.shbd` is missing |
 | `<file>: <reason>` | another read error |
 | `<file>: damaged block data (header <a> x <b>, <size> bytes)` | zero dimension or wrong size |
