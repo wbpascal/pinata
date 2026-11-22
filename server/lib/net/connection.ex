@@ -5,7 +5,8 @@ defmodule Net.Connection do
   packet of the wrong size is dropped. It closes the socket, without an error packet, on an unknown opcode, on
   oversized frames and when a limit is exceeded. It knows its part (the label of the server log) and the peer address:
   every line it writes carries both, and both are Logger metadata (`part`, `peer`) of the process. Every close it
-  decides on writes one line with the reason; a close by the client writes one `debug` line.
+  decides on writes one line with the reason; a close by the client writes one `debug` line. The handling of each
+  decoded packet is the telemetry span `[:pinata, :packet]` (`docs/technical/telemetry.md`).
   See `docs/technical/processes.md`.
   """
 
@@ -146,8 +147,11 @@ defmodule Net.Connection do
     end
   end
 
-  defp handle(socket, packet, state) do
-    case packet(socket, packet, state) do
+  # The packet handling time (docs/technical/telemetry.md): from the decoded packet to its effects handed to the socket.
+  defp handle(socket, %module{} = packet, state) do
+    metadata = %{part: state.part, opcode: module |> Module.split() |> List.last()}
+
+    case :telemetry.span([:pinata, :packet], metadata, fn -> {packet(socket, packet, state), metadata} end) do
       {:continue, state} -> frames(socket, state)
       {:close, state} -> {:close, state}
     end

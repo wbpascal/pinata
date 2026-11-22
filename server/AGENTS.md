@@ -24,6 +24,7 @@ CI also runs `mix deps.audit`. A noisy Credo check is switched off on its own in
 - **Exhaustiveness:** no catch-all clause on a closed set of our own values; a catch-all is mandatory on anything decoded from the client. This is a review rule; no tool checks it.
 - **Time and randomness:** only through `Clock` and `Random`.
 - **ETS:** no named tables.
+- **Telemetry:** server code emits only `:telemetry` events and `Logger` calls and never calls the OpenTelemetry API (ADR 0011). A duration is a `:telemetry` span (`:telemetry.span/3`, `start` / `stop`), never a single event with a time measured by hand. `Pinata.Otel` is the only module that names the OpenTelemetry API.
 - **Packet docs:** after a change to a packet definition run `mix pinata.packets_doc`; `mix check` fails on a stale `docs/technical/packets.md`.
 
 ## Untrusted input

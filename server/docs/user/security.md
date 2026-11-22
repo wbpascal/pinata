@@ -34,6 +34,10 @@ Watch for these lines (see [`operation.md`](operation.md)); many of one kind fro
 - client protocol violations (unknown opcode, wrong first packet, wrong version key)
 - many `login refused` lines for one account or from one peer
 
+## Telemetry export
+
+With `telemetry.otlp_enabled` the node opens outbound connections to the OTLP endpoint and opens no port. The exported data holds part names, packet names, map names, world numbers and durations, no account name, address or packet content. A secret for the Collector (an authentication header) belongs in the environment variable `OTEL_EXPORTER_OTLP_HEADERS`, not in the settings file. With the default `false` nothing leaves the node.
+
 ## Running the server
 
 - Run it as a user of its own without administrator rights.

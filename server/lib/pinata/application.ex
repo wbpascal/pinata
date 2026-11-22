@@ -1,7 +1,10 @@
 defmodule Pinata.Application do
   @moduledoc false
 
-  use Boundary, top_level?: true, deps: [Login, WorldManager, Zone, Persistence, Cluster, Settings, GameData]
+  use Boundary,
+    top_level?: true,
+    deps: [Login, WorldManager, Zone, Persistence, Cluster, Settings, GameData, Pinata.Figures, Pinata.Otel]
+
   use Application
 
   require Logger
@@ -14,6 +17,8 @@ defmodule Pinata.Application do
         # Mix starts Logger before it reads config/config.exs: re-apply the formatter.
         # No default handler exists in some runs (tests), so the result is ignored.
         _ = :logger.update_handler_config(:default, :formatter, Logger.default_formatter())
+        :ok = Pinata.Figures.attach()
+        :ok = Pinata.Otel.start(settings.telemetry)
         tables = settings.parts |> Enum.flat_map(&part(&1).game_data()) |> Enum.uniq()
 
         with :ok <- GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references),

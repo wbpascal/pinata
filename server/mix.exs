@@ -12,12 +12,23 @@ defmodule Pinata.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      releases: [pinata: [include_executables_for: [:unix, :windows]]],
+      releases: [
+        pinata: [
+          include_executables_for: [:unix, :windows],
+          # Started by Pinata.Otel after the settings are read, never by the boot script (docs/technical/telemetry.md).
+          applications: [
+            opentelemetry_exporter: :load,
+            opentelemetry: :load,
+            opentelemetry_experimental: :load,
+            opentelemetry_telemetry: :load
+          ]
+        ]
+      ],
       dialyzer: [
         flags: [:unmatched_returns, :extra_return, :missing_return],
         plt_local_path: "plts",
         plt_core_path: "plts",
-        plt_add_apps: [:mix]
+        plt_add_apps: [:mix, :opentelemetry_telemetry]
       ]
     ]
   end
@@ -45,6 +56,14 @@ defmodule Pinata.MixProject do
       {:thousand_island, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:libcluster, "~> 3.5"},
+      {:telemetry, "~> 1.4"},
+      {:opentelemetry_api, "~> 1.5"},
+      {:opentelemetry_api_experimental, "~> 0.6.0"},
+      # Started by Pinata.Otel after the settings are read, never by the boot script (docs/technical/telemetry.md).
+      {:opentelemetry_exporter, "~> 1.11", runtime: false},
+      {:opentelemetry, "~> 1.7", runtime: false},
+      {:opentelemetry_experimental, "~> 0.6.0", runtime: false},
+      {:opentelemetry_telemetry, "~> 1.1", runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ecto_sql, "~> 3.14"},

@@ -12,6 +12,7 @@ From the release (see [`install.md`](install.md)), with the path to its `bin/pin
 | OS process id | `bin/pinata pid` |
 | shell into the running node | `bin/pinata remote` |
 | run a command | `bin/pinata eval "<expression>"` |
+| run a command on the running node | `bin/pinata rpc "<expression>"` |
 
 A string inside an expression is written `~s(...)`, not in double quotes. On Windows there is no `daemon`: `bin/pinata start` stays in the foreground of its window; stop it with `bin/pinata stop` from another window; that is the recommended way. `Ctrl-C` twice in its window was not tried on Windows. See [`install.md`](install.md), section "Windows", for the other differences.
 
@@ -90,26 +91,70 @@ Lines an administrator acts on:
 | `Cluster: node <node> lost` | warning | multi-node mode: a node went away |
 | `Login: world <number> (<name>) is available` | info | multi-node mode: the WorldManager of the world is reachable from Login |
 | `Login: world <number> (<name>) is unavailable` | warning | multi-node mode: the world was available and is not any more |
+| `Pinata: OpenTelemetry export on, trace ratio <ratio>` | info | `telemetry.otlp_enabled` is true; traces and metrics go to the OTLP endpoint (see "OpenTelemetry" below) |
+| `Pinata: OpenTelemetry did not start (<reason>), nothing is exported` | warning | the OpenTelemetry libraries failed to start; the node runs on without export. Report the reason |
 
 The four cluster lines appear in multi-node mode only. Login looks the worlds up once a second; a world is reported unavailable only after it was available, so a Login node that starts before the WorldManager node logs nothing until the world appears. A close by the client is logged at `debug` only.
 
+With export on, the OpenTelemetry libraries write lines of their own without a part, for example `OTLP exporter successfully initialized`, and a line for a failed export when the Collector is unreachable.
+
+## Capacity figures
+
+A node counts two capacity figures, always, from its start (the counts start at 0 at every node start):
+
+- **packet handling time**: from a decoded client packet to its answers handed to the socket, every packet of every part;
+- **tick duration**: the work of one 100 ms tick of a map instance.
+
+`bin/pinata rpc "Pinata.Figures.print()"` prints them:
+
+```
+Packet handling time (ms)
+  buckets <=: 0.1 0.25 0.5 1 2.5 5 10 25 50 75 100 250 500 1000 +Inf
+  all nodes: count 1200, p50 <= 0.25, p99 <= 5, buckets 700 300 150 40 8 2 0 0 0 0 0 0 0 0 0
+  pinata@host: count 1200, p50 <= 0.25, p99 <= 5, buckets 700 300 150 40 8 2 0 0 0 0 0 0 0 0 0
+Tick duration (ms)
+  buckets <=: 0.1 0.25 0.5 1 2.5 5 10 25 50 75 100 250 500 1000 +Inf
+  all nodes: count 24, p50 <= 0.1, p99 <= 0.1, buckets 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  pinata@host: count 24, p50 <= 0.1, p99 <= 0.1, buckets 24 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+```
+
+Each figure is a histogram: `buckets <=` are the upper bounds of the buckets in milliseconds (a duration equal to a bound counts in that bucket; `+Inf` is everything above 1000 ms), `buckets` the counts in the same order. `p50` and `p99` are the bucket bounds that 50 % and 99 % of the counts do not exceed: "p99 <= 50" means at least 99 % of the packets took at most 50 ms; `-` means nothing was counted yet, `> 1000` that the percentile lies in the last bucket. The targets are packet handling time p99 <= 50 ms and tick duration p99 <= 100 ms. In multi-node mode the command asks every connected node: `all nodes` is the sum, then one line per node (`no answer` when a node did not answer within 5 s). `bin/pinata rpc "Pinata.Figures.reset()"` sets the counts of every connected node to 0.
+
+## OpenTelemetry
+
+The node can export traces and metrics over OTLP (HTTP) to an OpenTelemetry Collector or a compatible backend. It is off by default: then nothing is exported and no connection is opened, whatever the `OTEL_*` environment variables say. Three settings control it (see [`settings.md`](settings.md)):
+
+```toml
+[telemetry]
+otlp_enabled = true
+otlp_endpoint = "http://collector:4318"
+trace_ratio = 0.01
+```
+
+What is exported:
+
+- the spans `pinata.packet` (attributes `part`, `opcode`) and `pinata.tick` (attributes `world`, `map`), a share `telemetry.trace_ratio` of them (default 1 %);
+- the histograms `pinata.packet.duration` (attribute `part`) and `pinata.tick.duration`, in milliseconds with the bucket bounds of the capacity figures, every packet and tick counted, sent every 60 s.
+
+The server log is not exported. The metrics part of the OpenTelemetry library for Erlang is experimental. The standard `OTEL_*` variables are described in [`settings.md`](settings.md), section "OpenTelemetry variables".
+
 ## Memory
 
-Measured on 2026-11-19: the single-node release (all three parts, SQLite, 2016 `9Data` data directory, no client connected, idle for about one minute after `bin/pinata daemon`) on macOS 27.2.1, Apple M1 Pro (arm64), Erlang/OTP 29, Elixir 1.20.5:
+Measured on 2026-11-22: the single-node release (all three parts, SQLite, 2016 `9Data` data directory, no settings file, so OpenTelemetry export off; the release includes the OpenTelemetry libraries) on macOS 27.2.1, Apple M1 Pro (arm64), Erlang/OTP 29, Elixir 1.20.5. Idle, no client connected, about one minute after `bin/pinata daemon`, the 88 map processes running and no block data loaded:
 
 | Measure | Value | Command |
 |---|---|---|
-| resident set size of the OS process | 202384 kB (198 MB) | `ps -o rss= -p $(bin/pinata pid)` |
-| memory the Erlang VM reports | 144122129 bytes (137 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
+| resident set size of the OS process | 195360 kB (191 MB) | `ps -o rss= -p $(bin/pinata pid)` |
+| memory the Erlang VM reports | 128152735 bytes (122 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. Measured on 2026-11-22 on the same machine and release, with the block data of all 88 field maps loaded (`Zone.MapInstance.enter/2` once on every map), after about one minute:
+The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. The same node with the block data of all 88 field maps loaded (`Zone.MapInstance.enter/2` once on every map), after about one minute more:
 
 | Measure | Value | Command |
 |---|---|---|
-| resident set size of the OS process | 288432 kB (282 MB) | `ps -o rss= -p $(bin/pinata pid)` |
-| memory the Erlang VM reports | 224931376 bytes (215 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
+| resident set size of the OS process | 292848 kB (286 MB) | `ps -o rss= -p $(bin/pinata pid)` |
+| memory the Erlang VM reports | 219610335 bytes (209 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); :ok = Zone.MapInstance.enter(p, :memory_check) end'`. The idle figure with the map processes and no block data was 189536 kB resident. The budget is 512 MB.
+The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); :ok = Zone.MapInstance.enter(p, :memory_check) end'`. The budget is 512 MB.
 
 On Windows the two commands are `(Get-Process -Id (bin\pinata pid)).WorkingSet64` (PowerShell, bytes) and `bin\pinata rpc "IO.inspect(:erlang.memory(:total))"`.
 

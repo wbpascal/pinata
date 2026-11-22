@@ -51,6 +51,23 @@ defmodule Zone.MapInstanceTest do
     assert :sys.get_state(idle).ticks == 0
   end
 
+  @doc false
+  @spec forward([atom()], map(), map(), pid()) :: term()
+  def forward(event, measurements, metadata, test), do: send(test, {:telemetry, event, measurements, metadata})
+
+  test "each tick is a telemetry span with world and map" do
+    id = "map-instance-test-#{inspect(self())}"
+    :ok = :telemetry.attach_many(id, [[:pinata, :tick, :stop]], &__MODULE__.forward/4, self())
+    on_exit(fn -> :telemetry.detach(id) end)
+    Application.put_env(:pinata, :clock_source, TestClock)
+    on_exit(fn -> Application.delete_env(:pinata, :clock_source) end)
+    TestClock.set(1_000_000)
+    pid = start("Rou")
+    :ok = Zone.MapInstance.enter(pid, 1)
+    TestClock.set(1_100_000)
+    assert_receive {:telemetry, [:pinata, :tick, :stop], %{duration: _}, %{world: 200, map: "Rou"}}, 1000
+  end
+
   test "a crashed instance comes back empty and is logged once" do
     {:ok, old} = Zone.MapInstance.whereis(0, "RouCos01")
     :ok = Zone.MapInstance.enter(old, 1)

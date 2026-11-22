@@ -15,6 +15,7 @@ defmodule Settings.DocTest do
       ~w(data_dir public_host client_version_key login.port login.auto_create_accounts) ++
         ~w(world_manager.port zone.port database.url cluster.nodes data.strict_references) ++
         ~w(connection.max_packets_per_second connection.max_unsent_bytes log.level) ++
+        ~w(telemetry.otlp_enabled telemetry.otlp_endpoint telemetry.trace_ratio) ++
         ["[[world]] number", "[[world]] name"]
 
     for key <- keys do

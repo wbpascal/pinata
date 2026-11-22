@@ -116,6 +116,30 @@ defmodule Settings.Schema do
           doc: "Refuse to start when a data table refers to a row that does not exist."
         ]
       ]
+    ],
+    telemetry: [
+      type: :keyword_list,
+      keys: [
+        otlp_enabled: [
+          type: :boolean,
+          default: false,
+          doc:
+            "Export traces and metrics over OTLP (OpenTelemetry). When `false` nothing is exported and no connection is opened, whatever the `OTEL_*` environment variables say. See operation.md."
+        ],
+        otlp_endpoint: [
+          type: {:custom, Settings.Schema, :otlp_endpoint, []},
+          type_doc: "string, an `http://` or `https://` URL",
+          doc:
+            "The OTLP endpoint (HTTP), for example `http://collector:4318`. It wins over the environment variable `OTEL_EXPORTER_OTLP_ENDPOINT`. Default: that variable, else `http://localhost:4318`."
+        ],
+        trace_ratio: [
+          type: {:custom, Settings.Schema, :ratio, []},
+          type_doc: "number 0 to 1",
+          default: 0.01,
+          doc:
+            "The share of packets and ticks exported as trace spans. Metrics and the capacity figures count every packet and tick."
+        ]
+      ]
     ]
   ]
 
@@ -138,6 +162,17 @@ defmodule Settings.Schema do
 
   def log_level(other),
     do: {:error, "expected \"debug\", \"info\", \"warning\" or \"error\", got: #{inspect(other)}"}
+
+  @doc false
+  @spec otlp_endpoint(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def otlp_endpoint("http://" <> _ = url), do: {:ok, url}
+  def otlp_endpoint("https://" <> _ = url), do: {:ok, url}
+  def otlp_endpoint(other), do: {:error, "expected an http:// or https:// URL, got: #{inspect(other)}"}
+
+  @doc false
+  @spec ratio(term()) :: {:ok, float()} | {:error, String.t()}
+  def ratio(value) when is_number(value) and value >= 0 and value <= 1, do: {:ok, value * 1.0}
+  def ratio(other), do: {:error, "expected a number from 0 to 1, got: #{inspect(other)}"}
 
   @doc "The NimbleOptions schema."
   @spec schema() :: keyword()

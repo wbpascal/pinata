@@ -10,6 +10,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A node with the Zone part runs one map instance per field map (88 with the original data), places the NPCs of `ShineNPC` and logs how many rows it skipped. It does not start when the `.shbd` file of a field map is missing or damaged; the error names the map (#106).
 - In multi-node mode each Zone node reports its own `public_host` and `zone.port` to WorldManager (#106).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
+- `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
+- Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
 
 ### Differences from the original server
 

@@ -12,6 +12,7 @@ with no file the node starts in single-node mode on the data directory `./data`,
 | `PINATA_CONFIG` | `pinata.toml` in the working directory | Path of the settings file. The default file may be missing; a path set here must exist. |
 | `PINATA_PARTS` | `login,world_manager,zone` | The parts this node starts, separated by commas. A part that is not listed opens no port. |
 | `DATABASE_URL` | not set | Overrides `database.url`, so the secret can stay out of the file. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | not set | The OTLP endpoint when `telemetry.otlp_enabled` is true and `telemetry.otlp_endpoint` is not set. |
 
 ## Keys
 
@@ -32,6 +33,9 @@ with no file the node starts in single-node mode on the data directory `./data`,
 | `connection.max_unsent_bytes` | integer, 1 or more | `1048576` | A client with more than this many bytes of unsent outbound data is disconnected. |
 | `log.level` | `"debug"`, `"info"`, `"warning"` or `"error"` | `"info"` | The lowest level the server log prints (see operation.md). |
 | `data.strict_references` | boolean | `true` | Refuse to start when a data table refers to a row that does not exist. |
+| `telemetry.otlp_enabled` | boolean | `false` | Export traces and metrics over OTLP (OpenTelemetry). When `false` nothing is exported and no connection is opened, whatever the `OTEL_*` environment variables say. See operation.md. |
+| `telemetry.otlp_endpoint` | string, an `http://` or `https://` URL | see description | The OTLP endpoint (HTTP), for example `http://collector:4318`. It wins over the environment variable `OTEL_EXPORTER_OTLP_ENDPOINT`. Default: that variable, else `http://localhost:4318`. |
+| `telemetry.trace_ratio` | number 0 to 1 | `0.01` | The share of packets and ticks exported as trace spans. Metrics and the capacity figures count every packet and tick. |
 
 A key with a dot is written inside a table: `login.port` is `port` under `[login]`. Each world is one `[[world]]` table.
 
@@ -45,6 +49,14 @@ port = 9010
 number = 0
 name = "INITIO"
 ```
+
+## OpenTelemetry variables
+
+With `telemetry.otlp_enabled = true` the standard variables of the OpenTelemetry SDK work as upstream documents them:
+`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_SERVICE_NAME` (default
+`pinata`) and the others ([SDK configuration](https://opentelemetry.io/docs/languages/sdk-configuration/),
+[`opentelemetry_exporter`](https://hexdocs.pm/opentelemetry_exporter/)). `OTEL_TRACES_SAMPLER`, when set, replaces
+`telemetry.trace_ratio`. With `telemetry.otlp_enabled = false` none of them has an effect.
 
 ## Start-up errors
 

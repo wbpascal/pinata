@@ -14,6 +14,8 @@ The server cannot be played on yet. You download the release archive of your pla
 
 A string inside the expression is written `~s(...)`, not in double quotes: that form works in every shell, also on Windows. [`install.md`](install.md), section "Windows", lists what differs on Windows.
 
+On the running node, `bin/pinata rpc "Pinata.Figures.print()"` prints the capacity figures (see [`operation.md`](operation.md)).
+
 From a source checkout each of these has a `mix` task; they are listed in [`from-source.md`](from-source.md).
 
 ## Pages
@@ -25,7 +27,7 @@ From a source checkout each of these has a `mix` task; they are listed in [`from
 | [`from-source.md`](from-source.md) | building the release and the image yourself, starting without a release, the `mix` tasks |
 | [`settings.md`](settings.md) | every setting |
 | [`accounts.md`](accounts.md) | creating, blocking and unblocking accounts |
-| [`operation.md`](operation.md) | start, stop, logs, start-up failures, memory, time zone, database and migrations, moving to a new version |
+| [`operation.md`](operation.md) | start, stop, logs, start-up failures, capacity figures, OpenTelemetry, memory, time zone, database and migrations, moving to a new version |
 | [`security.md`](security.md) | what to open, which secrets to change, account and connection settings, log lines to watch, limits of the client protocol |
 | [`multi-node.md`](multi-node.md) | PostgreSQL, the node list, which part runs where, the data directory check, a Docker Compose example |
 
