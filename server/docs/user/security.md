@@ -25,6 +25,9 @@ The server treats everything a client sends as untrusted. What it cannot protect
 
 `connection.max_packets_per_second` and `connection.max_unsent_bytes` disconnect a client that floods the server or does not read. Keep the defaults unless honest players are disconnected.
 
+- The chat spam filter blocks the chat of a player who sends too many lines of normal chat or shout (values from `SpamerPenaltyRule.shn` and `SpamerPenalty.shn`, no setting; see "Chat" in `operation.md`).
+- A line of chat or shout carries at most 76 item links; a line with more is dropped with an `info` line.
+
 ## Server log
 
 Watch for these lines (see [`operation.md`](operation.md)); many of one kind from one peer suggest an attack or a modified client:

@@ -87,6 +87,14 @@ defmodule Proto.RoundtripTest.Fixtures.Linked do
   field :links, {:records, :count, 3}
 end
 
+defmodule Proto.RoundtripTest.Fixtures.TwoRecords do
+  use Proto.Packet
+  field :len, :u8
+  field :count, :u8
+  field :text, {:records, :len, 1}
+  field :links, {:records, :count, 3}
+end
+
 defmodule Proto.RoundtripTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
@@ -179,8 +187,17 @@ defmodule Proto.RoundtripTest do
     assert F.Linked.__packet__().fields == [count: "u8", text: "bytes[count: u8]", links: "bytes[count x 3]"]
   end
 
+  test "two records fields in a row" do
+    p = %F.TwoRecords{len: 2, count: 2, text: "hi", links: "abcdef"}
+    bytes = <<2, 2, "hi", "abcdef">>
+    assert F.TwoRecords.encode(p) == bytes
+    assert F.TwoRecords.decode(bytes) == {:ok, p}
+    assert F.TwoRecords.decode(<<2, 2, "hi", "abcde">>) == {:error, :bad_size}
+    assert F.TwoRecords.decode(<<2, 2, "hi", "abcdefg">>) == {:error, :bad_size}
+  end
+
   property "decode of random binaries never raises" do
-    check all mod <- StreamData.member_of([F.World, F.Avatar, F.Wide, F.Linked | Map.values(@modules)]),
+    check all mod <- StreamData.member_of([F.World, F.Avatar, F.Wide, F.Linked, F.TwoRecords | Map.values(@modules)]),
               bin <- StreamData.binary() do
       result = mod.decode(bin)
       assert match?({:ok, %^mod{}}, result) or result == {:error, :bad_size}

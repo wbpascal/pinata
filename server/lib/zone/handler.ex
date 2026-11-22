@@ -28,12 +28,25 @@ defmodule Zone.Handler do
   Sight (flow: `docs/technical/flows/sight.md`): in the world, `0x1C01` asks the map instance for the appear packet
   of an object (`Zone.MapInstance.inform/3`); the client's own handle field is ignored and an object out of sight,
   unknown or the requester itself gets no answer. The packets the map instance pushes for this player
-  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`) are sent in the world and dropped before.
+  (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`, chat lines) are sent in the world and dropped
+  before.
+
+  Chat (flow: `docs/technical/flows/chat.md`): in the world, `0x2001` (normal chat) and `0x201E` (shout) go to the
+  map instance (`Zone.MapInstance.chat/4`), which checks them with `Zone.Chat` and relays `0x2002` to the speaker and
+  the players in sight, or `0x201F` to every player of the map; a refusal is silent, a spam block answers `0x0848`.
+  A `0x2001` line starting with `&` is dropped and never shown: the GM command frame is issue 116. A line with more
+  than 76 item links is dropped with an `info` line (above it the relayed `0x201F` can exceed the frame limit). A
+  chat packet before `0x1803` is ignored. `0x082F` (in `:loading` and `:in_world`) is answered with
+  `0x0830 {ShoutLevel, ShoutDelay}`, which the 2016 client ignores (Z01-B5). Absent until their milestones: the GM
+  chat ban and the GM colour bit (7), font and balloon colours (9), the pet keyword (9), Lua chat triggers (10), the
+  chat-title counter `0x6006` (6), the megaphone `0x204B` (6), party chat (6).
   """
 
   @behaviour Net.Handler
 
+  alias Proto.Packets.ActChatReq
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.ActShoutCmd
   alias Proto.Packets.BriefinfoInformCmd
   alias Proto.Packets.CharLogoutcancelCmd
   alias Proto.Packets.CharLogoutreadyCmd
@@ -42,7 +55,12 @@ defmodule Zone.Handler do
   alias Proto.Packets.MapLogincompleteCmd
   alias Proto.Packets.MapLoginfailAck
   alias Proto.Packets.MapLoginReq
+  alias Proto.Packets.MiscServerparameterAck
+  alias Proto.Packets.MiscServerparameterReq
   alias Zone.MapEntry.Placeholders
+
+  # above it the relayed 0x201F can exceed the frame limit of Net.Connection
+  @max_item_links 76
 
   @enforce_keys [:checksums]
   defstruct [:checksums, step: :login, session: :none, entry: :none, map: :none, player: :none, entered_at: :none]
@@ -101,6 +119,24 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %BriefinfoInformCmd{handle: h}),
     do: {state, [{:perform, {:inform, state.map, p.handle, h}}]}
 
+  # The GM command frame is issue 116; until then a line starting with & is dropped. It is never shown as chat.
+  def handle_packet(%__MODULE__{step: :in_world} = state, %ActChatReq{content: "&" <> _}), do: {state, []}
+
+  def handle_packet(%__MODULE__{step: :in_world} = state, %ActChatReq{item_link_count: n}) when n > @max_item_links,
+    do: {state, [{:log, :info, "chat dropped: #{n} item links"}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActChatReq{} = req),
+    do: {state, [{:perform, {:chat, state.map, p.handle, :normal, line(req)}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world} = state, %ActShoutCmd{item_link_count: n}) when n > @max_item_links,
+    do: {state, [{:log, :info, "shout dropped: #{n} item links"}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActShoutCmd{} = req),
+    do: {state, [{:perform, {:chat, state.map, p.handle, :shout, line(req)}}]}
+
+  def handle_packet(%__MODULE__{step: step} = state, %MiscServerparameterReq{}) when step in [:loading, :in_world],
+    do: {state, [{:perform, :server_parameters}]}
+
   def handle_packet(state, _packet), do: {state, []}
 
   @impl Net.Handler
@@ -142,6 +178,14 @@ defmodule Zone.Handler do
     do: {state, [{:close, :warning, "map login complete failed: not on the map"}]}
 
   def handle_info(state, {:informed, packets}), do: {state, for(p <- packets, do: {:send, p})}
+
+  def handle_info(state, {:chatted, packets}), do: {state, for(p <- packets, do: {:send, p})}
+
+  def handle_info(state, {:server_parameters, %{level: level, delay_s: delay}}),
+    do: {state, [{:send, %MiscServerparameterAck{shout_level: level, shout_delay: delay}}]}
+
+  def handle_info(state, {:server_parameters, :off}),
+    do: {state, [{:log, :debug, "0x082F not answered: ShoutLevel or ShoutDelay missing in ChrCommon"}]}
 
   # a player not yet in the world (mode 0) receives nothing
   def handle_info(%__MODULE__{step: :in_world} = state, {:cluster, {:packets, packets}}),
@@ -242,6 +286,12 @@ defmodule Zone.Handler do
   def perform({:leave, map, player, entered_at}), do: {:left, leave(map, player, entered_at)}
 
   def perform({:inform, map, own, handle}), do: {:informed, Zone.MapInstance.inform(map, own, handle)}
+
+  def perform({:chat, map, handle, kind, line}), do: {:chatted, Zone.MapInstance.chat(map, handle, kind, line)}
+  def perform(:server_parameters), do: {:server_parameters, Zone.Chat.common().shout}
+
+  defp line(%{item_link_count: n, content: content, links: links}),
+    do: %{item_link_count: n, content: content, links: links}
 
   defp auto_save_timer,
     do: Process.send_after(self(), {:timer, :auto_save}, Application.get_env(:pinata, :auto_save_ms, 600_000))

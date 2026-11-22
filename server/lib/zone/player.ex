@@ -11,6 +11,9 @@ defmodule Zone.Player do
   other only in the same dimension or when one of them is in dimension -1, and the sub-layer (0 Base, 1 RangerStealth,
   2 Observer, 3 AdminHide, 4 GMDoor, 5 GMPlayer) decides one way whether an object is shown to another. Both are 0
   after the entry and are set by `Zone.MapInstance.set_layer/4`.
+
+  `chat` is the state of the chat spam filter and the shout delay (`Zone.Chat`): empty at every entry into a map
+  instance, never stored.
   """
 
   @type equipment :: %{
@@ -21,7 +24,9 @@ defmodule Zone.Player do
         }
 
   @enforce_keys [:character, :world_no, :map, :x, :y, :walk_speed, :run_speed, :map_type, :equipment, :address]
-  defstruct @enforce_keys ++ [handle: :none, conn: :none, mode: 0, admin_level: 0, dir: 90, dimension: 0, sub_layer: 0]
+  defstruct @enforce_keys ++
+              [handle: :none, conn: :none, mode: 0, admin_level: 0, dir: 90, dimension: 0, sub_layer: 0] ++
+              [chat: %{ring: [], block_until: :none, probation_until: :none, next_shout: :none}]
 
   @type t :: %__MODULE__{
           character: Persistence.loaded_character(),
@@ -40,7 +45,8 @@ defmodule Zone.Player do
           admin_level: non_neg_integer(),
           dir: 0..255,
           dimension: integer(),
-          sub_layer: 0..5
+          sub_layer: 0..5,
+          chat: Zone.Chat.state()
         }
 
   @doc """
