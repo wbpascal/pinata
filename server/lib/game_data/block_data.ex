@@ -89,8 +89,7 @@ defmodule GameData.BlockData do
 
   defp name(path), do: "BlockInfo/" <> Path.basename(path)
 
-  # The name on disk when found, the asked name when not.
-  # The only place a map name becomes a path. One segment of letters, digits, `_` and `-`: no `..`, no separator, no
+  # Every map name is checked here before file_path/3 makes it a path. One segment of letters, digits, `_` and `-`: no `..`, no separator, no
   # NUL, no drive, so a name from a client cannot leave BlockInfo/. Every name of the 2016 tables passes.
   defp map_name(name) do
     if name =~ ~r/\A[A-Za-z0-9_-]+\z/,
@@ -98,6 +97,7 @@ defmodule GameData.BlockData do
       else: {:error, "BlockInfo: #{inspect(name)} is not a map name"}
   end
 
+  # The name on disk when found, the asked name when not.
   defp file_path(data_dir, map_name, ext), do: GameData.DataFile.path(data_dir, "BlockInfo/" <> map_name <> ext)
 
   # Cell of a coordinate. mbi_IsMoveBlock FUN_0049df70: u32 arithmetic of the original, so a negative or huge
