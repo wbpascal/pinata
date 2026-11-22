@@ -538,6 +538,45 @@ defmodule Replay.HarnessTest do
       lines = @trigger <> "0200\n" <> @reply <> "0100efbeadde0700"
       assert {:error, %Failure{kind: :extra}} = run(Stub, lines, drop_after: [3])
     end
+
+    test "a connection whose remote port equals the client's port is left alone" do
+      endpoints = listen(Stub)
+      {_host, server_port} = endpoints["login"]
+      test = self()
+      loopback6 = {0, 0, 0, 0, 0, 0, 0, 1}
+
+      # Before packet 2 the client is connected: listen on its port number over IPv6 and connect a decoy there.
+      decoy = fn ->
+        [client_port] =
+          for port <- Port.list(),
+              Port.info(port, :name) == {:name, ~c"tcp_inet"},
+              match?({:ok, {_address, ^server_port}}, :inet.peername(port)),
+              {:ok, {_address, client_port}} <- [:inet.sockname(port)],
+              do: client_port
+
+        {:ok, listener} = :gen_tcp.listen(client_port, [:inet6, active: false, ip: loopback6])
+
+        pid =
+          spawn(fn ->
+            {:ok, socket} = :gen_tcp.connect(loopback6, client_port, [:inet6, active: false])
+            send(test, :decoy_ready)
+            receive do: (:stop -> :gen_tcp.close(socket))
+          end)
+
+        assert_receive :decoy_ready
+        send(test, {:decoy, pid, listener})
+        :ok
+      end
+
+      lines = @trigger <> "0100\n" <> @reply <> "0100efbeadde0700"
+      opts = [stop: :end, endpoints: endpoints, timeout: 200, drop_after: [3], before: %{2 => decoy}]
+      assert Replay.run(transcript(lines), opts) == :ok
+
+      assert_received {:decoy, pid, listener}
+      assert Process.alive?(pid)
+      send(pid, :stop)
+      :gen_tcp.close(listener)
+    end
   end
 
   test "bad mask entries raise" do

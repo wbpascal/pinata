@@ -234,7 +234,10 @@ defmodule Replay do
       client = Map.fetch!(state.clients, packet.conn)
       [kind | _] = String.split(packet.conn, "#")
       {:ok, local_port} = :inet.port(client.socket)
-      :ok = kill_server_side(local_port, Map.fetch!(%{"login" => :login, "wm" => :wm, "zone" => :zone}, kind))
+      {:ok, {_address, server_port}} = :inet.peername(client.socket)
+
+      :ok =
+        kill_server_side(local_port, server_port, Map.fetch!(%{"login" => :login, "wm" => :wm, "zone" => :zone}, kind))
 
       with :ok <- read_until_closed(client, packet, ctx) do
         TestClient.close(client)
@@ -245,13 +248,15 @@ defmodule Replay do
     end
   end
 
+  # A port matches by both ends: its peer is the client's port, its own port the one the client connected to.
   # The test VM first (hand-made listeners live there), then the node of the part; stops at the first match.
-  defp kill_server_side(local_port, part) do
+  defp kill_server_side(local_port, server_port, part) do
     Enum.reduce_while([&apply/3, &Replay.Topology.call(part, &1, &2, &3)], :ok, fn call, :ok ->
       killed =
         for port <- call.(Port, :list, []),
             call.(Port, :info, [port, :name]) == {:name, ~c"tcp_inet"},
             match?({:ok, {_address, ^local_port}}, call.(:inet, :peername, [port])),
+            match?({:ok, {_address, ^server_port}}, call.(:inet, :sockname, [port])),
             {:connected, pid} <- [call.(Port, :info, [port, :connected])],
             do: call.(Process, :exit, [pid, :kill])
 
