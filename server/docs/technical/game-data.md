@@ -108,7 +108,7 @@ One module per table, `GameData.<Name>`, implementing `GameData.Schema`: a struc
 - `source`: `{:shn | :csv, path in the data directory}`,
 - `key`: a field name, or `:row` (the 1-based data row number) for a table without a natural key,
 - `columns`: `field: {column name in the file, :integer | :string}`,
-- `indexes`: fields with a non-unique index (`GameData.lookup/3`, rows in file order),
+- `indexes`: fields with a non-unique index (`GameData.lookup/3`, rows in file order; `GameData.all/1` gives every row of a table in key order),
 - `references`: `field: schema`, the value must be a key of that schema's table.
 
 A schema lists only the columns the server reads. A column of the file that it does not list is ignored; a listed column the file lacks is an error. A table without a schema is not loaded. Built so far (all read by character creation, `docs/pseudocode/db/D02-character.md` §3.3 and `docs/pseudocode/wm/W01-core.md` §4.1): `SingleData`, `MapInfo`, `ItemInfo`, `HairInfo`, `HairColorInfo`, `FaceInfo`, `CharDefault`, `CharDefaultItem`, `CharDefaultSkill`, `CharDefaultQuest`, `CharDefaultShortcut`, and `BadNameFilter` (the name filter of WorldManager, W01 §4.1). The references are `CharDefault.start_map` to `MapInfo` and `CharDefaultItem.item_id` to `ItemInfo`.

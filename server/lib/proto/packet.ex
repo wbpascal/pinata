@@ -8,7 +8,7 @@ defmodule Proto.Packet do
       field :raw, {:bytes, 5}                     # untouched binary
       field :equip, {:u16s, 20}                   # list of integers
       field :text, {:counted, :u8}                # u8 length, then that many bytes; must be the last entry or be followed only by a `:records` field
-      field :links, {:records, :count, 0x67}      # count (an earlier integer field) x 0x67 opaque bytes; must be the last entry
+      field :links, {:records, :count, 0x67}      # count (an earlier integer field) x 0x67 opaque bytes; must be the last entry or be followed only by `:records` fields
       field :avatar, MyApp.Avatar                 # nested struct (any module using this DSL)
       bits [gender: 1, chrclass: 5, race: 2]      # one byte, most significant bit first
       array :worlds, MyApp.World, count: :u8      # must be the last entry

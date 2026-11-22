@@ -23,6 +23,12 @@ defmodule Zone.Maps do
     placed = names |> Enum.map(&length(GameData.lookup(GameData.ShineNpc, :map, &1))) |> Enum.sum()
     total = GameData.count(GameData.ShineNpc)
     Logger.info("Zone: #{total - placed} of #{total} NPC rows skipped: their map does not run")
+    common = Zone.Chat.common()
+    _ = if common.shout == :off, do: Logger.info("Zone: shout off: ShoutLevel or ShoutDelay missing in ChrCommon")
+
+    _ =
+      if common.spam == :off,
+        do: Logger.info("Zone: chat spam filter off: no usable row in SpamerPenaltyRule or SpamerPenalty")
 
     state = %{settings: settings, names: names, worlds: %{}, maps: %{}}
     for %{number: n} <- settings.world, do: :ok = Cluster.Registry.join_zones(n, self())
