@@ -330,16 +330,17 @@ defmodule MapEntryTest do
   test "known but unbuilt packets are dropped with one debug line, unknown ones close", %{cid: cid} do
     {wm, zone, _handle} = in_world(cid)
     wm = wm_burst(wm)
-    chat = <<0x01, 0x20>> <> capture(0x2001, :client)
+    # 0x2003, the legacy move, stays unbuilt (Z02-B1)
+    unbuilt = <<0x03, 0x20, 0::64>>
 
     log =
       TestLog.capture(fn ->
-        Process.put(:zone, zone |> send!(chat) |> nothing!())
+        Process.put(:zone, zone |> send!(unbuilt) |> nothing!())
         wm |> send!(<<0x11, 0x70, 0::size(24 * 8)>>) |> nothing!()
       end)
 
-    assert [_] = Regex.scan(~r/\[debug\] Zone: dropped a known but unbuilt packet 0x2001, peer 127\.0\.0\.1:/, log)
-    assert [_] = Regex.scan(~r/dropped a known but unbuilt packet 0x2001/, log)
+    assert [_] = Regex.scan(~r/\[debug\] Zone: dropped a known but unbuilt packet 0x2003, peer 127\.0\.0\.1:/, log)
+    assert [_] = Regex.scan(~r/dropped a known but unbuilt packet 0x2003/, log)
 
     assert [_] =
              Regex.scan(~r/\[debug\] WorldManager: dropped a known but unbuilt packet 0x7011, peer 127\.0\.0\.1:/, log)

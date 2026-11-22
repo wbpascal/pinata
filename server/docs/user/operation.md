@@ -96,6 +96,10 @@ Lines an administrator acts on:
 | `WorldManager: character login failed, database failure, peer <peer>` / `WorldManager: tutorial skip failed, database failure, peer <peer>` | warning | the database failed; look for the `Persistence` line before it |
 | `Zone: connection closed: Client data check failed: character "<name>", table <table>, server <hash>, client "<hash>", peer <peer>` | warning | the client's copy of a table differs from the server's (see "Client data check" below) |
 | `Zone: map login accepted: character <id>, map <map>, peer <peer>` | info | the client entered the Zone node |
+| `Zone: chat dropped: <n> item links, peer <peer>` | info | a line of normal chat with more than 76 item links was dropped (the unmodified client does not send it) |
+| `Zone: shout dropped: <n> item links, peer <peer>` | info | a shout with more than 76 item links was dropped |
+| `Zone: shout off: ShoutLevel or ShoutDelay missing in ChrCommon` | info | at start: the data directory lacks a shout value, so nobody can shout (see "Chat" below) |
+| `Zone: chat spam filter off: no usable row in SpamerPenaltyRule or SpamerPenalty` | info | at start: the spam filter tables are empty or unusable, so chat is not limited (see "Chat" below) |
 | `Zone: connection closed: map login refused: <reason>, peer <peer>` | info | `no session for the handle`, `no map-login ticket`, `reserved for another Zone node` or `not the reserved character`: the client came to the Zone without a fresh character login |
 | `Zone: connection closed: map entry failed: <reason>, peer <peer>` | warning | the character could not be placed on its map after the map login (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`); the client is told `0x142`. For a database failure or unreadable block data look for the `Persistence` or `Zone: map` line before it |
 | `Zone: connection closed: map login complete failed: not on the map, peer <peer>` | warning | the client reported the map loaded for a player the map does not hold; report it |
@@ -132,6 +136,16 @@ A crashed map process disconnects its players without a save: what happened sinc
 ## Client data check
 
 Always on, with no setting. On `0x1801` the client sends a checksum of each of 49 of its tables (`ItemInfo.shn`, `MapViewInfo.shn`, ...; the list is in the technical documentation, `flows/enter-world.md`). A node with the Zone part hashes its own copies at start. A client whose copy of one of them differs is refused and sees "The client has been illegally manipulated…"; the server writes one `warning` line with the table and both hashes. So a changed table must be shipped to the clients, and the Zone nodes must be started again, since they hash the tables only at start.
+
+## Chat
+
+Normal chat reaches the players in sight of the speaker, a shout every player of the map. The values come from the data directory, there is no setting:
+
+- `Chat` and `Shout` of each map in `FieldList` (1 = allowed; a map with 0 forbids it, for example `Shout` on `EldPri`);
+- `ShoutLevel` (5: a character must be above it to shout) and `ShoutDelay` (2 seconds between two shouts) in `Common` of `ChrCommon`;
+- `SpamerPenaltyRule.shn` (3 lines within 3000 ms) and `SpamerPenalty.shn` (the block and probation time per penalty level, 2016: 10 s / 15 s, 20 s / 30 s, 30 s / 45 s, 60 s / 90 s, up to 3600 s / 5400 s).
+
+A refused line gets no answer, as in the original server. A player who sends too many lines is blocked and sees the client's block message with the seconds left; a repeat offence during the probation time blocks longer. The block is forgotten when the player changes the map or logs in again. A changed table takes effect after a restart of the Zone nodes.
 
 ## Capacity figures
 

@@ -15,6 +15,9 @@ defmodule Zone.Player do
   Movement (`docs/technical/movement.md`): `mover` is the running move (`Zone.Mover`, `:none` while standing), `move`
   the last relayed move packet (`0x2018` / `0x201A`, sent again after an appear; `:none` after a stop), `last_good`
   the last position the block check accepted (the entry position at first), where a pull-back puts the player.
+
+  `chat` is the state of the chat spam filter and the shout delay (`Zone.Chat`): empty at every entry into a map
+  instance, never stored.
   """
 
   @type equipment :: %{
@@ -47,7 +50,8 @@ defmodule Zone.Player do
                 dimension: 0,
                 sub_layer: 0,
                 mover: :none,
-                move: :none
+                move: :none,
+                chat: %{ring: [], block_until: :none, probation_until: :none, next_shout: :none}
               ]
 
   @type t :: %__MODULE__{
@@ -70,7 +74,8 @@ defmodule Zone.Player do
           sub_layer: 0..5,
           last_good: Zone.Grid.point(),
           mover: :none | Zone.Mover.t(),
-          move: :none | Proto.Packets.ActSomeonemovewalkCmd.t() | Proto.Packets.ActSomeonemoverunCmd.t()
+          move: :none | Proto.Packets.ActSomeonemovewalkCmd.t() | Proto.Packets.ActSomeonemoverunCmd.t(),
+          chat: Zone.Chat.state()
         }
 
   @doc """

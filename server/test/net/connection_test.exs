@@ -336,15 +336,15 @@ defmodule Net.ConnectionTest do
   test "a known but unbuilt opcode on a Zone connection is dropped with one debug line" do
     {listener, port} = listen(QuietHandler, %{}, "Zone")
     {socket, cipher} = connect(port)
-    {chat, cipher} = frame(cipher, <<0x01, 0x20, 0, 0>>)
+    {unbuilt, cipher} = frame(cipher, <<0x03, 0x20, 0, 0>>)
 
     log =
       TestLog.capture(fn ->
-        :ok = :gen_tcp.send(socket, chat)
+        :ok = :gen_tcp.send(socket, unbuilt)
         await(listener, &(&1.window_count == 1))
       end)
 
-    assert log =~ "[debug] Zone: dropped a known but unbuilt packet 0x2001, peer 127.0.0.1:"
+    assert log =~ "[debug] Zone: dropped a known but unbuilt packet 0x2003, peer 127.0.0.1:"
     assert length(String.split(log, "dropped a known")) == 2
     refute log =~ "connection closed"
     nothing(socket)
@@ -357,15 +357,15 @@ defmodule Net.ConnectionTest do
   test "a Login connection closes on an opcode another part knows" do
     {_listener, port} = listen(QuietHandler, %{}, "Login")
     {socket, cipher} = connect(port)
-    {chat, _cipher} = frame(cipher, <<0x01, 0x20, 0, 0>>)
+    {unbuilt, _cipher} = frame(cipher, <<0x03, 0x20, 0, 0>>)
 
     log =
       TestLog.capture(fn ->
-        :ok = :gen_tcp.send(socket, chat)
+        :ok = :gen_tcp.send(socket, unbuilt)
         closed(socket)
       end)
 
-    one_close(log, "[info] Login: connection closed: unknown opcode 0x2001, peer 127.0.0.1:")
+    one_close(log, "[info] Login: connection closed: unknown opcode 0x2003, peer 127.0.0.1:")
   end
 
   test "a packet of the wrong size is dropped and is no sign of life" do

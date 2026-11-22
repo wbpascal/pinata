@@ -125,6 +125,10 @@ defmodule GameData do
   @spec lookup(module(), atom(), term()) :: [struct()]
   def lookup(schema, field, value), do: table(schema).indexes |> Map.fetch!(field) |> Map.get(value, [])
 
+  @doc "Every row of `schema`, in key order. Raises when the table was not loaded."
+  @spec all(module()) :: [struct()]
+  def all(schema), do: for({_key, row} <- Enum.sort(table(schema).rows), do: row)
+
   @doc "The row that `field` of `row` refers to. `:error` when it dangles (possible with `data.strict_references = false`)."
   @spec follow(struct(), atom()) :: {:ok, struct()} | :error
   def follow(%schema{} = row, field) do

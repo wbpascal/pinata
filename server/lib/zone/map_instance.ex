@@ -5,7 +5,8 @@ defmodule Zone.MapInstance do
   The state holds the sight radius (`MapInfo.Sight`; 0 for a map without a row), the NPCs placed from `ShineNPC`
   (`Zone.Npc`, in file order, with their handles) and the shown ones by handle, the grid of every object position
   (`Zone.Grid`, cell size = the sight radius, 1600 when it is 0), the block data (`nil` until the first entry), the
-  players by object handle (`Zone.Player`), the tick count and the tick schedule. A player
+  players by object handle (`Zone.Player`), the chat rules of the map (`Zone.Chat.rules/1`), the tick count and the
+  tick schedule. A player
   gets the next free handle from 8000 to 9499, counting on from the last one given and wrapping to 8000, so a freed
   handle is not reused before the wrap; 1500 players fill the map. A player enters in mode 0 (receives nothing,
   shown to nobody) and is in mode 1 after `login_complete/2`. The instance monitors the connection of each player
@@ -28,6 +29,10 @@ defmodule Zone.MapInstance do
   slice runs the block check and the sight rule (`step/3`); a mover stuck in blocked cells is pulled back to its last
   good position (`0x2013` to the players in sight, `0x204A` to the player). Packets for the requesting player go to
   its connection like all others, so their order holds.
+  Chat (`Zone.Chat`, `docs/technical/flows/chat.md`): `chat/4` checks a line of a player in mode 1 against the map's
+  rules and the player's `chat` state, sends a passed line to the other receivers (the players in sight for normal
+  chat, every player in mode 1 for a shout) and returns the speaker's own packets: its copy of the line, `0x0848`
+  for a spam block, or nothing.
   """
 
   use GenServer
@@ -39,6 +44,7 @@ defmodule Zone.MapInstance do
   alias Proto.Packets.ActSomeonemovewalkCmd
   alias Proto.Packets.ActSomeonestopCmd
   alias Proto.Packets.MapLogoutCmd
+  alias Proto.Packets.MiscChatBlockSpamerBlocktimeCmd
   alias Zone.Mover
 
   require Logger
@@ -122,6 +128,15 @@ defmodule Zone.MapInstance do
   @spec inform(pid(), 8000..9499, non_neg_integer()) :: [struct()]
   def inform(pid, requester, handle), do: GenServer.call(pid, {:inform, requester, handle})
 
+  @doc """
+  A chat line of the player of the handle (`Zone.Chat`): returns the packets for the speaker's own connection (its
+  copy of the line, or `0x0848`, or nothing) and sends the line to the other receivers: the players in sight for
+  `:normal`, every player in mode 1 for `:shout`. `[]` for an unknown handle or a player in mode 0.
+  """
+  @spec chat(pid(), 8000..9499, :normal | :shout, Zone.Chat.line()) :: [struct()]
+  def chat(pid, handle, kind, line) when kind in [:normal, :shout],
+    do: GenServer.call(pid, {:chat, handle, kind, line})
+
   @impl GenServer
   def init({world_id, name, data_dir}) do
     # terminate/2 runs on a supervisor shutdown only when exits are trapped.
@@ -163,6 +178,7 @@ defmodule Zone.MapInstance do
        npc_index: Map.new(shown, &{&1.handle, &1}),
        grid: grid,
        block_data: nil,
+       chat: Zone.Chat.rules(name),
        players: %{},
        next_handle: @first_handle,
        ticks: 0,
@@ -247,6 +263,32 @@ defmodule Zone.MapInstance do
     case state.players do
       %{^requester => %Zone.Player{} = player} -> {:reply, Zone.Sight.inform(view(state), player, handle), state}
       %{} -> {:reply, [], state}
+    end
+  end
+
+  def handle_call({:chat, handle, kind, line}, _from, state) do
+    case state.players do
+      %{^handle => %Zone.Player{mode: 1} = player} ->
+        now = Clock.monotonic_time(:millisecond)
+        {verdict, chat} = Zone.Chat.check(kind, player.chat, player.character.level, state.chat, now)
+        player = %{player | chat: chat}
+        state = put_in(state.players[handle], player)
+
+        case verdict do
+          :pass ->
+            packet = Zone.Chat.packet(kind, player, line)
+            kind |> others(state, player) |> Enum.map(&{&1, [packet]}) |> deliver()
+            {:reply, [packet], state}
+
+          :silent ->
+            {:reply, [], state}
+
+          {:blocked, seconds} ->
+            {:reply, [%MiscChatBlockSpamerBlocktimeCmd{block_time: seconds}], state}
+        end
+
+      %{} ->
+        {:reply, [], state}
     end
   end
 
@@ -467,6 +509,12 @@ defmodule Zone.MapInstance do
 
   # The one "to players in sight" function, at the full radius, for the relays of later issues.
   defp broadcast(state, %Zone.Player{} = sender, packets), do: state |> to_sight(sender, packets) |> deliver()
+
+  # The receivers of a passed line besides the speaker.
+  defp others(:normal, state, player), do: state |> view() |> Zone.Sight.receivers(player)
+
+  defp others(:shout, state, player),
+    do: for({h, %Zone.Player{mode: 1} = p} <- state.players, h != player.handle, do: p)
 
   defp view(state), do: %{radius: state.radius, grid: state.grid, npcs: state.npc_index, players: state.players}
 
