@@ -170,6 +170,7 @@ defmodule SightTest do
       map_type: 0,
       equipment: [],
       address: "127.0.0.1",
+      last_good: {x, y},
       conn: conn
     }
   end

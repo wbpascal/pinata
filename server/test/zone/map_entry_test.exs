@@ -37,6 +37,7 @@ defmodule Zone.MapEntryTest do
         map_type: 0,
         equipment: [],
         address: "172.16.42.231",
+        last_good: {6477, 9844},
         handle: 8000
       },
       fields

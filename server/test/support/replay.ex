@@ -27,11 +27,16 @@ defmodule Replay do
   packet; for state a later issue's packets would create), `timeout:` (ms to wait for a packet, 2000),
   `deferrals:` (per-test additions to `Replay.Deferrals`), `map_names:` (`{module, path}` of server packets that carry
   the map name, added to `Replay.Masks.map_names/0`), `tick_offset:` (ms, 0 or more, added to the first tick of a
-  train, see `TestClock`) and `drop_after:` (packet indices; the harness kills the server side of that connection
-  after the packet and expects the connection to close).
+  train, see `TestClock`), `drop_after:` (packet indices; the harness kills the server side of that connection
+  after the packet and expects the connection to close) and `late_ms:` (ms, default 0: how far the clock may run
+  ahead of a Zone server line that has not arrived).
 
   The test clock is moved to the time of every transcript line on every node of the topology
-  (`Replay.Topology.all/3`); due ticks (`Clock.send_after/3`) fire in order. After every client packet of a Zone
+  (`Replay.Topology.all/3`); due ticks (`Clock.send_after/3`) fire in order. The clock never runs backwards: a line
+  with a time below the clock leaves it where it is. With `late_ms:` a server line of a `zone#` connection whose
+  packet has not arrived gets a heartbeat round trip, then the clock moves on in steps of at most 100 ms and a round
+  trip after each, until the packet is there or the clock ran `late_ms` ahead (tick-driven packets whose ticks the
+  original ran a little later than the capture's line). After every client packet of a Zone
   connection (except a client `0x0804`) the harness runs a heartbeat round trip; the server packets it reads are
   buffered and compared at their own transcript lines.
   """
@@ -63,7 +68,8 @@ defmodule Replay do
         deferrals: [],
         map_names: [],
         tick_offset: 0,
-        drop_after: []
+        drop_after: [],
+        late_ms: 0
       ])
 
     masks = Masks.global() ++ port_masks(opts[:endpoints]) ++ opts[:masks]
@@ -90,6 +96,7 @@ defmodule Replay do
       before: opts[:before],
       timeout: opts[:timeout],
       drop_after: opts[:drop_after],
+      late_ms: opts[:late_ms],
       payload_all: payload_all,
       payload_at: at
     }
@@ -97,7 +104,7 @@ defmodule Replay do
     previous = Application.fetch_env(:pinata, :clock_source)
     Replay.Topology.all(Application, :put_env, [:pinata, :clock_source, TestClock])
     Replay.Topology.all(TestClock, :tick_offset, [opts[:tick_offset]])
-    state = %{clients: %{}, order: [], bound: %{}, last: %{}, pending: %{}}
+    state = %{clients: %{}, order: [], bound: %{}, last: %{}, pending: %{}, clock: 0}
 
     try do
       with {:ok, state} <- walk(packets, state, ctx), do: drain_all(state, ctx)
@@ -144,8 +151,9 @@ defmodule Replay do
   defp walk([], state, _ctx), do: {:ok, state}
 
   defp walk([packet | rest], state, ctx) do
-    Replay.Topology.all(TestClock, :set, [packet.time])
-    state = open(packet, state, ctx)
+    time = max(packet.time, state.clock)
+    Replay.Topology.all(TestClock, :set, [time])
+    state = open(packet, %{state | clock: time}, ctx)
     Map.get(ctx.before, packet.index, fn -> :ok end).()
     state = %{state | last: Map.put(state.last, packet.conn, packet.index)}
 
@@ -311,6 +319,41 @@ defmodule Replay do
   defp step(%{dir: :server, opcode: opcode}, state, _ctx) when opcode in @timer_driven, do: {:ok, state}
 
   defp step(%{dir: :server} = packet, state, ctx) do
+    with {:ok, state} <- late(packet, state, ctx, 0), do: received(packet, state, ctx)
+  end
+
+  defp step(%{dir: :client} = packet, state, ctx) do
+    with {:ok, payload} <- rewrite(packet, state.bound, ctx),
+         {:ok, client} <-
+           send_or_missing(Map.fetch!(state.clients, packet.conn), packet, payload, ctx) do
+      {:ok, put_client(state, packet.conn, client)}
+    end
+  end
+
+  # late_ms: a round trip, then the clock 100 ms on at most, until the packet is there or the clock ran late_ms ahead
+  defp late(packet, state, %{late_ms: late_ms} = ctx, waited) do
+    # no round trip before the seed has arrived
+    zone? = String.starts_with?(packet.conn, "zone#") and Map.fetch!(state.clients, packet.conn).cipher != nil
+
+    if late_ms > 0 and zone? and not pending?(state, packet.conn),
+      do: with({:ok, state} <- round_trip(state, packet, ctx, false), do: later(packet, state, ctx, waited)),
+      else: {:ok, state}
+  end
+
+  defp later(packet, state, ctx, waited) do
+    if pending?(state, packet.conn) or waited >= ctx.late_ms do
+      {:ok, state}
+    else
+      step = min(100, ctx.late_ms - waited)
+      clock = state.clock + step * 1000
+      Replay.Topology.all(TestClock, :set, [clock])
+      late(packet, %{state | clock: clock}, ctx, waited + step)
+    end
+  end
+
+  defp pending?(state, conn), do: Map.get(state.pending, conn, []) != []
+
+  defp received(packet, state, ctx) do
     case take_body(state, packet.conn, ctx.timeout) do
       {:error, reason} ->
         what =
@@ -329,14 +372,6 @@ defmodule Replay do
         ]
 
         {:error, failure(:unexpected, ctx, packet, "unexpected packet", lines)}
-    end
-  end
-
-  defp step(%{dir: :client} = packet, state, ctx) do
-    with {:ok, payload} <- rewrite(packet, state.bound, ctx),
-         {:ok, client} <-
-           send_or_missing(Map.fetch!(state.clients, packet.conn), packet, payload, ctx) do
-      {:ok, put_client(state, packet.conn, client)}
     end
   end
 

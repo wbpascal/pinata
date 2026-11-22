@@ -87,6 +87,32 @@ defmodule Replay.Setups do
   end
 
   @doc """
+  Setup of `re-data/captures/26_11_15_walk-run-portals.md`. The account `admin` and the character `Test1235` with the
+  stored values the capture's 0x0C14 and 0x1038 show (Kingdom Quest place and date, experience, position, HP, SP,
+  money, stones) and the one equipped item of its 0x1047 and 0x1C05 (1250).
+  """
+  @spec walk_run_portals() :: :ok
+  def walk_run_portals do
+    accounts()
+    |> test1235(
+      %{
+        kq_x: 5926,
+        kq_y: 8346,
+        kq_date: ~U[2026-11-15 09:14:46Z],
+        exp: 10,
+        login_x: 5926,
+        login_y: 8346,
+        hp: 3033,
+        sp: 2841,
+        money: 99_999_634_524,
+        hp_stones: 386,
+        sp_stones: 364
+      },
+      [{10, 1250}]
+    )
+  end
+
+  @doc """
   Setup of `re-data/captures/26_11_16_38_session-loss-kicks-char-select.md`. The account `admin` and the three
   characters its first 0x0C14 lists; `Test1235` with the stored values its first 0x1038 shows.
   """

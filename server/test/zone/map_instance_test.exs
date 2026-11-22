@@ -42,6 +42,7 @@ defmodule Zone.MapInstanceTest do
       map_type: 0,
       equipment: [],
       address: "127.0.0.1",
+      last_good: {0, 0},
       conn: conn
     }
   end
@@ -306,5 +307,244 @@ defmodule Zone.MapInstanceTest do
     end)
 
     assert {:ok, ^other} = Zone.MapInstance.whereis(0, "Rou")
+  end
+
+  describe "movement" do
+    alias Proto.Packets.ActMovefailAck
+    alias Proto.Packets.ActReinforceStopCmd
+    alias Proto.Packets.ActSomeonemoverunCmd
+    alias Proto.Packets.ActSomeonemovewalkCmd
+    alias Proto.Packets.ActSomeonestopCmd
+    alias Proto.Packets.BriefinfoBriefinfodeleteCmd
+    alias Proto.Packets.BriefinfoLogincharacterCmd
+
+    # 64 x 512 bytes = 3200 x 3200 units; a lattice at x 1500 to 1699 (free only where both cell numbers are odd) and a
+    # solid wall at x 2000 to 2199
+    setup %{tmp_dir: tmp_dir} do
+      blocked? = fn cx, cy ->
+        (cx in 240..271 and not (rem(cx, 2) == 1 and rem(cy, 2) == 1)) or cx in 320..351
+      end
+
+      rows =
+        for cy <- 0..511, byte <- 0..63, into: <<>> do
+          <<Enum.sum(for i <- 0..7, blocked?.(byte * 8 + i, cy), do: Bitwise.bsl(1, i))>>
+        end
+
+      File.mkdir_p!(Path.join(tmp_dir, "BlockInfo"))
+      File.write!(Path.join(tmp_dir, "BlockInfo/Rou.shbd"), <<64::little-32, 512::little-32>> <> rows)
+
+      Application.put_env(:pinata, :clock_source, TestClock)
+      TestClock.set(1_000_000)
+
+      on_exit(fn ->
+        Application.delete_env(:pinata, :clock_source)
+        TestClock.reset()
+      end)
+
+      pid = start("Rou", tmp_dir)
+      %{pid: pid, radius: :sys.get_state(pid).radius}
+    end
+
+    # a connection stub that forwards its packets tagged
+    defp conn(tag) do
+      test = self()
+
+      spawn_link(fn ->
+        relay = fn relay ->
+          receive do
+            {:cluster, {:packets, packets}} ->
+              send(test, {tag, packets})
+              relay.(relay)
+          end
+        end
+
+        relay.(relay)
+      end)
+    end
+
+    defp in_world!(pid, tag, {x, y}) do
+      p = %{player(conn(tag)) | x: x, y: y, last_good: {x, y}}
+      {:ok, handle} = Zone.MapInstance.enter(pid, p)
+      {:ok, _} = Zone.MapInstance.login_complete(pid, handle)
+      handle
+    end
+
+    # the packets of the stub since the last call, NPC appears left out
+    defp got(pid, tag) do
+      _ = :sys.get_state(pid)
+      Process.sleep(20)
+      collect(tag, [])
+    end
+
+    defp collect(tag, acc) do
+      receive do
+        {^tag, packets} -> collect(tag, acc ++ Enum.reject(packets, &npc?/1))
+      after
+        0 -> acc
+      end
+    end
+
+    defp npc?(packet),
+      do: match?(%Proto.Packets.BriefinfoRegenmobCmd{}, packet) or match?(%Proto.Packets.BriefinfoMobCmd{}, packet)
+
+    defp clock(ms), do: TestClock.set(ms * 1000)
+
+    defp two!(pid, pos \\ {1400, 1003}) do
+      me = in_world!(pid, :me, pos)
+      {x, y} = pos
+      _observer = in_world!(pid, :obs, {x, y + 200})
+      clock(5000)
+      _ = got(pid, :me) ++ got(pid, :obs)
+      me
+    end
+
+    defp at(pid, h) do
+      {:ok, p} = Zone.MapInstance.player(pid, h)
+      p
+    end
+
+    test "an accepted run goes to the players in sight, not to the mover", %{pid: pid} do
+      me = two!(pid)
+      assert :ok = Zone.MapInstance.move(pid, me, :run, {1400, 1003}, {1450, 1003})
+
+      move = %ActSomeonemoverunCmd{
+        handle: me,
+        from_x: 1400,
+        from_y: 1003,
+        to_x: 1450,
+        to_y: 1003,
+        speed: 127,
+        moveattr: 0
+      }
+
+      assert got(pid, :obs) == [move]
+      assert got(pid, :me) == []
+      assert %{dir: 45, mover: %Zone.Mover{duration: 393}} = at(pid, me)
+      clock(5500)
+      assert %{x: 1450, y: 1003, mover: :none, move: ^move} = at(pid, me)
+    end
+
+    test "an accepted walk relays 0x2018 at speed 33", %{pid: pid} do
+      me = two!(pid)
+      assert :ok = Zone.MapInstance.move(pid, me, :walk, {1400, 1003}, {1400, 1050})
+
+      assert [%ActSomeonemovewalkCmd{from_x: 1400, from_y: 1003, to_x: 1400, to_y: 1050, speed: 33, moveattr: 0}] =
+               got(pid, :obs)
+    end
+
+    test "from == to is refused with the server position; a running mover keeps running", %{pid: pid} do
+      me = two!(pid)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1400, 1003}, {1450, 1003})
+      _ = got(pid, :obs)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1420, 1003}, {1420, 1003})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1400, y: 1003}]
+      assert got(pid, :obs) == []
+      assert %{mover: %Zone.Mover{}} = at(pid, me)
+    end
+
+    test "from 200 units away is refused (dist² 40 001), 40 000 is accepted", %{pid: pid} do
+      me = two!(pid)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1600, 1004}, {1450, 1003})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1400, y: 1003}]
+      :ok = Zone.MapInstance.move(pid, me, :run, {1600, 1003}, {1450, 1003})
+      assert got(pid, :me) == []
+      assert [%ActSomeonemoverunCmd{}] = got(pid, :obs)
+    end
+
+    test "a target without a free cell is refused: inside the wall, outside the map", %{pid: pid} do
+      me = two!(pid, {1900, 1003})
+      :ok = Zone.MapInstance.move(pid, me, :run, {1900, 1003}, {2100, 1003})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1900, y: 1003}]
+      :ok = Zone.MapInstance.move(pid, me, :run, {1900, 1003}, {4_000_000_000, 0})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1900, y: 1003}]
+      assert got(pid, :obs) == []
+    end
+
+    test "a current position without a free cell is refused", %{pid: pid} do
+      me = two!(pid, {2100, 1003})
+      :ok = Zone.MapInstance.move(pid, me, :run, {2100, 1003}, {2300, 1003})
+      assert got(pid, :me) == [%ActMovefailAck{x: 2100, y: 1003}]
+    end
+
+    test "a line through the wall is refused", %{pid: pid} do
+      me = two!(pid, {1900, 1000})
+      :ok = Zone.MapInstance.move(pid, me, :run, {1900, 1000}, {2300, 1000})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1900, y: 1000}]
+      assert got(pid, :obs) == []
+    end
+
+    test "a stop in the middle of a slice stops at the millisecond", %{pid: pid} do
+      me = two!(pid)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1400, 1003}, {1450, 1003})
+      _ = got(pid, :obs)
+      clock(5137)
+      :ok = Zone.MapInstance.stop(pid, me, {1410, 1003})
+      x = 1400 + div(50 * 137, 393)
+      assert got(pid, :obs) == [%ActSomeonestopCmd{handle: me, x: x, y: 1003}]
+      assert got(pid, :me) == []
+      assert %{x: ^x, y: 1003, mover: :none, move: :none} = at(pid, me)
+    end
+
+    test "a refused stop: 200 units away and inside the wall; the mover keeps running", %{pid: pid} do
+      me = two!(pid, {1900, 1003})
+      :ok = Zone.MapInstance.move(pid, me, :run, {1900, 1003}, {1950, 1003})
+      _ = got(pid, :obs)
+      :ok = Zone.MapInstance.stop(pid, me, {1900, 1204})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1900, y: 1003}]
+      :ok = Zone.MapInstance.stop(pid, me, {2010, 1003})
+      assert got(pid, :me) == [%ActMovefailAck{x: 1900, y: 1003}]
+      assert got(pid, :obs) == []
+      assert %{mover: %Zone.Mover{}} = at(pid, me)
+    end
+
+    test "a stop while standing relays 0x2013", %{pid: pid} do
+      me = two!(pid)
+      :ok = Zone.MapInstance.stop(pid, me, {1400, 1003})
+      assert got(pid, :obs) == [%ActSomeonestopCmd{handle: me, x: 1400, y: 1003}]
+    end
+
+    test "a mover stuck in blocked cells is pulled back: 0x2013 to sight, 0x204A to the player", %{pid: pid} do
+      me = two!(pid)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1400, 1003}, {1800, 1003})
+      _ = got(pid, :obs)
+      clock(8000)
+      assert %{x: x, y: 1003, mover: :none, move: :none} = at(pid, me)
+      assert x < 1500
+      assert got(pid, :obs) == [%ActSomeonestopCmd{handle: me, x: x, y: 1003}]
+      assert got(pid, :me) == [%ActReinforceStopCmd{x: x, y: 1003}]
+    end
+
+    test "a player that comes into sight on a step gets the appear at the position before the step", %{
+      pid: pid,
+      radius: r
+    } do
+      me = in_world!(pid, :me, {1400, 1003})
+      far = in_world!(pid, :far, {1400, 1003 + r + 20})
+      clock(5000)
+      _ = got(pid, :me) ++ got(pid, :far)
+      :ok = Zone.MapInstance.move(pid, me, :walk, {1400, 1003}, {1400, 1150})
+      clock(6000)
+
+      assert [%BriefinfoLogincharacterCmd{handle: ^me, x: 1400} = brief, %ActSomeonemovewalkCmd{} = m] = got(pid, :far)
+      # the last position out of sight
+      assert brief.y > 1003 and brief.y <= 1023
+      assert {m.from_x, m.from_y, m.to_y} == {1400, brief.y, 1150}
+      assert [%BriefinfoLogincharacterCmd{handle: ^far}] = got(pid, :me)
+      # walking back out of sight: 0x1C0E both ways
+      :ok = Zone.MapInstance.move(pid, me, :walk, {1400, 1036}, {1400, 1003})
+      clock(7000)
+      assert [_relay, %BriefinfoBriefinfodeleteCmd{handle: ^me}] = got(pid, :far)
+      assert [%BriefinfoBriefinfodeleteCmd{handle: ^far}] = got(pid, :me)
+    end
+
+    test "an unknown handle and a mode-0 player", %{pid: pid} do
+      assert {:error, :not_entered} = Zone.MapInstance.move(pid, 9000, :run, {1, 1}, {2, 2})
+      assert {:error, :not_entered} = Zone.MapInstance.stop(pid, 9000, {1, 1})
+      {:ok, hidden} = Zone.MapInstance.enter(pid, %{player(conn(:hidden)) | x: 1400, y: 1003, last_good: {1400, 1003}})
+      assert :ok = Zone.MapInstance.move(pid, hidden, :run, {1400, 1003}, {1400, 1003})
+      assert :ok = Zone.MapInstance.stop(pid, hidden, {1400, 1003})
+      assert got(pid, :hidden) == []
+      assert %{mover: :none, move: :none} = at(pid, hidden)
+    end
   end
 end

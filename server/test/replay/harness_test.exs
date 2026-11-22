@@ -111,6 +111,10 @@ defmodule Replay.HarnessTest do
       {state, []}
     end
 
+    # seed 2: a reply whose token is the clock
+    def handle_packet(state, %MiscSeedAck{seed: 2}),
+      do: {state, [{:send, %Reply{code: 1, token: rem(Clock.system_time(:millisecond), 4_294_967_296), handle: 7}}]}
+
     @impl Net.Handler
     def handle_info(state, {:cluster, :tick}) do
       Clock.send_after(self(), {:cluster, :tick}, 100)
@@ -291,6 +295,17 @@ defmodule Replay.HarnessTest do
           "0100\n100.650000 login#1 S 0x7F01 0100efbeadde0700\n100.750000 login#1 S 0x7F01 0100efbeadde0700"
 
       assert run(Ticker, shifted, sync_after: [2], tick_offset: 50) == :ok
+    end
+
+    test "late_ms lets the clock run ahead of a Zone line that has not arrived, and never back" do
+      # the tick of 100.6 s is captured 50 ms before it
+      early = "100.500000 zone#1 C 0x0807 0100\n100.550000 zone#1 S 0x7F01 0100efbeadde0700"
+      assert {:error, %Failure{kind: :missing}} = run(Ticker, early, conns: ["zone#1"])
+      assert run(Ticker, early, conns: ["zone#1"], late_ms: 100) == :ok
+
+      # the clock ran one step of 100 ms to 100.65 s; a later line at 100.56 s leaves it there: 100 650 ms = 0x0001892a
+      back = "\n100.560000 zone#1 C 0x0807 0200\n100.570000 zone#1 S 0x7F01 01002a8901000700"
+      assert run(Ticker, early <> back, conns: ["zone#1"], late_ms: 100) == :ok
     end
 
     test "TestClock.reset delivers the pending timers and erases the offset" do

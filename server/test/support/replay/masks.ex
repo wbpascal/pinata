@@ -53,6 +53,10 @@ defmodule Replay.Masks do
            "uninitialised memory (Z09-B54): the original never writes the first byte, the rebuild sends 0"},
           {Proto.Packets.ActSomeonewhisperCmd, :flag,
            "uninitialised memory (P02-B29): the original leaves bits 1 to 7 of the flag as its stack held them, the rebuild sends 0; the mask covers the whole byte, so the GM colour bit is not compared"},
+          {Proto.Packets.ActSomeonemovewalkCmd, :moveattr,
+           "uninitialised memory (Z02-B2): the original leaves the move attributes as its buffer held them except bit 0, the rebuild sends 0"},
+          {Proto.Packets.ActSomeonemoverunCmd, :moveattr,
+           "uninitialised memory (Z02-B2): the original leaves the move attributes as its buffer held them except bit 0, the rebuild sends 0"},
           {Proto.Packets.ActWhispersuccessAck, :item_link_count,
            "uninitialised memory (W04-B4): the original never writes the count of the empty-whisper echo, the rebuild sends 0; the mask covers the count of every 0x200F, which test/whisper_test.exs checks instead"}
         ]
@@ -110,7 +114,11 @@ defmodule Replay.Masks do
       {Proto.Packets.MapLogoutCmd, :handle, :object, "object handle: the player that left the map"},
       {Proto.Packets.BriefinfoInformCmd, :my_handle, :object,
        "object handle: the client sends its own handle of 0x1802"},
-      {Proto.Packets.BriefinfoInformCmd, :handle, :object, "object handle: the client sends back a handle it was shown"}
+      {Proto.Packets.BriefinfoInformCmd, :handle, :object,
+       "object handle: the client sends back a handle it was shown"},
+      {Proto.Packets.ActSomeonemovewalkCmd, :handle, :object, "object handle: the object that walks"},
+      {Proto.Packets.ActSomeonemoverunCmd, :handle, :object, "object handle: the object that runs"},
+      {Proto.Packets.ActSomeonestopCmd, :handle, :object, "object handle: the object that stopped"}
     ]
 
   defp brief_handles do

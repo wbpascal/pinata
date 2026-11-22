@@ -29,11 +29,21 @@ defmodule Zone.Handler do
   of an object (`Zone.MapInstance.inform/3`); the client's own handle field is ignored and an object out of sight,
   unknown or the requester itself gets no answer. The packets the map instance pushes for this player
   (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`) are sent in the world and dropped before.
+
+  Movement (flow: `docs/technical/flows/movement.md`): in the world, `0x2017` walk, `0x2019` run and `0x2012` stop go
+  to the map instance (`Zone.MapInstance.move/5`, `stop/3`), which checks them against the server position and the
+  block data. Every answer (`0x201B`, `0x204A`) and every packet for this player comes as
+  `{:cluster, {:packets, packets}}`; the map sends them before it replies, so the connection takes them from its
+  mailbox right after the call and sends them before it reads the next frame (a heartbeat in the same TCP read would
+  otherwise be answered first). Before the world these packets get no answer.
   """
 
   @behaviour Net.Handler
 
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.ActMoverunCmd
+  alias Proto.Packets.ActMovewalkCmd
+  alias Proto.Packets.ActStopReq
   alias Proto.Packets.BriefinfoInformCmd
   alias Proto.Packets.CharLogoutcancelCmd
   alias Proto.Packets.CharLogoutreadyCmd
@@ -101,6 +111,15 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %BriefinfoInformCmd{handle: h}),
     do: {state, [{:perform, {:inform, state.map, p.handle, h}}]}
 
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActMovewalkCmd{} = m),
+    do: {state, [{:perform, {:move, state.map, p.handle, :walk, {m.from_x, m.from_y}, {m.to_x, m.to_y}}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActMoverunCmd{} = m),
+    do: {state, [{:perform, {:move, state.map, p.handle, :run, {m.from_x, m.from_y}, {m.to_x, m.to_y}}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActStopReq{x: x, y: y}),
+    do: {state, [{:perform, {:stop, state.map, p.handle, {x, y}}}]}
+
   def handle_packet(state, _packet), do: {state, []}
 
   @impl Net.Handler
@@ -142,6 +161,8 @@ defmodule Zone.Handler do
     do: {state, [{:close, :warning, "map login complete failed: not on the map"}]}
 
   def handle_info(state, {:informed, packets}), do: {state, for(p <- packets, do: {:send, p})}
+
+  def handle_info(state, {:moved, packets}), do: {state, for(p <- packets, do: {:send, p})}
 
   # a player not yet in the world (mode 0) receives nothing
   def handle_info(%__MODULE__{step: :in_world} = state, {:cluster, {:packets, packets}}),
@@ -242,6 +263,21 @@ defmodule Zone.Handler do
   def perform({:leave, map, player, entered_at}), do: {:left, leave(map, player, entered_at)}
 
   def perform({:inform, map, own, handle}), do: {:informed, Zone.MapInstance.inform(map, own, handle)}
+
+  def perform({:move, map, own, kind, from, to}), do: moved(Zone.MapInstance.move(map, own, kind, from, to))
+
+  def perform({:stop, map, own, loc}), do: moved(Zone.MapInstance.stop(map, own, loc))
+
+  # the packets the map instance sent this connection before its reply (one sender: they are in the mailbox)
+  defp moved(_result), do: {:moved, pushed([])}
+
+  defp pushed(acc) do
+    receive do
+      {:cluster, {:packets, packets}} -> pushed(acc ++ packets)
+    after
+      0 -> acc
+    end
+  end
 
   defp auto_save_timer,
     do: Process.send_after(self(), {:timer, :auto_save}, Application.get_env(:pinata, :auto_save_ms, 600_000))

@@ -34,16 +34,6 @@ defmodule Replay.Milestone2Test.Unbuilt.GameoptionCmd do
   def opcode, do: 0x7034
 end
 
-defmodule Replay.Milestone2Test.Unbuilt.ActSomeoneMoveWalkCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x2018
-end
-
-defmodule Replay.Milestone2Test.Unbuilt.ActSomeoneMoveRunCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x201A
-end
-
 defmodule Replay.Milestone2Test.Unbuilt.BatAbstateresetCmd do
   @spec opcode() :: 0..0xFFFF
   def opcode, do: 0x2428
@@ -82,7 +72,8 @@ defmodule Replay.Milestone2Test do
       endpoints: Replay.Topology.endpoints(),
       deferrals: opts[:deferrals] || [],
       close_after: opts[:close_after] || [],
-      drop_after: opts[:drop_after] || []
+      drop_after: opts[:drop_after] || [],
+      late_ms: opts[:late_ms] || 0
     )
   end
 
@@ -113,9 +104,9 @@ defmodule Replay.Milestone2Test do
        appear: [{P.BriefinfoRegenmobCmd, :handle, :mob_id}],
        lists: [{P.BriefinfoMobCmd, :mobs, :handle, :mob_id, 28}],
        gone: [{P.BriefinfoBriefinfodeleteCmd, :handle}],
-       about: [],
+       about: [{P.ActSomeonemovewalkCmd, :handle}, {P.ActSomeonemoverunCmd, :handle}, {P.ActSomeonestopCmd, :handle}],
        npc?: &__MODULE__.npc?/2
-     }, 4, "the monsters of the map (mobs); the NPC elements of 0x1C09 are compared"},
+     }, 4, "the monsters of the map and their moves (mobs); the NPC elements of 0x1C09 are compared"},
     {:absent, U.BatAbstateinformNoeffectCmd, 4, "the abstates 345 and 291 of the captured character (abstates)"},
     {:absent, U.BatAbstateinformCmd, 4, "the title abstates and abstate 728 (abstates)"},
     {:absent, U.BriefinfoAbstateChangeCmd, 4, "the abstates of the captured character (abstates)"},
@@ -140,12 +131,8 @@ defmodule Replay.Milestone2Test do
 
   @prison_race "order race of the original: its 0x7C07 comes between 0x7005 and 0x700D; the rebuild answers in request order (test/map_entry_test.exs)"
   @kq_race "order race of the original (its 0x581C comes after the WorldManager burst) and the Kingdom Quest list 0x581D (Kingdom Quest); the answer is checked by test/map_entry_test.exs"
-  @mob_moves "mob moves (mobs, milestone 4); issue 110 defines the packets and must narrow this to a :mobs deferral"
-
-  # Behind a map entry: mob moves, abstate resets and the Kingdom Quest notices.
+  # Behind a map entry: abstate resets and the Kingdom Quest notices (mob moves are in the :mobs deferral).
   @in_world [
-    {:absent, U.ActSomeoneMoveWalkCmd, 4, @mob_moves},
-    {:absent, U.ActSomeoneMoveRunCmd, 4, @mob_moves},
     {:absent, U.BatAbstateresetCmd, 4, "the reset of abstate 291 (abstates)"},
     {:absent, U.KqListUpdateAck, 10, "the Kingdom Quest list updates (Kingdom Quest)"},
     {:absent, U.KqJoiningAlarmCmd, 10, "the Kingdom Quest joining alarm (Kingdom Quest)"}
@@ -153,7 +140,8 @@ defmodule Replay.Milestone2Test do
 
   # Behind the map entry (140): mob moves (milestone 4), the reset of abstate 291 with its 0x1035 at 145 and 146
   # (milestone 4), the expiry of the pick-up mini-mon at 161 to 168 (milestones 3 and 9), the Kingdom Quest notices
-  # (milestone 10) and the leave: 0x2012, 0x1071 and the option saves get no answer, 0x0C18 {0} ends the session.
+  # (milestone 10) and the leave: 0x2012 (a stop, relayed to nobody in sight), 0x1071 and the option saves get no
+  # answer, 0x0C18 {0} ends the session.
   @idle_deferrals @deferrals ++
                     @in_world ++
                     [
@@ -203,8 +191,8 @@ defmodule Replay.Milestone2Test do
   # Steps 1 to 5 of the scenario up to the first &getmoney. Closed by the client: 144 (zone#1, 1 s after 0x0C18 {1}),
   # 154 (wm#1 after 0x0C34), 164, 405 and 415 (Login connections that ended with 0x0C18 {0}), 718 and 722 (the killed
   # client, zone#4 and wm#4). Dropped: zone#2 and zone#3 at their last played line, for the capture's server-side
-  # resets at 292.5 s and 423.4 s. 0x2001 (&adminlevel), 0x2012 and 0x2019 are sent; the server drops them (issues
-  # 116 and 110).
+  # resets at 292.5 s and 423.4 s. 0x2001 (&adminlevel) is sent and dropped (issue 116); 0x2012 and 0x2019 are
+  # handled and answer nothing (no other player in sight, no refusal).
   test "26_11_16_38_session-loss-kicks-char-select",
     do:
       replay(
@@ -214,5 +202,34 @@ defmodule Replay.Milestone2Test do
         deferrals: @session_loss_deferrals,
         close_after: [144, 154, 164, 405, 415, 718, 722],
         drop_after: [386, 547]
+      )
+
+  @walk_run_deferrals @deferrals ++
+                        @in_world ++
+                        [
+                          {:unsent, 44, [47], 2, @prison_race},
+                          {:unsent, 49, [54, 55, 56, 57], 10, @kq_race},
+                          {:unsent, 58, [124], 2, @inventory_race},
+                          {:unsent, 59, [131], 2, @inventory_race},
+                          {:absent, [139, 172, 173], 4,
+                           "the late 0x1035 of the abstate reset (parameters); the built one at 127 stays"},
+                          {:unsent, 222, [223], 4, "0x2401 target select and its 0x2402 (combat)"},
+                          {:unsent, 224, [225, 227], 3,
+                           "0x200A NPC click with 0x243D and the menu 0x201C (NPC menus); the town portal is issue 112"}
+                        ]
+
+  # zone#1 walks and runs through RouN: every 0x2017, 0x2019 and 0x2012 is played (no refusal, nothing relayed: no
+  # other player), the NPCs that come into sight appear with 0x1C08 on the tick; the mob moves are in the :mobs
+  # deferral. late_ms: 200 because the original handled each move 5 to 60 ms after its capture time and ticked at its
+  # own phase, so a tick-driven appear can lie before the tick that sends it here; without it the replay fails at the
+  # first NPC appear (146) for every tick phase, with it it passes for all (testing.md, "Clock").
+  test "26_11_15_walk-run-portals",
+    do:
+      replay(
+        "26_11_15_walk-run-portals",
+        :walk_run_portals,
+        {:cut, 73.8, "the town portal 0x181A and the map change (issue 112)"},
+        deferrals: @walk_run_deferrals,
+        late_ms: 200
       )
 end

@@ -53,6 +53,7 @@ defmodule Zone.SightTest do
         map_type: 0,
         equipment: [],
         address: "127.0.0.1",
+        last_good: {x, y},
         handle: handle,
         mode: 1
       },
@@ -173,8 +174,9 @@ defmodule Zone.SightTest do
       v = view([a, b])
       moved = %{a | x: 5600}
 
+      # the mover's appear carries its position before the step (capture 45)
       assert deliveries(Sight.step(v, a, {5600, 5000})) == [
-               {8001, [Sight.brief(moved)]},
+               {8001, [Sight.brief(a)]},
                {8000, [Sight.brief(b)]}
              ]
 
@@ -212,6 +214,29 @@ defmodule Zone.SightTest do
       b = player(8001, 6500, 5000, %{mode: 0})
       assert Sight.step(view([a, b]), a, {5600, 5000}) == []
       assert Sight.step(view([%{a | mode: 0}, %{b | mode: 1}]), %{a | mode: 0}, {5600, 5000}) == []
+    end
+
+    test "the appear of a moving player is its 0x1C06 and its move packet from the position before the step" do
+      move = %Proto.Packets.ActSomeonemoverunCmd{
+        handle: 8000,
+        from_x: 4000,
+        from_y: 5000,
+        to_x: 6000,
+        to_y: 5000,
+        speed: 127,
+        moveattr: 0
+      }
+
+      a = player(8000, 5000, 5000, %{move: move})
+      b = player(8001, 6500, 5000)
+
+      resent = %{move | from_x: 5000}
+
+      assert [{8001, [%BriefinfoLogincharacterCmd{x: 5000}, ^resent]}, {8000, [_]}] =
+               deliveries(Sight.step(view([a, b]), a, {5600, 5000}))
+
+      assert Sight.appear(a) == [Sight.brief(a), %{move | from_x: 5000}]
+      assert Sight.inform(view([a, b]), %{b | x: 5100}, 8000) == [Sight.brief(a), %{move | from_x: 5000}]
     end
 
     test "a hidden mover (sub-layer 3) gets the other's appear, the other gets nothing" do
