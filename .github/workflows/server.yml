@@ -250,3 +250,93 @@ jobs:
       - name: Stop
         if: always()
         run: docker compose down -v
+
+  # The release with OpenTelemetry: export off opens nothing and logs nothing; export on reaches a real Collector.
+  otel-smoke:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: server
+    env:
+      MIX_ENV: test
+      R: _build/prod/rel/pinata
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Data set (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - run: mix deps.get
+
+      - run: MIX_ENV=prod mix release
+
+      - run: $R/bin/pinata eval "GameData.Release.import_data(~S($GITHUB_WORKSPACE/Files/Server/2016/9Data), ~s(data))"
+
+      - name: Export off
+        run: |
+          set -euo pipefail
+          OTEL_TRACES_EXPORTER=otlp $R/bin/pinata start > "$RUNNER_TEMP/off.out" 2>&1 &
+          for i in $(seq 60); do
+            if (echo > /dev/tcp/127.0.0.1/9010) 2> /dev/null; then break; fi
+            if [ "$i" = 60 ]; then echo "Login does not listen on 9010"; exit 1; fi
+            sleep 2
+          done
+          $R/bin/pinata rpc 'IO.inspect(Enum.sort(for {a, _, _} <- Application.started_applications(), a in [:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter], do: a))' | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
+          $R/bin/pinata rpc "Pinata.Figures.print()" | grep -F "Packet handling time"
+          $R/bin/pinata stop
+          ! grep -E 'OTLP|opentelemetry|CA\(s\)' "$RUNNER_TEMP/off.out"
+
+      - name: Collector
+        run: docker run -d --name otelcol -p 4318:4318 -v "$PWD/test/support/otel-collector.yaml:/etc/otelcol/config.yaml:ro" otel/opentelemetry-collector:0.119.0
+
+      - name: Export on
+        run: |
+          set -euo pipefail
+          printf '[telemetry]\notlp_enabled = true\ntrace_ratio = 1.0\n' > otel.toml
+          PINATA_CONFIG=otel.toml $R/bin/pinata start > "$RUNNER_TEMP/on.out" 2>&1 &
+          for i in $(seq 60); do
+            if (echo > /dev/tcp/127.0.0.1/9010) 2> /dev/null; then break; fi
+            if [ "$i" = 60 ]; then echo "Login does not listen on 9010"; exit 1; fi
+            sleep 2
+          done
+          $R/bin/pinata rpc 'IO.inspect(Enum.sort(for {a, _, _} <- Application.started_applications(), a in [:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter], do: a))' | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
+          printf 'smoke-password\n' | $R/bin/pinata eval 'Persistence.Release.create_account("smoke")'
+          mix run --no-start test/support/smoke.exs 9010
+          $R/bin/pinata rpc '{:ok, p} = Zone.MapInstance.whereis(0, ~s(Rou)); :ok = Zone.MapInstance.enter(p, :otel_smoke)'
+          sleep 2
+          $R/bin/pinata rpc ':otel_tracer_provider.force_flush(); :otel_meter_server.force_flush()'
+          grep -F "Pinata: OpenTelemetry export on" "$RUNNER_TEMP/on.out"
+          $R/bin/pinata stop
+
+      - name: Collector received
+        run: |
+          for i in $(seq 15); do
+            docker logs otelcol > "$RUNNER_TEMP/otelcol.out" 2>&1
+            if grep -qF pinata.packet.duration "$RUNNER_TEMP/otelcol.out" &&
+              grep -qF pinata.tick.duration "$RUNNER_TEMP/otelcol.out" &&
+              grep -qE 'Name +: pinata\.packet *$' "$RUNNER_TEMP/otelcol.out"; then exit 0; fi
+            sleep 2
+          done
+          echo "the Collector did not receive the span pinata.packet and both metrics"
+          exit 1
+
+      - name: Node and Collector output
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP/off.out" "$RUNNER_TEMP/on.out" || true
+          docker logs otelcol || true
+
+      - name: Stop the Collector
+        if: always()
+        run: docker rm -f otelcol || true

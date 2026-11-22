@@ -6,6 +6,9 @@ defmodule Replay.Masks do
   reason}` is a field whose value the server picks anew in each run; the harness maps the captured value to the
   received one. A path is a field name or a list of names through nested structs and arrays. Every entry needs a
   reason. Ranges are whole bytes, a `bits` field masks its whole byte.
+
+  The handle namespace `:object` is bound per map (the map of a connection comes from `map_names/0`); `0xFFFF` in
+  a 2-byte `:object` field means "no object" and passes unmapped. Every other namespace is global.
   """
 
   @type path :: atom() | [atom()]
@@ -64,6 +67,11 @@ defmodule Replay.Masks do
       {Proto.Packets.AvatarCreatesuccAck, [:avatars, :chrregnum], :character,
        "identifier: the character number comes from the database sequence"}
     ]
+
+  # The Zone entry packet with the captured map name is added by the issue that defines it.
+  @doc "The server packets whose field is the map name a connection is on."
+  @spec map_names() :: [{module(), path()}]
+  def map_names, do: []
 
   @doc "Raises `ArgumentError` for an empty reason or a first path element that is not a field of the packet."
   @spec validate!([mask() | handle()]) :: :ok

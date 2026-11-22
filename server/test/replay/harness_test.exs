@@ -37,6 +37,27 @@ defmodule Replay.HarnessTest do
     array :items, Item, count: :u8
   end
 
+  defmodule Enter do
+    @moduledoc false
+    use Proto.Packet, opcode: 0x7F03
+
+    field :map, {:char, 12}
+  end
+
+  defmodule Gone do
+    @moduledoc false
+    use Proto.Packet, opcode: 0x7F04
+
+    field :handle, :u16
+  end
+
+  defmodule About do
+    @moduledoc false
+    use Proto.Packet, opcode: 0x7F05
+
+    field :handle, :u16
+  end
+
   defmodule Stub do
     @moduledoc false
     @behaviour Net.Handler
@@ -76,36 +97,104 @@ defmodule Replay.HarnessTest do
       do: {state, [{:send, %Reply{code: 1, token: 0, handle: rem(seed + 1, 65_536)}}]}
   end
 
+  # schedules a tick through Clock.send_after/3; each tick sends one reply and schedules the next
+  defmodule Ticker do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, %MiscSeedAck{seed: 1}) do
+      Clock.send_after(self(), {:cluster, :tick}, 100)
+      {state, []}
+    end
+
+    @impl Net.Handler
+    def handle_info(state, {:cluster, :tick}) do
+      Clock.send_after(self(), {:cluster, :tick}, 100)
+      {state, [{:send, %Reply{code: 1, token: 0xDEADBEEF, handle: 7}}]}
+    end
+  end
+
+  # the token is the clock at the moment the packet is handled
+  defmodule Tokener do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, %MiscSeedAck{seed: 1}),
+      do: {state, [{:send, %Reply{code: 1, token: rem(Clock.system_time(:millisecond), 4_294_967_296), handle: 7}}]}
+  end
+
+  # answers, then closes the connection
+  defmodule Refuser do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, %MiscSeedAck{seed: 1}),
+      do: {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}, {:close, :info, "bye"}]}
+  end
+
+  # a seed of 10, 11 or 12 enters a map; the handle of a later reply depends on the map entered
+  defmodule Maps do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    @impl Net.Handler
+    def init(_settings), do: %{base: 0}
+
+    @impl Net.Handler
+    def handle_packet(state, %MiscSeedAck{seed: 10}), do: {%{state | base: 100}, [{:send, %Enter{map: "A"}}]}
+    def handle_packet(state, %MiscSeedAck{seed: 11}), do: {%{state | base: 200}, [{:send, %Enter{map: "B"}}]}
+    def handle_packet(state, %MiscSeedAck{seed: 12}), do: {%{state | base: 300}, [{:send, %Enter{map: "A"}}]}
+
+    def handle_packet(state, %MiscSeedAck{seed: 1}),
+      do: {state, [{:send, %Reply{code: 1, token: 0, handle: state.base}}]}
+  end
+
   @limits %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576}
 
   setup do
-    on_exit(fn -> :persistent_term.erase({TestClock, :now}) end)
+    on_exit(fn ->
+      TestClock.reset()
+      :persistent_term.erase({TestClock, :now})
+    end)
   end
 
   defp listen(handler) do
     pid = start_supervised!({Net.Listener, {"Net", handler, 0, %{connection: @limits}}})
     {:ok, {_address, port}} = ThousandIsland.listener_info(pid)
-    %{"login" => {~c"127.0.0.1", port}}
+    %{"login" => {~c"127.0.0.1", port}, "zone" => {~c"127.0.0.1", port}}
   end
 
-  defp transcript(lines) do
-    Transcript.parse!(
-      "# transcript of handwritten.pcapng\n# start 100.000000\n100.000000 login#1 S 0x0807 6301\n" <> lines <> "\n"
-    )
+  # one seed line per connection first
+  defp transcript(lines, conns \\ ["login#1"]) do
+    seeds = for conn <- conns, do: "100.000000 #{conn} S 0x0807 6301\n"
+    Transcript.parse!("# transcript of handwritten.pcapng\n# start 100.000000\n" <> Enum.join(seeds) <> lines <> "\n")
   end
 
   defp run(handler, lines, opts \\ []) do
+    {conns, opts} = Keyword.pop(opts, :conns, ["login#1"])
     endpoints = listen(handler)
-    Replay.run(transcript(lines), Keyword.merge([stop: :end, endpoints: endpoints, timeout: 200], opts))
+    Replay.run(transcript(lines, conns), Keyword.merge([stop: :end, endpoints: endpoints, timeout: 200], opts))
   end
 
   @trigger "100.500000 login#1 C 0x0807 "
   @reply "100.600000 login#1 S 0x7F01 "
 
-  test "pass, and the clock is moved to the capture time" do
+  test "pass, and the clock is moved to the capture time of every line, server lines too" do
     assert run(Stub, @trigger <> "0100\n" <> @reply <> "0100efbeadde0700", masks: [{Reply, :token, "test"}]) == :ok
-    assert :persistent_term.get({TestClock, :now}) == 100_500_000
-    assert TestClock.system_time(:millisecond) == 100_500
+    assert :persistent_term.get({TestClock, :now}) == 100_600_000
+    assert TestClock.system_time(:millisecond) == 100_600
   end
 
   test "byte mismatch names connection, index, opcode and field" do
@@ -181,6 +270,116 @@ defmodule Replay.HarnessTest do
     assert {:error, %Failure{index: 4}} = run(Stub, lines)
   end
 
+  describe "ticks" do
+    @tick_lines @trigger <> "0100\n" <> @reply <> "0100efbeadde0700\n100.700000 login#1 S 0x7F01 0100efbeadde0700"
+
+    test "a tick scheduled through Clock.send_after fires at its captured time" do
+      assert run(Ticker, @tick_lines, sync_after: [2]) == :ok
+    end
+
+    test "tick_offset moves the first tick of a train only" do
+      assert {:error, %Failure{kind: :missing}} = run(Ticker, @tick_lines, sync_after: [2], tick_offset: 50)
+
+      shifted =
+        @trigger <>
+          "0100\n100.650000 login#1 S 0x7F01 0100efbeadde0700\n100.750000 login#1 S 0x7F01 0100efbeadde0700"
+
+      assert run(Ticker, shifted, sync_after: [2], tick_offset: 50) == :ok
+    end
+
+    test "TestClock.reset delivers the pending timers and erases the offset" do
+      TestClock.tick_offset(5)
+      TestClock.send_after(self(), :late, 1000)
+      refute_received :late
+      assert TestClock.reset() == :ok
+      assert_received :late
+      assert :persistent_term.get({TestClock, :tick_offset}, nil) == nil
+    end
+  end
+
+  describe "zone" do
+    test "a heartbeat round trip follows every client packet, the answer is buffered, the clock stays" do
+      # 100 500 ms = 0x00018894 little-endian
+      lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 010094880100" <> "0700"
+      assert run(Tokener, lines, conns: ["zone#1"]) == :ok
+    end
+
+    test "an answer followed by a close by the server is still a transcript line" do
+      lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 0100000000000700"
+      assert run(Refuser, lines, conns: ["zone#1"]) == :ok
+    end
+
+    test "a buffered answer nobody expects is an extra packet at the end" do
+      lines = "100.500000 zone#1 C 0x0807 0100"
+      assert {:error, %Failure{kind: :extra}} = run(Tokener, lines, conns: ["zone#1"])
+    end
+  end
+
+  describe "handle scope per map" do
+    @enter_a "41" <> String.duplicate("00", 11)
+    @enter_b "42" <> String.duplicate("00", 11)
+    @opts [map_names: [{Enter, :map}], conns: ["zone#1", "zone#2"]]
+
+    # seed 0a00 enters map A, 0b00 map B, 0c00 map A again
+    defp scope_lines(first, second) do
+      enter = %{"0a00" => @enter_a, "0b00" => @enter_b, "0c00" => @enter_a}
+
+      """
+      100.100000 zone#1 C 0x0807 #{first}
+      100.110000 zone#1 S 0x7F03 #{enter[first]}
+      100.200000 zone#2 C 0x0807 #{second}
+      100.210000 zone#2 S 0x7F03 #{enter[second]}
+      100.300000 zone#1 C 0x0807 0100
+      100.310000 zone#1 S 0x7F01 0100000000000500
+      100.400000 zone#2 C 0x0807 0100
+      100.410000 zone#2 S 0x7F01 0100000000000500
+      """
+      |> String.trim()
+    end
+
+    test "two clients in different maps share captured handles with different received values" do
+      handles = [{Reply, :handle, :object, "test"}]
+      assert run(Maps, scope_lines("0a00", "0b00"), [handles: handles] ++ @opts) == :ok
+    end
+
+    test "two clients in the same map must agree" do
+      handles = [{Reply, :handle, :object, "test"}]
+
+      assert {:error, %Failure{kind: :handle, conn: "zone#2"}} =
+               run(Maps, scope_lines("0a00", "0c00"), [handles: handles] ++ @opts)
+    end
+
+    test "another namespace is global" do
+      handles = [{Reply, :handle, :other, "test"}]
+
+      assert {:error, %Failure{kind: :handle}} =
+               run(Maps, scope_lines("0a00", "0b00"), [handles: handles] ++ @opts)
+    end
+  end
+
+  describe "0xFFFF" do
+    @ffff [{Reply, :handle, :object, "test"}, {MiscSeedAck, :seed, :object, "test"}]
+
+    test "passes unmapped, next to a bound handle" do
+      lines = """
+      100.500000 login#1 C 0x0807 ffff
+      100.510000 login#1 S 0x7F01 010000000000ffff
+      100.520000 login#1 C 0x0807 6301
+      100.530000 login#1 S 0x7F01 0100000000006301
+      100.540000 login#1 C 0x0807 ffff
+      100.550000 login#1 S 0x7F01 010000000000ffff
+      """
+
+      assert run(EchoHandle, String.trim(lines), handles: @ffff) == :ok
+    end
+
+    test "captured ffff received as another value fails" do
+      lines = "100.500000 login#1 C 0x0807 6301\n100.510000 login#1 S 0x7F01 010000000000ffff"
+      assert {:error, %Failure{kind: :handle, message: message}} = run(EchoHandle, lines, handles: @ffff)
+      assert message =~ "ffff must stay ffff"
+    end
+  end
+
   describe "handle map" do
     @handles [{MiscSeedAck, :seed, :h, "test"}, {Reply, :handle, :h, "test"}]
     @lines "100.500000 login#1 C 0x0807 6301\n" <> @reply <> "0100000000006301"
@@ -198,6 +397,185 @@ defmodule Replay.HarnessTest do
       lines = "100.500000 login#1 C 0x0807 6302\n"
       handles = [{Reply, :handle, :h, "test"}, {MiscSeedAck, :seed, :h, "test"}]
       assert {:error, %Failure{kind: :handle}} = run(EchoHandle, lines, handles: handles, masks: [])
+    end
+  end
+
+  describe "deferrals" do
+    @good @trigger <> "0100\n" <> @reply <> "0100efbeadde0700"
+
+    test "payload of the whole packet: any size, but the opcode still counts" do
+      lines = @trigger <> "0100\n" <> @reply <> "0100"
+      assert {:error, %Failure{kind: :mismatch}} = run(Stub, lines)
+      assert run(Stub, lines, deferrals: [{:payload, Reply, :all, 3, "r"}]) == :ok
+
+      other = @trigger <> "0100\n100.600000 login#1 S 0x7F02 00"
+
+      assert {:error, %Failure{kind: :unexpected}} =
+               run(Stub, other, deferrals: [{:payload, Reply, :all, 3, "r"}])
+    end
+
+    test "payload of a field acts like a mask" do
+      lines = @trigger <> "0100\n" <> @reply <> "0100aaaaaaaa0700"
+      assert {:error, %Failure{kind: :mismatch}} = run(Stub, lines)
+      assert run(Stub, lines, deferrals: [{:payload, Reply, :token, 4, "r"}]) == :ok
+    end
+
+    test "absent: the packet is taken out of the transcript" do
+      lines = @good <> "\n100.700000 login#1 S 0x7F02 00"
+      assert {:error, %Failure{kind: :missing}} = run(Stub, lines)
+      assert run(Stub, lines, deferrals: [{:absent, Box, 4, "r"}]) == :ok
+    end
+
+    test "unsent: a client packet and its answers are left out, the replay continues" do
+      lines =
+        "100.400000 login#1 C 0x0807 0200\n" <>
+          "100.410000 login#1 S 0x7F01 0100efbeadde0700\n100.420000 login#1 S 0x7F01 0100efbeadde0700\n" <> @good
+
+      assert run(Stub, lines, deferrals: [{:unsent, 2, [3, 4], 3, "r"}]) == :ok
+    end
+
+    test "validation" do
+      packets = transcript(@good).packets
+      assert Replay.Deferrals.validate!([{:absent, Box, 4, "r"}, {:unsent, 2, [3], 3, "r"}], packets) == :ok
+      assert_raise ArgumentError, ~r/reason/, fn -> Replay.Deferrals.validate!([{:absent, Box, 4, ""}], packets) end
+      assert_raise ArgumentError, ~r/milestone/, fn -> Replay.Deferrals.validate!([{:absent, Box, 0, "r"}], packets) end
+
+      assert_raise ArgumentError, ~r/no field :nope/, fn ->
+        Replay.Deferrals.validate!([{:payload, Reply, :nope, 3, "r"}], packets)
+      end
+
+      assert_raise ArgumentError, ~r/not a client packet/, fn ->
+        Replay.Deferrals.validate!([{:unsent, 1, [3], 3, "r"}], packets)
+      end
+
+      assert_raise ArgumentError, ~r/not a server packet/, fn ->
+        Replay.Deferrals.validate!([{:unsent, 2, [2], 3, "r"}], packets)
+      end
+
+      assert_raise ArgumentError, ~r/malformed/, fn -> Replay.Deferrals.validate!([{:bogus, 1}], packets) end
+    end
+  end
+
+  describe "mob exclusion" do
+    @a "41" <> String.duplicate("00", 11)
+    @mob_lines """
+    100.100000 zone#1 S 0x7F03 #{@a}
+    100.110000 zone#1 S 0x7F01 0100000000000a00
+    100.120000 zone#1 S 0x7F01 0200000000000b00
+    100.130000 zone#1 S 0x7F05 0b00
+    100.140000 zone#1 S 0x7F05 0a00
+    100.150000 zone#1 C 0x0807 0b00
+    100.160000 zone#1 C 0x0807 0a00
+    100.170000 zone#1 S 0x7F02 00000000020a0001 0c0002
+    100.180000 zone#1 S 0x7F02 00000000020d0002 0e0002
+    100.190000 zone#1 S 0x7F04 0b00
+    100.200000 zone#1 S 0x7F05 0b00
+    100.210000 zone#2 S 0x7F05 0b00
+    100.220000 zone#1 S 0x7F04 0a00
+    100.230000 zone#1 S 0x7F05 0c00
+    """
+
+    defp mobs do
+      me = self()
+
+      %{
+        appear: [{Reply, :handle, :code}],
+        lists: [{Box, :items, :id, :qty}],
+        gone: [{Gone, :handle}],
+        about: [{About, :handle}, {MiscSeedAck, :seed}],
+        npc?: fn map, id ->
+          send(me, {:npc, map, id})
+          id == 1
+        end
+      }
+    end
+
+    test "per connection, until gone, lists reduced or taken out" do
+      lines = String.replace(@mob_lines, " 0c0002", "0c0002") |> String.replace(" 0e0002", "0e0002")
+      transcript = transcript(String.trim(lines), ["zone#1", "zone#2"])
+
+      packets =
+        Replay.Deferrals.apply(transcript.packets, [{:mobs, mobs(), 3, "r"}], [{Enter, :map}])
+
+      # the seed lines are 1 and 2; NPC appear 4 kept, mob appear 5 out, about 6 out, about of the NPC 7 kept,
+      # client on the mob 8 out, on the NPC 9 kept, list 10 reduced, list of mobs 11 out, gone 12 out,
+      # about 13 kept again, second connection 14 kept, gone of the NPC 15 kept, about of a listed mob 16 out
+      assert Enum.map(packets, & &1.index) == [1, 2, 3, 4, 7, 9, 10, 13, 14, 15]
+      assert Enum.find(packets, &(&1.index == 10)).payload == Base.decode16!("00000000010a0001", case: :lower)
+      assert Enum.find(packets, &(&1.index == 4)).scope == "A"
+      assert Enum.find(packets, &(&1.index == 14)).scope == nil
+      assert_received {:npc, "A", 2}
+    end
+
+    test "end to end through run/2" do
+      lines = @trigger <> "0100\n" <> @reply <> "0100efbeadde0700\n100.650000 login#1 S 0x7F01 0200efbeadde0900"
+      assert {:error, %Failure{}} = run(Stub, lines)
+      assert run(Stub, lines, deferrals: [{:mobs, mobs(), 3, "r"}]) == :ok
+    end
+  end
+
+  describe "replay cut" do
+    @cut_lines @trigger <> "0100\n" <> @reply <> "0100efbeadde0700\n100.700000 login#1 S 0x7F01 ffffffffffffffff"
+
+    test "lines at or after the seconds are not played" do
+      assert {:error, %Failure{index: 4}} = run(Stub, @cut_lines)
+      assert run(Stub, @cut_lines, stop: {:cut, 0.65, "the rest needs the map instance"}) == :ok
+    end
+
+    test "the reason is one line of text" do
+      assert_raise ArgumentError, ~r/reason/, fn -> run(Stub, @cut_lines, stop: {:cut, 0.65, ""}) end
+      assert_raise ArgumentError, ~r/reason/, fn -> run(Stub, @cut_lines, stop: {:cut, 0.65, "a\nb"}) end
+    end
+  end
+
+  describe "drop_after" do
+    test "the server side of the connection is killed and the client sees the close" do
+      lines = @trigger <> "0100\n" <> @reply <> "0100efbeadde0700"
+      assert run(Stub, lines, drop_after: [3]) == :ok
+    end
+
+    test "a packet the transcript does not hold is an extra packet" do
+      lines = @trigger <> "0200\n" <> @reply <> "0100efbeadde0700"
+      assert {:error, %Failure{kind: :extra}} = run(Stub, lines, drop_after: [3])
+    end
+
+    test "a connection whose remote port equals the client's port is left alone" do
+      endpoints = listen(Stub)
+      {_host, server_port} = endpoints["login"]
+      test = self()
+      loopback6 = {0, 0, 0, 0, 0, 0, 0, 1}
+
+      # Before packet 2 the client is connected: listen on its port number over IPv6 and connect a decoy there.
+      decoy = fn ->
+        [client_port] =
+          for port <- Port.list(),
+              Port.info(port, :name) == {:name, ~c"tcp_inet"},
+              match?({:ok, {_address, ^server_port}}, :inet.peername(port)),
+              {:ok, {_address, client_port}} <- [:inet.sockname(port)],
+              do: client_port
+
+        {:ok, listener} = :gen_tcp.listen(client_port, [:inet6, active: false, ip: loopback6])
+
+        pid =
+          spawn(fn ->
+            {:ok, socket} = :gen_tcp.connect(loopback6, client_port, [:inet6, active: false])
+            send(test, :decoy_ready)
+            receive do: (:stop -> :gen_tcp.close(socket))
+          end)
+
+        assert_receive :decoy_ready
+        send(test, {:decoy, pid, listener})
+        :ok
+      end
+
+      lines = @trigger <> "0100\n" <> @reply <> "0100efbeadde0700"
+      opts = [stop: :end, endpoints: endpoints, timeout: 200, drop_after: [3], before: %{2 => decoy}]
+      assert Replay.run(transcript(lines), opts) == :ok
+
+      assert_received {:decoy, pid, listener}
+      assert Process.alive?(pid)
+      send(pid, :stop)
+      :gen_tcp.close(listener)
     end
   end
 

@@ -64,6 +64,8 @@ In the two-client captures (scenarios 14, 45, 52) the connections are numbered i
 
 `server/test/support/` holds test-only code: `TestClock`, `TestClient`, `TestPorts`, `Replay` and the `Replay.*` modules. `server/test/test_helper.exs` loads it. It is not part of the application, so the `boundary` compiler and Dialyzer do not see it.
 
+The telemetry tests are in `server/test/pinata/`: `figures_test.exs` (buckets, percentiles, merge, the printed text), `figures_peers_test.exs` (`Pinata.Figures.collect/0` over the three peer nodes) and `otel_test.exs`. `otel_test.exs` restarts the OpenTelemetry applications of the test VM and changes its `OTEL_TRACES_EXPORTER`, `OTEL_METRIC_READERS` and `OTEL_EXPORTER_OTLP_ENDPOINT` variables, so it is `async: false`; it restores both when it ends.
+
 ## Ports
 
 No test listens on or connects to a fixed port. Every port comes from the operating system through `TestPorts` (`test/support/test_ports.ex`): `TestPorts.free(n)` binds `n` sockets on all addresses with port 0, reads the ports back and closes them. A port where a connect to `127.0.0.1` still succeeds afterwards is dropped and replaced: on Windows another program can listen on `127.0.0.1:9010` while our listener binds `0.0.0.0:9010` without an error, and the connections then reach the other program (Logitech G HUB does this on 9010).
@@ -103,17 +105,29 @@ client = TestClient.expect(client, %Proto.Packets.MiscHeartbeatAck{})
 
 | Option | Meaning |
 |---|---|
-| `stop:` | required: the last packet index to play, or `:end` |
+| `stop:` | required: the last packet index to play, `:end`, or `{:cut, seconds, reason}` (a Replay cut, see below) |
 | `endpoints:` | required: connection kind (`login`, `wm`, `zone`) to `{host, port}`; use `Replay.Topology.endpoints()` |
 | `masks:`, `handles:` | per-test additions to the global lists |
 | `close_after:` | packet indices; the harness closes the connection of that packet right after it (the transcript holds no TCP close) |
 | `sync_after:` | packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves on |
 | `before:` | a map of packet index to a zero-arity function, run before the harness sends that client packet; no replay uses it at present |
+| `deferrals:` | per-test additions to `Replay.Deferrals.global/0` (see Deferrals) |
+| `map_names:` | `{packet_module, path}` of the server packets that carry the name of the map a connection is on, added to `Replay.Masks.map_names/0`; the handle scope per map follows it |
+| `tick_offset:` | whole milliseconds, 0 or more, added to the first tick of a train (see Clock) |
+| `drop_after:` | packet indices; after each the harness kills the server side of that connection and expects the client to see the close |
 | `timeout:` | milliseconds to wait for a server packet, default 2000 |
 
 **Pacing.** Client packets are sent in capture order. Each one is sent after all earlier server packets of the Transcript arrived. Order is compared per connection only. A connection is opened right before its first line. All connections are closed when the replay ends.
 
-**Clock.** The harness puts `TestClock` in as the clock source and sets it to the capture timestamp before each connection open and each client packet. The clock source is global, so replay tests are not async.
+**Clock.** The harness puts `TestClock` in as the clock source and sets it to the capture timestamp of every Transcript line (client, server and timer-driven) before the harness opens the connection or sends or expects the packet. Server lines on Login and WorldManager move the clock too; if the server may still be working on the client packet before such a line, `sync_after:` is the tool. The clock source is global, so replay tests are not async.
+
+Only the tick of a map instance is scheduled through `Clock.send_after/3`; heartbeat, game time and auto-save stay real timers. `TestClock.set/1` fires every tick that is due at the new time, earliest first (the first of equal times first), moves the clock to its due time, and waits for the receiver (`:sys.get_state/2`, so a tick receiver is an OTP process; a dead one is skipped). A tick that is scheduled while a tick fires gets no offset, so the period stays exact. `tick_offset:` is added once, to a tick scheduled from outside a running tick (the first of a train): the Zone's first tick is not aligned with the capture. At the end the harness restores the clock source, erases the offset and delivers the pending ticks at once without waiting (`TestClock.reset/0`); dropping them would leave a map instance that waits for its tick without a tick.
+
+**Zone heartbeat round trip.** After every client packet on a `zone#N` connection (except a client `0x0804`, whose `0x0805` answer is a Transcript line) the harness sends a heartbeat and reads until the `0x0805` answer. The server packets read on the way are buffered per connection and compared at their own Transcript lines, so the Zone has handled the packet, and sent its answers, before the clock moves on. The Zone must have finished a client packet, map instance included, before its connection answers the next `0x0804`. A buffered packet that no line asks for is an extra packet at the end. A connection the server closed meanwhile is not a failure there (it is for a packet in `sync_after:`).
+
+**Server-side drop.** `drop_after:` finds the server-side process of a connection among the TCP ports of the node of the part: the port whose remote port is the local port of the client socket and whose own port is the port the client connected to (`Process.exit(pid, :kill)`), then reads the client socket until it is closed. Another packet on the way is an `:extra` failure, no close within `timeout:` a `:missing` one. The connection is then gone from the replay; the transcript holds no TCP close.
+
+**Two clients.** Connections named `zone#1` and `zone#2` are two clients on the Zone listener; they share the handle scope of a map (see Handle map).
 
 **Stop point.** Packets with an index above `stop:` are not played. Each Replay test plays everything of its capture that milestone 1 covers:
 
@@ -151,9 +165,30 @@ A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads 
 
 Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name, offset, size, sub}` per field (offset in the payload; for an array the offset of its count and size `nil`). A `bits` field masks its whole byte.
 
+## Deferrals
+
+A Deferral is a part of a capture the rebuild does not reproduce yet; the replay leaves it out and names the milestone that builds it, so the gap is visible in the code. Every entry has a milestone (a positive integer) and a reason (a non-empty text); `Replay.Deferrals.validate!/2` raises `ArgumentError` otherwise, for a field that does not exist, and for an `:unsent` entry that names a line of the wrong direction. The milestone that builds the part removes its entries. Forms:
+
+| Form | Effect |
+|---|---|
+| `{:payload, Reply, :token, 4, "reason"}` | the field is not compared (like a Mask); `:all` instead of the field accepts the whole payload of that opcode, any size, no handle binding; the opcode still has to arrive |
+| `{:absent, Box, 4, "reason"}` | the server packets of that module are taken out of the Transcript: the rebuild does not send them yet |
+| `{:unsent, 12, [13, 14], 4, "reason"}` | the client packet with index 12 and the server packets 13 and 14 are left out, by Transcript index (GM commands share the chat opcode, so an opcode cannot name them); the replay continues with a later packet |
+| `{:mobs, %{appear: ..., lists: ..., gone: ..., about: ..., npc?: fun}, 4, "reason"}` | the monsters of a map are left out per object (below) |
+
+The global list is `Replay.Deferrals.global/0` (empty until the issue that defines a packet adds its entry); a test adds its own with `deferrals:`. Packet indices stay as they are, so failures name the line of the Transcript file.
+
+**Monsters.** `appear` (`{module, handle_path, mob_id_path}`, `0x1C08`) names the packets that show an object: its mob id (little-endian) goes to `npc?.(map_name, mob_id)`; an NPC stays, anything else is taken out and its handle is excluded. `lists` (`{module, array, handle_field, mob_id_field}`, `0x1C09`) does the same per element: the NPC elements stay and the count is rewritten; a list left with no element is taken out. `gone` (`0x1C0E`) of an excluded handle is taken out and ends the exclusion. `about` (`{module, handle_path}`) names the packets of either direction that carry a handle: one with an excluded handle is taken out. The excluded handles are kept per connection (each client gets its own appear and `gone`) and are cleared when the map of the connection changes.
+
+## Replay cuts
+
+`stop: {:cut, seconds, reason}` plays only the lines before `seconds` after the `start` of the Transcript (the relative time of `docs/protocol/capture-validation.md`); lines at or after it are not played. The reason is a non-empty text of one line, else `ArgumentError`. A Replay cut ends a replay where the capture continues with something the rebuild cannot do yet (a map reset, a long idle); what lies behind a cut gets a hand-written test.
+
 ## Handle map
 
 A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list: the login token (`:login_token`, `0x0C34` and `0x0C37`), the world key (`:world_key`: `validate` of `0x0C0C` and of the client's `0x0C0F`, so the client logs in to WorldManager with the key of this run; on a refusal the rebuild's zero key is bound to the uninitialised bytes of the capture, P02-B23) the `worldmanager` session handle of `0x0C14` (`:wm_session`) and the `chrregnum` of the AVATAR in `0x1406` (`:character`, the id comes from the database sequence). `TestClock.local_time/1` is UTC+1, the zone of all captures. `TestClock` also keeps timers: `Clock.send_after/3` stores one, and `TestClock.set/1` fires those that fall due, in due order, each one handled by its receiver before the next (a receiver that schedules a new timer while handling one is seen by the same loop).
+
+The namespace `:object` is bound per map: the map of a connection is the captured value of a map name field (`Replay.Masks.map_names/0` plus `map_names:`; a trailing NUL is trimmed; `nil` before the first one), and every other namespace is global. Connections on the same map share one scope (two clients in sight of each other see the same objects), connections on different maps do not. `0xFFFF` in a 2-byte `:object` field means "no object": it is not bound on either side, a captured `ffff` must be received as `ffff` (else a `:handle` failure), and a client `ffff` is sent as it is.
 
 ## Setup functions
 
@@ -173,6 +208,7 @@ The topology runs on any database (the peers use the `DATABASE_URL` of the test 
 2. Add or extend its function in `Replay.Setups`.
 3. Write the test: call the setup function, `Replay.Transcript.read!/1` the file, `Replay.assert_replay/2` with `stop:` and `endpoints: Replay.Topology.endpoints()`. See `server/test/replay/milestone1_test.exs`.
 4. Mask every field the server cannot reproduce, each with a reason (global list for a field of the packet itself, `masks:` for one test).
+5. Defer what a later milestone builds with a Deferral (`deferrals:`, milestone and reason), and end the replay with a Replay cut where the capture continues with something the rebuild cannot do yet.
 
 ## Peer nodes
 
@@ -203,6 +239,8 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
   ```
 
 - `windows-smoke` against a release built on Windows in single-node mode with SQLite (see "Windows").
+
+The job `otel-smoke` (Linux) runs the release with OpenTelemetry ([`telemetry.md`](telemetry.md)). With export off and `OTEL_TRACES_EXPORTER=otlp` set it checks that the three OpenTelemetry applications run, that `Pinata.Figures.print()` answers and that the node output has no line containing `OTLP`, `opentelemetry` or `CA(s)`. Then it starts an OpenTelemetry Collector container (`otel/opentelemetry-collector`, configuration `test/support/otel-collector.yaml`, debug exporter), starts the release with `telemetry.otlp_enabled = true` and `trace_ratio = 1.0`, runs the smoke script, enters one map so that it ticks, flushes both providers and waits until the Collector log holds the span `pinata.packet` and the metrics `pinata.packet.duration` and `pinata.tick.duration`. Locally, in `server/` after `MIX_ENV=prod mix release`, with the data directory in `data`, run the commands of the job's steps with `R=_build/prod/rel/pinata` and a temporary directory for `$RUNNER_TEMP`; afterwards remove `data`, `otel.toml` and the container (`docker rm -f otelcol`).
 
 `test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
 

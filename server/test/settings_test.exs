@@ -32,6 +32,7 @@ defmodule SettingsTest do
              cluster: %{nodes: []},
              connection: %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576},
              log: %{level: :info},
+             telemetry: %{otlp_enabled: false, trace_ratio: 0.01},
              data: %{strict_references: true}
            }
   end
@@ -44,6 +45,24 @@ defmodule SettingsTest do
 
   test "an unknown log.level is a problem", %{tmp_dir: tmp_dir} do
     assert {:error, [<<"log.level: ", _::binary>>]} = load(tmp_dir, "[log]\nlevel = \"loud\"\n")
+  end
+
+  test "the telemetry keys", %{tmp_dir: dir} do
+    toml = "[telemetry]\notlp_enabled = true\notlp_endpoint = \"http://c:4318\"\ntrace_ratio = 1\n"
+
+    assert {:ok, %{telemetry: %{otlp_enabled: true, otlp_endpoint: "http://c:4318", trace_ratio: 1.0}}} =
+             load(dir, toml)
+  end
+
+  test "a bad value for each telemetry key is a problem", %{tmp_dir: dir} do
+    toml = "[telemetry]\notlp_enabled = \"yes\"\notlp_endpoint = \"collector\"\ntrace_ratio = 2\n"
+
+    assert {:error,
+            [
+              <<"telemetry.otlp_enabled: ", _::binary>>,
+              <<"telemetry.otlp_endpoint: ", _::binary>>,
+              <<"telemetry.trace_ratio: ", _::binary>>
+            ]} = load(dir, toml)
   end
 
   test "a valid file", %{tmp_dir: dir} do

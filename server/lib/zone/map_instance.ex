@@ -5,6 +5,7 @@ defmodule Zone.MapInstance do
   The state holds the NPCs placed from `ShineNPC` (in file order, with their handles), the block data (`nil` until
   the first entry), the players, the tick count and the tick schedule. Players are opaque ids until the player
   struct exists (issue 108). The map ticks every 100 ms through `Clock.send_after/3`, only while it has players.
+  Each tick is the telemetry span `[:pinata, :tick]` (`docs/technical/telemetry.md`).
   """
 
   use GenServer
@@ -75,9 +76,13 @@ defmodule Zone.MapInstance do
   # The ref ends a tick chain: a leave and a new entry inside 100 ms would otherwise run two chains.
   @impl GenServer
   def handle_info({:tick, ref}, %{tick_ref: ref} = state) do
-    next = state.next_tick + @tick_ms
-    Clock.send_after(self(), {:tick, ref}, max(next - Clock.monotonic_time(:millisecond), 0))
-    {:noreply, %{state | ticks: state.ticks + 1, next_tick: next}}
+    metadata = %{world: state.world, map: state.name}
+
+    :telemetry.span([:pinata, :tick], metadata, fn ->
+      next = state.next_tick + @tick_ms
+      Clock.send_after(self(), {:tick, ref}, max(next - Clock.monotonic_time(:millisecond), 0))
+      {{:noreply, %{state | ticks: state.ticks + 1, next_tick: next}}, metadata}
+    end)
   end
 
   def handle_info({:tick, _stale}, state), do: {:noreply, state}

@@ -22,6 +22,11 @@ defmodule Settings do
           cluster: %{nodes: [String.t()]},
           connection: %{max_packets_per_second: pos_integer(), max_unsent_bytes: pos_integer()},
           log: %{level: :debug | :info | :warning | :error},
+          telemetry: %{
+            :otlp_enabled => boolean(),
+            :trace_ratio => float(),
+            optional(:otlp_endpoint) => String.t()
+          },
           data: %{strict_references: boolean()}
         }
 
