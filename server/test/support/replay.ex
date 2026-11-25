@@ -28,8 +28,8 @@ defmodule Replay do
   `deferrals:` (per-test additions to `Replay.Deferrals`), `map_names:` (`{module, path}` of server packets that carry
   the map name, added to `Replay.Masks.map_names/0`), `tick_offset:` (ms, 0 or more, added to the first tick of a
   train, see `TestClock`), `drop_after:` (packet indices; the harness kills the server side of that connection
-  after the packet, once that process has ended the callback it is in, and expects the connection to close) and `late_ms:` (ms, default 0: how far the clock may run
-  ahead of a Zone server line that has not arrived).
+  after the packet, once that process has ended the callback it is in, and expects the connection to close) and
+  `late_ms:` (ms, default 0: how far the clock may run ahead of a Zone server line that has not arrived).
 
   The test clock is moved to the time of every transcript line on every node of the topology
   (`Replay.Topology.all/3`); due ticks (`Clock.send_after/3`) fire in order. The clock never runs backwards: a line
