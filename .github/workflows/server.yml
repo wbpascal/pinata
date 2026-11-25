@@ -292,7 +292,7 @@ jobs:
             if [ "$i" = 60 ]; then echo "Login does not listen on 9010"; exit 1; fi
             sleep 2
           done
-          $R/bin/pinata rpc 'IO.inspect(Enum.sort(for {a, _, _} <- Application.started_applications(), a in [:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter], do: a))' | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
+          $R/bin/pinata rpc "Code.eval_file(~S($PWD/test/support/otel_apps.exs))" | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
           $R/bin/pinata rpc "Pinata.Figures.print()" | grep -F "Packet handling time"
           $R/bin/pinata stop
           ! grep -E 'OTLP|opentelemetry|CA\(s\)' "$RUNNER_TEMP/off.out"
@@ -310,12 +310,13 @@ jobs:
             if [ "$i" = 60 ]; then echo "Login does not listen on 9010"; exit 1; fi
             sleep 2
           done
-          $R/bin/pinata rpc 'IO.inspect(Enum.sort(for {a, _, _} <- Application.started_applications(), a in [:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter], do: a))' | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
+          $R/bin/pinata rpc "Code.eval_file(~S($PWD/test/support/otel_apps.exs))" | grep -F '[:opentelemetry, :opentelemetry_experimental, :opentelemetry_exporter]'
           printf 'smoke-password\n' | $R/bin/pinata eval 'Persistence.Release.create_account("smoke")'
           mix run --no-start test/support/smoke.exs 9010
-          $R/bin/pinata rpc '{:ok, p} = Zone.MapInstance.whereis(0, ~s(Rou)); conn = spawn(fn -> Process.sleep(:infinity) end); {:ok, _} = Zone.MapInstance.enter(p, %Zone.Player{character: :otel_smoke, world_no: 0, map: 0, x: 0, y: 0, last_good: {0, 0}, walk_speed: 0, run_speed: 0, map_type: 0, equipment: [], address: {127, 0, 0, 1}, conn: conn})'
+          $R/bin/pinata rpc "Code.eval_file(~S($PWD/test/support/otel_enter.exs))"
           sleep 2
-          $R/bin/pinata rpc ':otel_tracer_provider.force_flush(); :otel_meter_server.force_flush()'
+          $R/bin/pinata rpc ':otel_tracer_provider.force_flush()'
+          $R/bin/pinata rpc ':otel_meter_server.force_flush()'
           grep -F "Pinata: OpenTelemetry export on" "$RUNNER_TEMP/on.out"
           $R/bin/pinata stop
 
