@@ -21,6 +21,15 @@ defmodule Zone.MapInstance do
   `0x1805` to the players in sight. Packets for other players go to their connections as
   `{:cluster, {:packets, packets}}`.
 
+  Movement (`docs/technical/movement.md`, flow: `docs/technical/flows/movement.md`): `move/5` checks a walk or run
+  request (`0x2017` / `0x2019`) against the server position and the block data, starts the player's mover
+  (`Zone.Mover`) and relays `0x2018` / `0x201A` to the players in sight; a refusal sends `0x201B` to the player.
+  `stop/3` (`0x2012`) ends the mover and relays `0x2013`, or refuses with `0x201B`. Both first step the mover to the
+  millisecond of the clock. Each tick steps every mover in ascending handle order, in slices of at most 100 ms: each
+  slice runs the block check and the sight rule (`step/3`); a mover stuck in blocked cells is pulled back to its last
+  good position (`0x2013` to the players in sight, `0x204A` to the player). Packets for the requesting player go to
+  its connection like all others, so their order holds.
+
   Chat (`Zone.Chat`, `docs/technical/flows/chat.md`): `chat/4` checks a line of a player in mode 1 against the map's
   rules and the player's `chat` state, sends a passed line to the other receivers (the players in sight for normal
   chat, every player in mode 1 for a shout) and returns the speaker's own packets: its copy of the line, `0x0848`
@@ -29,8 +38,15 @@ defmodule Zone.MapInstance do
 
   use GenServer
 
+  alias GameData.BlockData
+  alias Proto.Packets.ActMovefailAck
+  alias Proto.Packets.ActReinforceStopCmd
+  alias Proto.Packets.ActSomeonemoverunCmd
+  alias Proto.Packets.ActSomeonemovewalkCmd
+  alias Proto.Packets.ActSomeonestopCmd
   alias Proto.Packets.MapLogoutCmd
   alias Proto.Packets.MiscChatBlockSpamerBlocktimeCmd
+  alias Zone.Mover
 
   require Logger
 
@@ -40,6 +56,10 @@ defmodule Zone.MapInstance do
   # player handles, docs/knowledge/Z01.md §3
   @first_handle 8000
   @last_handle 9499
+  # a claimed position (from, loc) must lie within 200 units of the server position: dist² < 40 001 (Z02 §2)
+  @reach2 40_001
+  # the block check probes around a blocked step only when the last good position is farther than 30 units
+  @stuck2 899
 
   @spec start_link({Cluster.Registry.world_id(), binary(), Path.t()}) :: GenServer.on_start()
   def start_link({world_id, map_name, _data_dir} = arg),
@@ -74,11 +94,31 @@ defmodule Zone.MapInstance do
 
   @doc """
   The player of the handle stands at a new point: the appear and disappear packets go to the players concerned.
-  Called by the movement of issue 110; the caller has checked the point.
+  The caller has checked the point; the same function is the one way the mover sets a position.
   """
   @spec step(pid(), 8000..9499, Zone.Grid.point()) :: :ok | {:error, :not_entered}
   def step(pid, handle, {x, y}) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
     do: GenServer.call(pid, {:step, handle, {x, y}})
+
+  @doc """
+  A walk (`0x2017`) or run (`0x2019`) request from `from` to `to`. Refused with `0x201B {server position}` when
+  `from == to`, when `from` is 200 units or more from the server position, when the target or the current position
+  has no free cell around it, or when the line to the target is blocked. Otherwise the mover starts and the move
+  packet goes to the players in sight with the server position as `from`. A player in mode 0 is ignored.
+  """
+  @spec move(pid(), 8000..9499, :walk | :run, Zone.Grid.point(), Zone.Grid.point()) :: :ok | {:error, :not_entered}
+  def move(pid, handle, kind, {fx, fy} = from, {tx, ty} = to)
+      when kind in [:walk, :run] and is_integer(fx) and fx >= 0 and is_integer(fy) and fy >= 0 and is_integer(tx) and
+             tx >= 0 and is_integer(ty) and ty >= 0,
+      do: GenServer.call(pid, {:move, handle, kind, from, to})
+
+  @doc """
+  A stop request (`0x2012`) at `loc`: when `loc` lies within 200 units and has a free cell, the mover ends and
+  `0x2013 {server position}` goes to the players in sight; else `0x201B`. `loc` is never stored.
+  """
+  @spec stop(pid(), 8000..9499, Zone.Grid.point()) :: :ok | {:error, :not_entered}
+  def stop(pid, handle, {x, y} = loc) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
+    do: GenServer.call(pid, {:stop, handle, loc})
 
   @doc "Sets the dimension and the sub-layer of the player of the handle; sends nothing."
   @spec set_layer(pid(), 8000..9499, integer(), 0..5) :: :ok | {:error, :not_entered}
@@ -191,19 +231,23 @@ defmodule Zone.MapInstance do
 
   def handle_call({:player, handle}, _from, state), do: {:reply, Map.fetch(state.players, handle), state}
 
-  def handle_call({:step, handle, {x, y} = point}, _from, state) do
+  def handle_call({:step, handle, point}, _from, state) do
     case state.players do
       %{^handle => %Zone.Player{} = player} ->
-        deliveries = Zone.Sight.step(view(state), player, point)
-        moved = %{player | x: x, y: y}
-        grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
+        {state, deliveries} = place(state, player, point)
         deliver(deliveries)
-        {:reply, :ok, %{state | players: Map.put(state.players, handle, moved), grid: grid}}
+        {:reply, :ok, state}
 
       %{} ->
         {:reply, {:error, :not_entered}, state}
     end
   end
+
+  def handle_call({:move, handle, kind, from, to}, _from, state),
+    do: movement(state, handle, fn state, player, now -> check_move(state, player, kind, from, to, now) end)
+
+  def handle_call({:stop, handle, loc}, _from, state),
+    do: movement(state, handle, fn state, player, _now -> check_stop(state, player, loc) end)
 
   def handle_call({:set_layer, handle, dimension, sub_layer}, _from, state) do
     case state.players do
@@ -255,8 +299,18 @@ defmodule Zone.MapInstance do
     metadata = %{world: state.world, map: state.name}
 
     :telemetry.span([:pinata, :tick], metadata, fn ->
+      now = Clock.monotonic_time(:millisecond)
       next = state.next_tick + @tick_ms
-      Clock.send_after(self(), {:tick, ref}, max(next - Clock.monotonic_time(:millisecond), 0))
+      Clock.send_after(self(), {:tick, ref}, max(next - now, 0))
+
+      {state, deliveries} =
+        for {handle, %Zone.Player{mover: %Mover{}}} <- Enum.sort(state.players), reduce: {state, []} do
+          {state, acc} ->
+            {state, deliveries} = advance(state, handle, now)
+            {state, acc ++ deliveries}
+        end
+
+      deliver(deliveries)
       {{:noreply, %{state | ticks: state.ticks + 1, next_tick: next}}, metadata}
     end)
   end
@@ -283,6 +337,161 @@ defmodule Zone.MapInstance do
     :ok
   end
 
+  # -- movement (docs/technical/movement.md); each step returns {state, deliveries in order}
+
+  # a request of a player in the world: the mover is stepped to the millisecond first (capture 45)
+  defp movement(state, handle, check) do
+    case state.players do
+      %{^handle => %Zone.Player{mode: 0}} ->
+        {:reply, :ok, state}
+
+      %{^handle => %Zone.Player{}} ->
+        now = Clock.monotonic_time(:millisecond)
+        {state, stepped} = advance(state, handle, now)
+        {state, answered} = check.(state, state.players[handle], now)
+        deliver(stepped ++ answered)
+        {:reply, :ok, state}
+
+      %{} ->
+        {:reply, {:error, :not_entered}, state}
+    end
+  end
+
+  # sp_NC_ACT_MOVEWALK_CMD / sp_NC_ACT_MOVERUN_CMD (Z02 §2.2); the order bounds the line walk to the map
+  defp check_move(state, player, kind, {_, _} = from, {tx, ty} = to, now) do
+    pos = {player.x, player.y}
+    b = state.block_data
+
+    cond do
+      from == to -> refuse(state, player)
+      dist2(pos, from) >= @reach2 -> refuse(state, player)
+      not BlockData.free_cell?(b, tx, ty) or not BlockData.free_cell?(b, player.x, player.y) -> refuse(state, player)
+      BlockData.line_blocked?(b, pos, to, 2) -> refuse(state, player)
+      true -> accept(state, player, kind, to, now)
+    end
+  end
+
+  # a target at the server position leaves the direction and a running mover as they are
+  defp accept(state, %Zone.Player{x: x, y: y} = player, kind, {tx, ty} = to, now) do
+    {module, speed} =
+      if kind == :walk, do: {ActSomeonemovewalkCmd, player.walk_speed}, else: {ActSomeonemoverunCmd, player.run_speed}
+
+    player =
+      if to == {x, y},
+        do: player,
+        else: %{player | dir: Mover.direction(tx - x, ty - y), mover: Mover.start({x, y}, to, speed, now)}
+
+    # moveattr: the original sends leftover buffer bytes (Z02-B2)
+    move = struct!(module, handle: player.handle, from_x: x, from_y: y, to_x: tx, to_y: ty, speed: speed, moveattr: 0)
+    player = %{player | move: move}
+    state = put_player(state, player)
+    {state, to_sight(state, player, [move])}
+  end
+
+  # sp_NC_ACT_STOP_REQ (Z02 §2.3)
+  defp check_stop(state, player, {lx, ly} = loc) do
+    if dist2({player.x, player.y}, loc) < @reach2 and BlockData.free_cell?(state.block_data, lx, ly),
+      do: stop_here(state, player),
+      else: refuse(state, player)
+  end
+
+  # mm_Step FUN_004be7e0: every slice up to now, each with the block check and the sight rule
+  defp advance(state, handle, now) do
+    case state.players[handle] do
+      %Zone.Player{mover: %Mover{} = mover} -> slices(state, handle, Mover.slices(mover, now), [])
+      %Zone.Player{mover: :none} -> {state, []}
+    end
+  end
+
+  defp slices(state, handle, [], acc) do
+    case state.players[handle] do
+      %Zone.Player{mover: %Mover{} = m} = p ->
+        if(Mover.done?(m), do: {put_player(state, %{p | mover: :none}), acc}, else: {state, acc})
+
+      %Zone.Player{mover: :none} ->
+        {state, acc}
+    end
+  end
+
+  defp slices(state, handle, [{applied, point} | rest], acc) do
+    %Zone.Player{mover: mover} = player = state.players[handle]
+
+    case block_check(state.block_data, player, point) do
+      {:ok, last_good} ->
+        player = %{player | last_good: last_good, mover: %{mover | applied: applied}}
+        {state, deliveries} = state |> put_player(player) |> place(player, point)
+        slices(state, handle, rest, acc ++ deliveries)
+
+      :pull_back ->
+        {state, deliveries} = pull_back(state, player)
+        {state, acc ++ deliveries}
+    end
+  end
+
+  # ShinePlayer::smo_BlockCheck FUN_004bec00 with sp_MoveFindEmpty FUN_004be4c0
+  defp block_check(b, %Zone.Player{x: x, y: y} = player, {px, py}) do
+    cond do
+      not BlockData.blocked?(b, px, py) ->
+        {:ok, {x, y}}
+
+      dist2({x, y}, player.last_good) > @stuck2 ->
+        probe(b, [{px + 10, py}, {px - 10, py}, {px, py + 10}, {px, py - 10}])
+
+      true ->
+        {:ok, player.last_good}
+    end
+  end
+
+  # the first free probe becomes the last good position
+  defp probe(b, probes) do
+    case Enum.find(probes, fn {a, c} -> not BlockData.blocked?(b, a, c) end) do
+      nil -> :pull_back
+      probe -> {:ok, probe}
+    end
+  end
+
+  # smo_StopBlockCheck FUN_004bee40: before every refusal
+  defp stop_block_check(state, %Zone.Player{x: x, y: y} = player) do
+    if {x, y} != player.last_good and BlockData.blocked?(state.block_data, x, y),
+      do: pull_back(state, player),
+      else: {state, []}
+  end
+
+  defp pull_back(state, player) do
+    {state, placed} = place(state, player, player.last_good)
+    {state, stopped} = stop_here(state, state.players[player.handle])
+    player = state.players[player.handle]
+    {state, placed ++ stopped ++ [{player, [%ActReinforceStopCmd{x: player.x, y: player.y}]}]}
+  end
+
+  # the stop goes to the players in sight, not to the player itself (capture 45)
+  defp stop_here(state, player) do
+    player = %{player | mover: :none, move: :none}
+    state = put_player(state, player)
+    {state, to_sight(state, player, [%ActSomeonestopCmd{handle: player.handle, x: player.x, y: player.y}])}
+  end
+
+  # a refusal does not stop a running mover
+  defp refuse(state, player) do
+    {state, pulled} = stop_block_check(state, player)
+    player = state.players[player.handle]
+    {state, pulled ++ [{player, [%ActMovefailAck{x: player.x, y: player.y}]}]}
+  end
+
+  defp place(state, %Zone.Player{handle: handle} = player, {x, y} = point) do
+    deliveries = Zone.Sight.step(view(state), player, point)
+    moved = %{player | x: x, y: y}
+    grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
+    {%{state | players: Map.put(state.players, handle, moved), grid: grid}, deliveries}
+  end
+
+  defp put_player(state, %Zone.Player{handle: handle} = player),
+    do: %{state | players: Map.put(state.players, handle, player)}
+
+  defp to_sight(state, player, packets), do: state |> view() |> Zone.Sight.receivers(player) |> Enum.map(&{&1, packets})
+
+  defp dist2({ax, ay}, {bx, by}), do: (ax - bx) * (ax - bx) + (ay - by) * (ay - by)
+
   defp remove(state, leaves?) do
     state =
       for {handle, player} <- state.players, leaves?.(handle), reduce: state do
@@ -300,8 +509,7 @@ defmodule Zone.MapInstance do
   end
 
   # The one "to players in sight" function, at the full radius, for the relays of later issues.
-  defp broadcast(state, %Zone.Player{} = sender, packets),
-    do: state |> view() |> Zone.Sight.receivers(sender) |> Enum.map(&{&1, packets}) |> deliver()
+  defp broadcast(state, %Zone.Player{} = sender, packets), do: state |> to_sight(sender, packets) |> deliver()
 
   # The receivers of a passed line besides the speaker.
   defp others(:normal, state, player), do: state |> view() |> Zone.Sight.receivers(player)

@@ -52,6 +52,106 @@ defmodule Proto.Packets.ActWhispersuccessAck do
   field :links, {:records, :item_link_count, 0x67}
 end
 
+defmodule Proto.Packets.ActStopReq do
+  @moduledoc "0x2012 NC_ACT_STOP_REQ, client to server: the player stops at the point the client shows."
+  use Proto.Packet, opcode: 0x2012
+  # official: loc.x
+  field :x, :u32
+  # official: loc.y
+  field :y, :u32
+end
+
+defmodule Proto.Packets.ActSomeonestopCmd do
+  @moduledoc "0x2013 NC_ACT_SOMEONESTOP_CMD, server to client: the object stopped at the server's position."
+  use Proto.Packet, opcode: 0x2013
+  # official: handle
+  field :handle, :u16
+  # official: loc.x
+  field :x, :u32
+  # official: loc.y
+  field :y, :u32
+end
+
+defmodule Proto.Packets.ActMovewalkCmd do
+  @moduledoc "0x2017 NC_ACT_MOVEWALK_CMD, client to server: the player walks from `from` to `to`."
+  use Proto.Packet, opcode: 0x2017
+  # official: from.x, from.y
+  field :from_x, :u32
+  field :from_y, :u32
+  # official: to.x, to.y
+  field :to_x, :u32
+  field :to_y, :u32
+end
+
+defmodule Proto.Packets.ActSomeonemovewalkCmd do
+  @moduledoc """
+  0x2018 NC_ACT_SOMEONEMOVEWALK_CMD, server to client: the object walks from `from` (the server's position) to `to`.
+  The original leaves `moveattr` as its buffer held it except bit 0 (Z02-B2); we send 0.
+  """
+  use Proto.Packet, opcode: 0x2018
+  # official: handle
+  field :handle, :u16
+  # official: from.x, from.y
+  field :from_x, :u32
+  field :from_y, :u32
+  # official: to.x, to.y
+  field :to_x, :u32
+  field :to_y, :u32
+  # official: speed
+  field :speed, :u16
+  # official: moveattr
+  field :moveattr, :u16
+end
+
+defmodule Proto.Packets.ActMoverunCmd do
+  @moduledoc "0x2019 NC_ACT_MOVERUN_CMD, client to server: the player runs from `from` to `to`."
+  use Proto.Packet, opcode: 0x2019
+  # official: from.x, from.y
+  field :from_x, :u32
+  field :from_y, :u32
+  # official: to.x, to.y
+  field :to_x, :u32
+  field :to_y, :u32
+end
+
+defmodule Proto.Packets.ActSomeonemoverunCmd do
+  @moduledoc """
+  0x201A NC_ACT_SOMEONEMOVERUN_CMD, server to client: the object runs from `from` (the server's position) to `to`.
+  The original leaves `moveattr` as its buffer held it except bit 0 (Z02-B2); we send 0.
+  """
+  use Proto.Packet, opcode: 0x201A
+  # official: handle
+  field :handle, :u16
+  # official: from.x, from.y
+  field :from_x, :u32
+  field :from_y, :u32
+  # official: to.x, to.y
+  field :to_x, :u32
+  field :to_y, :u32
+  # official: speed
+  field :speed, :u16
+  # official: moveattr
+  field :moveattr, :u16
+end
+
+defmodule Proto.Packets.ActMovefailAck do
+  @moduledoc "0x201B NC_ACT_MOVEFAIL_ACK, server to client: a refused move or stop; the player stands at the server's position."
+  use Proto.Packet, opcode: 0x201B
+  # official: back.x
+  field :x, :u32
+  # official: back.y
+  field :y, :u32
+end
+
+defmodule Proto.Packets.ActReinforceStopCmd do
+  @moduledoc "0x204A NC_ACT_REINFORCE_STOP_CMD, server to client: the server pulled the player back to this point."
+  use Proto.Packet, opcode: 0x204A
+  # official: loc.x
+  field :x, :u32
+  # official: loc.y
+  field :y, :u32
+end
+
 defmodule Proto.Packets.ActChatReq do
   @moduledoc "0x2001 NC_ACT_CHAT_REQ, client to server: a line of normal chat, with its item links."
   use Proto.Packet, opcode: 0x2001

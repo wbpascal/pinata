@@ -88,12 +88,15 @@ The entrant's packets go into the second map-entry burst directly after `0x583A`
   (`NPCRole_Portal::nrb_BriefInformSet` @ FUN_004c2360, `so_SetGateBriefInform` @ FUN_00557bc0). The replay of
   `idle_in_world` compares all 29 elements byte for byte.
 
-An appear is the appear packet alone until issue 110 adds the current move.
+The appear of a player that has a remembered move (`Zone.Player.move`, set by an accepted walk or run, forgotten by a
+stop) is its `0x1C06` followed by that move packet (`0x2018` / `0x201A`) with `from` = its current position
+(`ResendLastMove` @ FUN_005555e0), so a client that sees it appear also sees where it goes
+([`movement.md`](movement.md)). The move stays remembered after the mover reached its goal.
 
 ## Step
 
-`Zone.MapInstance.step/3` (called by the movement of issue 110) computes, from the old and the new position and
-without any per-player "seen" list (`Zone.Sight.step/3`):
+`Zone.MapInstance.step/3`, the one way a position changes (each slice of the mover, a pull-back), computes, from the
+old and the new position and without any per-player "seen" list (`Zone.Sight.step/3`):
 
 - **appears**: for each shown object within the radius of the new position that was not within the radius of the
   old one: a player gets the mover's appear when it sees the mover, the mover gets the object's appear when it sees
@@ -101,7 +104,8 @@ without any per-player "seen" list (`Zone.Sight.step/3`):
 - **disappears**: for each player in mode 1 within the radius of the old position that is not within the radius of
   the new one: `0x1C0E` both ways, each when that side saw the other. NPCs are never removed by a move.
 
-Appears go out before disappears on one step.
+Appears go out before disappears on one step. The mover's own appear carries its position **before** the step: the
+original sends it before it sets the position (capture 45: B is shown at a point 1602 units from A, radius 1600).
 
 ## Leave
 
@@ -115,7 +119,8 @@ issues use too.
 The client asks for the appear packet of a handle it does not know. In the world, `Zone.Handler` asks the map instance
 (`Zone.MapInstance.inform/3`); the client's own handle field is ignored (the connection's player is the requester). The
 answer is the object's appear packet when the requester is in mode 1, the object is a shown player or NPC other than
-the requester, `dist² < Sight²` and the requester sees it. Anything else (unknown handle, the requester itself, a
+the requester, `dist² < Sight²` and the requester sees it; for a player with a remembered move the answer is both
+packets of its appear. Anything else (unknown handle, the requester itself, a
 player in mode 0, an object out of sight or hidden) gets no answer, no log line, and the connection stays open: the
 unmodified client can send all of these. There is no rate limit; the original has none and each request is one cheap
 call.

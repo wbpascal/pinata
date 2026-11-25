@@ -148,6 +148,7 @@ defmodule Zone.ChatTest do
       map_type: 0,
       equipment: [],
       address: "127.0.0.1",
+      last_good: {6477, 9844},
       conn: :none
     }
   end

@@ -57,6 +57,9 @@ defmodule WhisperTest do
       end
 
     wait_until(fn -> match?({:ok, _}, t.call.(:wm, WorldManager.World, :zone_of, [0, "RouN"])) end)
+    # a Zone connection of the previous test (either topology) saves while it ends
+    :ok = TestSessions.wait_none()
+    :ok = TestSessions.wait_none(fn part, m, f, a -> :peer.call(peers[part], m, f, a) end)
     Persistence.Repo.active().query!("DELETE FROM accounts")
     account("admin", "Test1235")
     account("second", "X14B")

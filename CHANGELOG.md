@@ -14,6 +14,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A character that enters the world passes the loading screen and stands on its stored map at its stored position, wearing its equipment. Inventory, skills, quests, titles and the shortcut bar are empty until their milestones (#108).
 - A client packet that belongs to the protocol but is not built yet is ignored with a `debug` line; before, it closed the connection. A packet outside the protocol still closes it (#108).
 - Players on a map see each other and the standing NPCs: when they enter the map, when they come into or leave each other's sight, and when one leaves the map. A player in a crowd (29 or more objects within 500 units) gets the players of a smaller radius at entry, as in the original. A map without `MapInfo` row and an NPC without `MobInfo` row are logged with an `info` line at start-up (#109).
+- Walking, running and stopping: the server checks each move against the map's blocked cells and its own position (200 units), moves the character at walk speed 33 / run speed 127 and shows the movement to the players in sight; a refused move puts the character back (#110).
 - Normal chat reaches the players in sight, shout every player of the map. A map can forbid either (`Chat` / `Shout` of `FieldList`); shout needs a level above `ShoutLevel` (5) and waits `ShoutDelay` (2 s) between two shouts. A refused line gets no answer, as in the original (#113).
 - Chat spam filter: 3 lines of normal chat or shout within 3 s block the player's chat for 10 s, longer for each repeat (`SpamerPenaltyRule.shn`, `SpamerPenalty.shn`); the client shows the block time (#113).
 - Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
@@ -30,6 +31,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A refused map login carries the real refusal code; the original sent another one (Z01-B1) (#107).
 - Objects in different dimensions no longer get an appear and a delete packet on every step (P02-B27) (#109).
 - A client request for the appear packet of an object (`0x1C01`) is answered only when the object is in sight (#109).
+- The unused `moveattr` bytes of the move packets `0x2018` / `0x201A` are 0; the original sent leftover memory (Z02-B2) (#110).
+- The legacy move packets `0x2003` / `0x2005` are ignored; the original moved the character without any check (Z02-B1) (#110).
 - The unused bits of the shout flag are 0; the original sent bits of its own memory (P02-B29) (#113).
 - A whisper whose size does not match its item links is ignored; the original copied past its buffer and any player could stop WorldManager with it (W04-B2) (#114).
 - The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).

@@ -29,6 +29,8 @@ defmodule SightTest do
     wait_until(fn -> match?({:ok, _}, WorldManager.World.zone_of(0, "RouN")) end)
     {:ok, map} = Zone.MapInstance.whereis(0, "RouN")
     wait_until(fn -> :sys.get_state(map).players == %{} end)
+    # a Zone connection of the previous test saves while it ends
+    :ok = TestSessions.wait_none()
     Persistence.Repo.active().query!("DELETE FROM accounts")
 
     for {account, name, {x, y}} <- [{"alice", "Alice", @a_pos}, {"bobby", "Bobby", @b_pos}] do
@@ -170,6 +172,7 @@ defmodule SightTest do
       map_type: 0,
       equipment: [],
       address: "127.0.0.1",
+      last_good: {x, y},
       conn: conn
     }
   end

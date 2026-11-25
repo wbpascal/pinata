@@ -12,6 +12,10 @@ defmodule Zone.Player do
   2 Observer, 3 AdminHide, 4 GMDoor, 5 GMPlayer) decides one way whether an object is shown to another. Both are 0
   after the entry and are set by `Zone.MapInstance.set_layer/4`.
 
+  Movement (`docs/technical/movement.md`): `mover` is the running move (`Zone.Mover`, `:none` while standing), `move`
+  the last relayed move packet (`0x2018` / `0x201A`, sent again after an appear; `:none` after a stop), `last_good`
+  the last position the block check accepted (the entry position at first), where a pull-back puts the player.
+
   `chat` is the state of the chat spam filter and the shout delay (`Zone.Chat`): empty at every entry into a map
   instance, never stored.
   """
@@ -23,10 +27,32 @@ defmodule Zone.Player do
           class: integer() | :unknown
         }
 
-  @enforce_keys [:character, :world_no, :map, :x, :y, :walk_speed, :run_speed, :map_type, :equipment, :address]
+  @enforce_keys [
+    :character,
+    :world_no,
+    :map,
+    :x,
+    :y,
+    :walk_speed,
+    :run_speed,
+    :map_type,
+    :equipment,
+    :address,
+    :last_good
+  ]
   defstruct @enforce_keys ++
-              [handle: :none, conn: :none, mode: 0, admin_level: 0, dir: 90, dimension: 0, sub_layer: 0] ++
-              [chat: %{ring: [], block_until: :none, probation_until: :none, next_shout: :none}]
+              [
+                handle: :none,
+                conn: :none,
+                mode: 0,
+                admin_level: 0,
+                dir: 90,
+                dimension: 0,
+                sub_layer: 0,
+                mover: :none,
+                move: :none,
+                chat: %{ring: [], block_until: :none, probation_until: :none, next_shout: :none}
+              ]
 
   @type t :: %__MODULE__{
           character: Persistence.loaded_character(),
@@ -46,6 +72,9 @@ defmodule Zone.Player do
           dir: 0..255,
           dimension: integer(),
           sub_layer: 0..5,
+          last_good: Zone.Grid.point(),
+          mover: :none | Zone.Mover.t(),
+          move: :none | Proto.Packets.ActSomeonemovewalkCmd.t() | Proto.Packets.ActSomeonemoverunCmd.t(),
           chat: Zone.Chat.state()
         }
 
@@ -67,6 +96,7 @@ defmodule Zone.Player do
          map: entry.map,
          x: character.login_x,
          y: character.login_y,
+         last_good: {character.login_x, character.login_y},
          walk_speed: walk,
          run_speed: run,
          map_type: field.kq,

@@ -124,9 +124,13 @@ defmodule Zone.Sight do
     end
   end
 
-  @doc "The packets that make an object appear to a receiver. Issue 110 adds the current move."
+  @doc """
+  The packets that make an object appear to a receiver: a player's `0x1C06`, followed by its remembered move packet
+  with `from` = its current position (`ResendLastMove` FUN_005555e0); an NPC's appear element.
+  """
   @spec appear(object()) :: [struct()]
-  def appear(%Zone.Player{} = player), do: [brief(player)]
+  def appear(%Zone.Player{move: :none} = player), do: [brief(player)]
+  def appear(%Zone.Player{move: move} = player), do: [brief(player), %{move | from_x: player.x, from_y: player.y}]
   def appear(%Zone.Npc{brief: brief}), do: [brief]
 
   @doc """
@@ -191,21 +195,21 @@ defmodule Zone.Sight do
   @doc """
   The deliveries of one step of a player from its position in `player` to `new`: first the appears of the objects
   that come into sight (both ways; an NPC only to the mover), then the `0x1C0E` of the players that leave it (both
-  ways; NPCs are never removed). A player in mode 0 causes nothing.
+  ways; NPCs are never removed). The mover's own appear carries its position before the step (capture 45: the
+  original sends it before it sets the position). A player in mode 0 causes nothing.
   """
   @spec step(view(), Zone.Player.t(), Grid.point()) :: [delivery()]
   def step(_view, %Zone.Player{mode: 0}, _new), do: []
 
-  def step(view, %Zone.Player{handle: handle} = mover, {nx, ny} = new) do
+  def step(view, %Zone.Player{handle: handle} = mover, new) do
     old = {mover.x, mover.y}
     r2 = view.radius * view.radius
-    moved = %{mover | x: nx, y: ny}
 
     appears =
       for h <- Grid.query(view.grid, new, view.radius, handle),
           o <- shown(view, h),
           dist2(o, old) >= r2,
-          d <- appear_both(mover, moved, o),
+          d <- appear_both(mover, o),
           do: d
 
     disappears =
@@ -218,12 +222,12 @@ defmodule Zone.Sight do
     appears ++ disappears
   end
 
-  defp appear_both(mover, moved, %Zone.Player{} = o) do
-    if(sees?(o, mover), do: [{o, appear(moved)}], else: []) ++
+  defp appear_both(mover, %Zone.Player{} = o) do
+    if(sees?(o, mover), do: [{o, appear(mover)}], else: []) ++
       if sees?(mover, o), do: [{mover, appear(o)}], else: []
   end
 
-  defp appear_both(mover, _moved, %Zone.Npc{} = o), do: if(sees?(mover, o), do: [{mover, appear(o)}], else: [])
+  defp appear_both(mover, %Zone.Npc{} = o), do: if(sees?(mover, o), do: [{mover, appear(o)}], else: [])
 
   defp disappear_both(mover, o) do
     if(sees?(o, mover), do: [{o, [%BriefinfoBriefinfodeleteCmd{handle: mover.handle}]}], else: []) ++

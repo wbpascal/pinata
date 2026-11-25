@@ -31,6 +31,13 @@ defmodule Zone.Handler do
   (`{:cluster, {:packets, packets}}`: appears, disappears, `0x1805`, chat lines) are sent in the world and dropped
   before.
 
+  Movement (flow: `docs/technical/flows/movement.md`): in the world, `0x2017` walk, `0x2019` run and `0x2012` stop go
+  to the map instance (`Zone.MapInstance.move/5`, `stop/3`), which checks them against the server position and the
+  block data. Every answer (`0x201B`, `0x204A`) and every packet for this player comes as
+  `{:cluster, {:packets, packets}}`; the map sends them before it replies, so the connection takes them from its
+  mailbox right after the call and sends them before it reads the next frame (a heartbeat in the same TCP read would
+  otherwise be answered first). Before the world these packets get no answer.
+
   Chat (flow: `docs/technical/flows/chat.md`): in the world, `0x2001` (normal chat) and `0x201E` (shout) go to the
   map instance (`Zone.MapInstance.chat/4`), which checks them with `Zone.Chat` and relays `0x2002` to the speaker and
   the players in sight, or `0x201F` to every player of the map; a refusal is silent, a spam block answers `0x0848`.
@@ -46,7 +53,10 @@ defmodule Zone.Handler do
 
   alias Proto.Packets.ActChatReq
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.ActMoverunCmd
+  alias Proto.Packets.ActMovewalkCmd
   alias Proto.Packets.ActShoutCmd
+  alias Proto.Packets.ActStopReq
   alias Proto.Packets.BriefinfoInformCmd
   alias Proto.Packets.CharLogoutcancelCmd
   alias Proto.Packets.CharLogoutreadyCmd
@@ -119,6 +129,15 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %BriefinfoInformCmd{handle: h}),
     do: {state, [{:perform, {:inform, state.map, p.handle, h}}]}
 
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActMovewalkCmd{} = m),
+    do: {state, [{:perform, {:move, state.map, p.handle, :walk, {m.from_x, m.from_y}, {m.to_x, m.to_y}}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActMoverunCmd{} = m),
+    do: {state, [{:perform, {:move, state.map, p.handle, :run, {m.from_x, m.from_y}, {m.to_x, m.to_y}}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActStopReq{x: x, y: y}),
+    do: {state, [{:perform, {:stop, state.map, p.handle, {x, y}}}]}
+
   # The GM command frame is issue 116; until then a line starting with & is dropped. It is never shown as chat.
   def handle_packet(%__MODULE__{step: :in_world} = state, %ActChatReq{content: "&" <> _}), do: {state, []}
 
@@ -179,6 +198,7 @@ defmodule Zone.Handler do
 
   def handle_info(state, {:informed, packets}), do: {state, for(p <- packets, do: {:send, p})}
 
+  def handle_info(state, {:moved, packets}), do: {state, for(p <- packets, do: {:send, p})}
   def handle_info(state, {:chatted, packets}), do: {state, for(p <- packets, do: {:send, p})}
 
   def handle_info(state, {:server_parameters, %{level: level, delay_s: delay}}),
@@ -287,8 +307,23 @@ defmodule Zone.Handler do
 
   def perform({:inform, map, own, handle}), do: {:informed, Zone.MapInstance.inform(map, own, handle)}
 
+  def perform({:move, map, own, kind, from, to}), do: moved(Zone.MapInstance.move(map, own, kind, from, to))
+
+  def perform({:stop, map, own, loc}), do: moved(Zone.MapInstance.stop(map, own, loc))
+
   def perform({:chat, map, handle, kind, line}), do: {:chatted, Zone.MapInstance.chat(map, handle, kind, line)}
   def perform(:server_parameters), do: {:server_parameters, Zone.Chat.common().shout}
+
+  # the packets the map instance sent this connection before its reply (one sender: they are in the mailbox)
+  defp moved(_result), do: {:moved, pushed([])}
+
+  defp pushed(acc) do
+    receive do
+      {:cluster, {:packets, packets}} -> pushed(acc ++ packets)
+    after
+      0 -> acc
+    end
+  end
 
   defp line(%{item_link_count: n, content: content, links: links}),
     do: %{item_link_count: n, content: content, links: links}
