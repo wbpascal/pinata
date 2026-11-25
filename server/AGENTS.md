@@ -14,7 +14,27 @@ Run `mix check` in `server/` before you finish or approve anything, and paste it
 - `mix dialyzer` with `:unmatched_returns`, `:extra_return`, `:missing_return`; there is no ignore file
 - `mix test --warnings-as-errors`
 
-CI also runs `mix deps.audit`. A noisy Credo check is switched off on its own in `.credo.exs`, never a whole category.
+CI also runs `mix deps.audit`. `mix check` covers only the job `check`; a test plan names every job of the table "CI jobs" that the change affects. A noisy Credo check is switched off on its own in `.credo.exs`, never a whole category.
+
+## CI jobs
+
+`.github/workflows/server.yml` runs these jobs. A test plan names each job the change affects, with its local
+command. `test/workflow_test.exs` fails when a job has no row here or a row names no job.
+
+| Job | Checks | Affected by | Locally (macOS) |
+|---|---|---|---|
+| `changelog` | a `CHANGELOG.md` line or `Changelog: none` in the PR description | every PR | at the repo root: `bash .github/scripts/changelog-check-test.sh`; `PR_BODY="…" bash .github/scripts/changelog-check.sh origin/master HEAD` |
+| `check` | the gate, single-node on SQLite, and `mix deps.audit` | every change | `mix check && mix deps.audit` |
+| `check-windows` | the gate on Windows | paths, line ends, file modes, symlinks, SQLite | CI only |
+| `windows-smoke` | release on Windows: import, start, account, login to the character list | release, config, start-up, import code | CI only |
+| `test-postgres` | the tests on PostgreSQL with three peer nodes | database code, migrations, cluster code, anything a peer node runs | `docker run -d --name pinata-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=pinata_test -p 5432:5432 postgres:18`, then with `MIX_ENV=test DATABASE_URL=postgres://postgres:postgres@localhost:5432/pinata_test PINATA_TEST_TOPOLOGY=multi`: `mix pinata.migrate`, `mix test --warnings-as-errors` |
+| `compose-smoke` | the Docker image and the Compose example: login to the character list | `Dockerfile`, `compose.yaml`, `compose.toml`, release, config, start-up code | `docs/technical/testing.md`, "Smoke test" |
+| `otel-smoke` | the release with OpenTelemetry export off and on, against a real Collector | telemetry, `Pinata.Otel`, release, config, start-up code, `Zone.Player`, `Zone.MapInstance.enter/2` | `MIX_ENV=prod mix release`, then the job's steps (`docs/technical/testing.md`, "Smoke test") |
+
+**No inline code in workflows.** An `eval` or `rpc` string in a workflow is one call with literal arguments.
+Anything longer is a script in `test/support/` that the workflow runs (`mix run`, or
+`bin/pinata rpc "Code.eval_file(…)"`), and a test of the suite loads the script or runs the same code
+(`test/workflow_test.exs`), so that `mix check` fails when the script breaks.
 
 ## Conventions
 
