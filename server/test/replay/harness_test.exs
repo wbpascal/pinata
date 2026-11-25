@@ -135,8 +135,9 @@ defmodule Replay.HarnessTest do
       do: {state, [{:send, %Reply{code: 1, token: rem(Clock.system_time(:millisecond), 4_294_967_296), handle: 7}}]}
   end
 
-  # answers, then closes the connection a moment later: a close with the heartbeat of the harness unread resets the
-  # connection on Windows and the client loses the answer
+  # answers, then closes on a tick of the test clock: the harness fires it when it moves the clock to the next line,
+  # after its heartbeat round trip has read the answer. A close in the same callback, or on a real timer, can leave
+  # that heartbeat unread; the server then resets the connection and on Windows the client loses the answer.
   defmodule Refuser do
     @moduledoc false
     @behaviour Net.Handler
@@ -146,7 +147,7 @@ defmodule Replay.HarnessTest do
 
     @impl Net.Handler
     def handle_packet(state, %MiscSeedAck{seed: 1}) do
-      Process.send_after(self(), {:cluster, :bye}, 200)
+      Clock.send_after(self(), {:cluster, :bye}, 100)
       {state, [{:send, %Reply{code: 1, token: 0, handle: 7}}]}
     end
 
@@ -327,7 +328,8 @@ defmodule Replay.HarnessTest do
 
     test "an answer followed by a close by the server is a transcript line and the close ends the replay" do
       lines = "100.500000 zone#1 C 0x0807 0100\n100.900000 zone#1 S 0x7F01 0100000000000700"
-      assert run(Refuser, lines, conns: ["zone#1"]) == :ok
+      log = TestLog.capture(fn -> assert run(Refuser, lines, conns: ["zone#1"]) == :ok end)
+      assert log =~ "[info] Net: connection closed: bye, peer 127.0.0.1:"
     end
 
     test "a buffered answer nobody expects is an extra packet at the end" do
