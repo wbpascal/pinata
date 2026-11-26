@@ -222,7 +222,7 @@ A named packet field that a replay test does not compare because its value canno
 _Avoid_: ignore list, wildcard
 
 **Deferral**:
-A packet, packet field, client packet or object (a mob) that a replay test leaves out for now because the milestone that builds it has not landed: a server packet or field is not compared, a client packet is not sent, an object's packets are taken out. It names that milestone, which removes it.
+A packet, packet field, client packet or object (a mob) that a replay test leaves out for now because the milestone that builds it has not landed: a server packet or field is not compared, a client packet is not sent, an object's packets are taken out, a placeholder packet the original does not send is dropped. It names that milestone, which removes it.
 _Avoid_: mask (a mask never goes away), skip, placeholder (that is what the server sends meanwhile)
 
 **Replay cut**:

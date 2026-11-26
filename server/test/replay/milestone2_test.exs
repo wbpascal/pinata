@@ -90,7 +90,9 @@ defmodule Replay.Milestone2Test do
       deferrals: opts[:deferrals] || [],
       close_after: opts[:close_after] || [],
       drop_after: opts[:drop_after] || [],
-      late_ms: opts[:late_ms] || 0
+      late_ms: opts[:late_ms] || 0,
+      masks: opts[:masks] || [],
+      tick_offset: opts[:tick_offset] || 0
     )
   end
 
@@ -269,8 +271,12 @@ defmodule Replay.Milestone2Test do
                                  "the mystery vault window state of the captured characters (mystery vault); the placeholder sends 0"},
                                 {:payload, [213, 215], P.BriefinfoMobCmd, :all, 4,
                                  "B's entry lists of NPCs and monsters: the original's first list holds a monster, so its border differs, and the :mobs deferral cannot join the two lists across the 0x1C07 between them (mobs)"},
-                                {:payload, [222], P.ChargedBoothslotsizeCmd, :size, 9,
-                                 "the booth slot count of X45B (charged items); the placeholder sends 5"},
+                                {:payload, [222], P.ChargedBoothslotsizeCmd, :size, 6,
+                                 "the booth slot count of X45B (booth size); the placeholder sends 5"},
+                                {:extra, P.CharClientItemCmd, 3,
+                                 "the placeholder sends an empty 0x1047 for each of the boxes 9, 8, 12 and 15; the original leaves out an empty box other than 15 (A has no worn item, B none and no box 12 item), which needs the loaded boxes (items)"},
+                                {:absent, [879], 4,
+                                 "0x1C0E of object 14204: no packet of the capture introduces this handle, it is not a player and not an NPC of the rebuild (objects)"},
                                 {:absent, [243, 280, 282], 3,
                                  "the 0x3001 item cell changes at the entry and at 42.9 s (items)"},
                                 {:absent, [279], 9, "the 0x9010 at 42.9 s with the item changes (charged items)"},
@@ -282,6 +288,8 @@ defmodule Replay.Milestone2Test do
                                  "B equips the bow 0x300F: 0x1C05 to A, 0x3002, 0x3001, 0x3011, 0x1035 (items)"},
                                 {:payload, [888], P.BriefinfoLogincharacterCmd, :equip, 3,
                                  "Equ_LeftHand: the bow B equipped at 151.9 s (items); the mask covers the 20 slots, only the left hand differs"},
+                                {:payload, [888], P.BriefinfoLogincharacterCmd, :y, 2,
+                                 "B's position at the tick that brings it into sight: the original's tick phase and handling delays are not in the capture. No milestone removes it"},
                                 {:payload, P.BriefinfoLogincharacterCmd, :abstatebit, 4, "the abstate bits (abstates)"},
                                 {:payload, P.BriefinfoCharacterCmd, [:chars, :abstatebit], 4,
                                  "the abstate bits (abstates)"},
@@ -335,15 +343,27 @@ defmodule Replay.Milestone2Test do
                                 {:absent, [628, 629], 4, "the chat line 0x2002 of a mob (handle 5991; mobs)"}
                               ]
 
+  @handling "the server position of a mover at the instant of a request: the original handled the packet up to 45 ms after its capture line (the relay's own delay bounds it), one unit at run speed is 8 ms; test/movement_test.exs compares these fields with capture 45 at a set clock"
+
+  @walk_sit_emote_masks [
+    {P.ActSomeonemovewalkCmd, :from_x, @handling},
+    {P.ActSomeonemovewalkCmd, :from_y, @handling},
+    {P.ActSomeonemoverunCmd, :from_x, @handling},
+    {P.ActSomeonemoverunCmd, :from_y, @handling},
+    {P.ActSomeonestopCmd, :x, @handling},
+    {P.ActSomeonestopCmd, :y, @handling}
+  ]
+
   # zone#1 is A (X45A), zone#2 is B (X45B), in sight of each other from the start. Played: the walk and run relay
   # (169 to 180 s), the sit 0x2020 {7} and the jump, the dance three times and the step that ends it (0x2021 to both,
   # 0x2025 to A only), B leaving and entering A's sight at run speed (0x1C0E, 0x1C06 with B's emote state), the shout
   # out of sight and the whisper to an unknown name. Deferred: B's GM setup at 104 to 152 s (items, stats, skills),
   # the bow in B's later appear (items), abstates, the regular 0x1035, the mob chat. late_ms: 200 as in
   # walk-run-portals (the tick-driven 0x1C0E / 0x1C06 of B's runs at 305.6 s and 385.0 s).
-  # Blocked (exec report of issue 115): the 0x1047 placeholder sends four boxes where the capture has three (A) and
-  # two (B), and B's move relays from 457 on differ by 1 or 2 units in `from`; neither can be deferred.
-  @tag skip: "blocked: 0x1047 box count and move relay drift, see .agent-loop/115/exec-1.md"
+  # The 0x1047 placeholders of the empty boxes the original leaves out are dropped (:extra). The `from` of the move
+  # relays and the stop position are masked: the server takes the mover's position at the instant it handles the
+  # request, which the capture bounds only by the relay's delay; for each of the 108 relayed requests before 471 s
+  # a delay inside that bound gives the captured position (simulation of Zone.Mover over the transcript).
   test "26_11_21_45_walk-sit-emote-stop-shout-whisper-cast-abort",
     do:
       replay(
@@ -351,6 +371,7 @@ defmodule Replay.Milestone2Test do
         :walk_sit_emote,
         {:cut, 471, "&mb ArchMageBook: the mob, B's death and town revive, casts (combat, milestone 4)"},
         deferrals: @walk_sit_emote_deferrals,
+        masks: @walk_sit_emote_masks,
         late_ms: 200
       )
 end

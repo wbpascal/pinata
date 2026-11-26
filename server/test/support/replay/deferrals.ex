@@ -9,7 +9,9 @@ defmodule Replay.Deferrals do
   `{:absent, [index, ...], milestone, reason}` (these server packets are left out, by transcript index: for an opcode
   that built code also sends),
   `{:unsent, client_index, answer_indices, milestone, reason}` (a client packet and its answers are left out, by
-  transcript index) and `{:mobs, mobs, milestone, reason}` (the monsters of a map are left out per object).
+  transcript index), `{:mobs, mobs, milestone, reason}` (the monsters of a map are left out per object) and
+  `{:extra, module, milestone, reason}` (the rebuild sends server packets of that module the capture does not have at
+  that place, a placeholder for an empty list the original leaves out; they are dropped).
 
   A `lists` entry of `:mobs` is `{module, array, handle_field, mob_id_field, max}`: the elements of a list packet
   that are monsters are taken out. Then a run of consecutive kept list packets of one connection (same opcode) has
@@ -35,6 +37,7 @@ defmodule Replay.Deferrals do
           | {:absent, [pos_integer()], pos_integer(), String.t()}
           | {:unsent, client_index :: pos_integer(), answer_indices :: [pos_integer()], pos_integer(), String.t()}
           | {:mobs, mobs(), pos_integer(), String.t()}
+          | {:extra, module(), pos_integer(), String.t()}
 
   # Entries are added by the issue that defines each packet.
   @doc "Deferrals that apply to every replay."
@@ -66,6 +69,7 @@ defmodule Replay.Deferrals do
   defp check_shape!({:payload, _mod, :all, _m, _r}, _packets), do: :ok
   defp check_shape!({:payload, mod, path, _m, r}, _packets) when is_atom(mod), do: Masks.validate!([{mod, path, r}])
   defp check_shape!({:absent, mod, _m, _r}, _packets) when is_atom(mod), do: :ok
+  defp check_shape!({:extra, mod, _m, _r}, _packets) when is_atom(mod), do: :ok
 
   defp check_shape!({:payload, indices, mod, path, _m, r}, packets) when is_list(indices) and is_atom(mod) do
     for index <- indices,

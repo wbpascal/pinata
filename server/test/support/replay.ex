@@ -81,6 +81,7 @@ defmodule Replay do
     :ok = Replay.Deferrals.validate!(deferrals, transcript.packets)
     masks = masks ++ for({:payload, mod, path, _m, reason} <- deferrals, path != :all, do: {mod, path, reason})
     payload_all = for {:payload, mod, :all, _m, _r} <- deferrals, into: MapSet.new(), do: mod.opcode()
+    extra = for {:extra, mod, _m, _r} <- deferrals, into: MapSet.new(), do: mod.opcode()
     at = for {:payload, indices, mod, path, _m, _r} <- deferrals, do: {MapSet.new(indices), mod, path}
 
     packets = transcript.packets |> Enum.filter(&played?(&1, Keyword.fetch!(opts, :stop), transcript.start))
@@ -98,7 +99,8 @@ defmodule Replay do
       drop_after: opts[:drop_after],
       late_ms: opts[:late_ms],
       payload_all: payload_all,
-      payload_at: at
+      payload_at: at,
+      extra: extra
     }
 
     previous = Application.fetch_env(:pinata, :clock_source)
@@ -373,15 +375,22 @@ defmodule Replay do
       {:ok, <<opcode::little-16, received::binary>>, state} when opcode == packet.opcode ->
         compared(packet, received, state, ctx)
 
-      {:ok, <<opcode::little-16, received::binary>>, _state} ->
-        lines = [
-          "expected: #{opcode_text(packet.opcode)}",
-          "received: #{opcode_text(opcode)}",
-          "payload: #{hex(received)}"
-        ]
-
-        {:error, failure(:unexpected, ctx, packet, "unexpected packet", lines)}
+      {:ok, <<opcode::little-16, received::binary>>, state} ->
+        # an :extra deferral: the packet is dropped and the line waits for the next one
+        if MapSet.member?(ctx.extra, opcode),
+          do: received(packet, state, ctx),
+          else: unexpected(packet, opcode, received, ctx)
     end
+  end
+
+  defp unexpected(packet, opcode, received, ctx) do
+    lines = [
+      "expected: #{opcode_text(packet.opcode)}",
+      "received: #{opcode_text(opcode)}",
+      "payload: #{hex(received)}"
+    ]
+
+    {:error, failure(:unexpected, ctx, packet, "unexpected packet", lines)}
   end
 
   defp send_or_missing(client, packet, payload, ctx) do

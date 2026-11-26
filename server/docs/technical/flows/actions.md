@@ -89,5 +89,7 @@ the players in sight during `0x1803` (capture 45 index 239) is not sent: its cau
 ## Tests
 
 `test/actions_test.exs` (end to end over real sockets, the bytes of capture 45 and 14), `test/zone/map_instance_test.exs`
-(receivers and state), `test/proto/packets/act_test.exs` (codecs). `0x2022` / `0x2023` were never captured; they are
+(receivers and state), `test/proto/packets/act_test.exs` (codecs). The replay of capture 45 in
+`test/replay/milestone2_test.exs` runs to 471 s and compares every `0x2021`, the `0x2025` and the emote state of the
+appears. `0x2022` / `0x2023` were never captured; they are
 built from Z02 §4 and belong on the manual real-client check.
