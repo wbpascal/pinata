@@ -157,6 +157,102 @@ defmodule Replay.Setups do
     :ok
   end
 
+  @doc """
+  Setup of `re-data/captures/26_11_21_45_walk-sit-emote-stop-shout-whisper-cast-abort.md`. The account `admin` with
+  the four characters its 0x0C14 lists (`X45A` in slot 3) and the account `testaccountB` with its two (`X45B` in
+  slot 1); `X45A` and `X45B` with the stored values their 0x1038 shows (level, experience, position, HP, SP, stones).
+  """
+  @spec walk_sit_emote() :: :ok
+  def walk_sit_emote do
+    account_id = accounts()
+
+    :ok =
+      test1235(account_id, %{kq_x: 5756, kq_y: 8745, kq_date: ~U[2026-11-16 10:54:42Z]}, [{10, 1250}])
+
+    :ok = test2(account_id, %{level: 33, kq_x: 5758, kq_y: 8789, kq_date: ~U[2026-11-16 10:53:06Z]})
+
+    x37 =
+      Factory.character(account_id, %{
+        id: 7,
+        slot: 2,
+        name: "X37Del",
+        level: 2,
+        race: 1,
+        class: 21,
+        gender: 1,
+        hair: 4,
+        kq_map: "RouN",
+        kq_x: 6596,
+        kq_y: 6931,
+        kq_date: ~U[2026-11-21 11:56:58Z]
+      })
+
+    _ = Factory.item(x37.id, 12, 57_363)
+
+    _ =
+      Factory.character(account_id, %{
+        id: 15,
+        slot: 3,
+        name: "X45A",
+        level: 40,
+        race: 1,
+        class: 21,
+        gender: 1,
+        hair: 4,
+        exp: 1_389_279,
+        login_x: 6397,
+        login_y: 9849,
+        hp: 48,
+        sp: 46,
+        hp_stones: 15,
+        sp_stones: 11,
+        kq_map: "RouN",
+        kq_x: 6397,
+        kq_y: 9849,
+        kq_date: ~U[2026-11-21 17:23:57Z]
+      })
+
+    {:ok, b_id} = Persistence.create_account("testaccountB", "098f6bcd4621d373cade4e832627b4f6")
+
+    x14 =
+      Factory.character(b_id, %{
+        id: 8,
+        slot: 0,
+        name: "X14B",
+        race: 3,
+        class: 16,
+        hair: 1,
+        hair_color: 1,
+        face: 4,
+        kq_map: "RouN",
+        kq_x: 6431,
+        kq_y: 8801,
+        kq_date: ~U[2026-11-15 17:44:03Z]
+      })
+
+    _ = Factory.item(x14.id, 12, 1750)
+
+    _ =
+      Factory.character(b_id, %{
+        id: 16,
+        slot: 1,
+        name: "X45B",
+        level: 40,
+        race: 2,
+        class: 14,
+        exp: 1_389_279,
+        login_x: 6843,
+        login_y: 9850,
+        hp: 46,
+        sp: 24,
+        hp_stones: 13,
+        sp_stones: 10,
+        kq_date: ~U[2026-11-21 17:22:02Z]
+      })
+
+    :ok
+  end
+
   defp test2(account_id, attrs) do
     character =
       Factory.character(

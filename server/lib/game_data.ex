@@ -19,6 +19,7 @@ defmodule GameData do
       HairInfo,
       HairColorInfo,
       FaceInfo,
+      ActionViewInfo,
       CharDefault,
       CharDefaultItem,
       CharDefaultSkill,

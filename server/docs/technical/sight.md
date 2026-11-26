@@ -76,9 +76,12 @@ The entrant's packets go into the second map-entry burst directly after `0x583A`
 
 ## Appear packets
 
-- **Player** `0x1C06` (`Zone.Sight.brief/1`, 235 bytes): handle, name, position, direction, mode 1, class, look,
+- **Player** `0x1C06` (`Zone.Sight.brief/1`, 235 bytes): handle, name, position, direction, mode (the stance, 1 or
+  2), class, look,
   the item id of each worn item in the 20 slots of `WorldManager.Avatar` (0xFFFF for an empty one) with the upgrades
-  of right hand, left hand, leg, body and shoes, polymorph 0xFFFF, emoticon `{0xFF, 0xFFFF}`, type 2, no mover
+  of right hand, left hand, leg, body and shoes, polymorph 0xFFFF, the player's emote state as emoticon (`{0xFF, 0}` in
+  the entrant's own appear of the entry exchange, `{0xFF, 0xFFFF}` once cleared, `{id, frame}` during an emote;
+  [`flows/actions.md`](flows/actions.md)), type 2, no mover
   (0xFFFF, slot 0x0A), Kingdom Quest team type 2, level; title, guild and the 99 abstate bytes are 0 until their
   milestones. Checked against the captured `0x1C06` of capture 14 (`test/zone/sight_test.exs`).
 - **NPC** `0x1C08` (`Zone.Npc`, 149 bytes, built once at instance start): mode 2, the mob id of the `MobInfo` row of

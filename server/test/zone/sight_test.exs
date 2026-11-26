@@ -124,6 +124,8 @@ defmodule Zone.SightTest do
     p =
       player(c.handle, c.x, c.y, %{
         dir: c.dir,
+        # X14B was in the world before: its emote state is cleared (capture 45 index 888)
+        emoticon: {0xFF, 0xFFFF},
         equipment: [%{slot: 12, item_id: Enum.at(c.equip, 2), upgrade: 0, class: 5}]
       })
 

@@ -28,6 +28,9 @@ A **refusal** runs the stop block check (below), then sends `0x201B {pos}` to th
 mover. No log line: the unmodified client produces refused moves (it sends `from == to`, see `walk-run-portals` file
 line 701), and the answer is the original's.
 
+An accepted move clears the emote state of the player (`{0xFF, 0xFFFF}`) after its relay; a stop, a refusal and a
+pull-back do not ([`flows/actions.md`](flows/actions.md)).
+
 ## Stop request
 
 `0x2012 {loc}`: the mover is stepped to the clock's millisecond; when `dist²(pos, loc) < 40 001` and `loc` has a free

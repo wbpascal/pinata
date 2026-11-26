@@ -54,6 +54,23 @@ defmodule Replay.Milestone2Test.Unbuilt.KqJoiningAlarmCmd do
   def opcode, do: 0x5824
 end
 
+defmodule Replay.Milestone2Test.Unbuilt.BriefinfoAbstateChangeListCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x1C19
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatAbstatesetCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2427
+end
+
+# official name from the 2017 PDB only (NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD); capture-validation.md §12 calls it the
+# range broadcast of the mini-mon use
+defmodule Replay.Milestone2Test.Unbuilt.CharUseitemMinimonUseBroadCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x112C
+end
+
 defmodule Replay.Milestone2Test do
   # The harness swaps the global clock source, so it cannot run async.
   use ExUnit.Case, async: false
@@ -230,6 +247,110 @@ defmodule Replay.Milestone2Test do
         :walk_run_portals,
         {:cut, 73.8, "the town portal 0x181A and the map change (issue 112)"},
         deferrals: @walk_run_deferrals,
+        late_ms: 200
+      )
+
+  @param_1035 "the late and the once-a-minute 0x1035 (parameters, regeneration; capture-validation.md §27.8); the built ones at 134 and 246 stay"
+
+  @walk_sit_emote_deferrals @deferrals ++
+                              @in_world ++
+                              [
+                                {:unsent, 43, [46], 2, @prison_race},
+                                {:unsent, 64, [79, 80, 81, 82], 10, @kq_race},
+                                {:unsent, 70, [131], 2, @inventory_race},
+                                {:unsent, 71, [138], 2, @inventory_race},
+                                {:unsent, 164, [167], 2, @prison_race},
+                                {:unsent, 171, [177, 178, 179, 231], 10, @kq_race},
+                                {:unsent, 232, [257], 2, @inventory_race},
+                                {:unsent, 233, [256], 2, @inventory_race},
+                                {:payload, P.CharClientCoininfoCmd, :exchangeable, 11,
+                                 "the exchangeable coins of the captured characters (coins); the placeholder sends the value of idle_in_world"},
+                                {:payload, P.CharMysteryvaultUiStateCmd, :state, 11,
+                                 "the mystery vault window state of the captured characters (mystery vault); the placeholder sends 0"},
+                                {:payload, [213, 215], P.BriefinfoMobCmd, :all, 4,
+                                 "B's entry lists of NPCs and monsters: the original's first list holds a monster, so its border differs, and the :mobs deferral cannot join the two lists across the 0x1C07 between them (mobs)"},
+                                {:payload, [222], P.ChargedBoothslotsizeCmd, :size, 9,
+                                 "the booth slot count of X45B (charged items); the placeholder sends 5"},
+                                {:absent, [243, 280, 282], 3,
+                                 "the 0x3001 item cell changes at the entry and at 42.9 s (items)"},
+                                {:absent, [279], 9, "the 0x9010 at 42.9 s with the item changes (charged items)"},
+                                {:unsent, 357, [358, 359], 4,
+                                 "B's &fullpoint and its 0x240E / 0x240F (GM commands, stats)"},
+                                {:unsent, 368, [369], 3, "B's &makeitem HeavyBow and its 0x3001 (items)"},
+                                {:unsent, 421, [422], 4, "B's skill shortcut 0x7037 and its 0x7038 (skills)"},
+                                {:unsent, 425, [426, 427, 428, 429, 430], 3,
+                                 "B equips the bow 0x300F: 0x1C05 to A, 0x3002, 0x3001, 0x3011, 0x1035 (items)"},
+                                {:payload, [888], P.BriefinfoLogincharacterCmd, :equip, 3,
+                                 "Equ_LeftHand: the bow B equipped at 151.9 s (items); the mask covers the 20 slots, only the left hand differs"},
+                                {:payload, P.BriefinfoLogincharacterCmd, :abstatebit, 4, "the abstate bits (abstates)"},
+                                {:payload, P.BriefinfoCharacterCmd, [:chars, :abstatebit], 4,
+                                 "the abstate bits (abstates)"},
+                                {:absent, U.BriefinfoAbstateChangeListCmd, 4,
+                                 "the abstate list of a player in sight (abstates)"},
+                                {:absent, U.BatAbstatesetCmd, 4, "the abstate set of a player in sight (abstates)"},
+                                {:absent, U.CharUseitemMinimonUseBroadCmd, 9,
+                                 "the mini-mon broadcast of a player that enters (charged items)"},
+                                {:absent, [239], 4,
+                                 "the 0x2013 {B} the original sends to the players in sight inside 0x1803, between the abstate packets of the login protection; its cause is not reconstructed"},
+                                {:absent,
+                                 [
+                                   169,
+                                   277,
+                                   283,
+                                   350,
+                                   353,
+                                   437,
+                                   440,
+                                   551,
+                                   554,
+                                   644,
+                                   646,
+                                   835,
+                                   837,
+                                   989,
+                                   991,
+                                   1080,
+                                   1083
+                                 ], 4, @param_1035},
+                                {:absent,
+                                 [
+                                   267,
+                                   278,
+                                   281,
+                                   351,
+                                   352,
+                                   438,
+                                   439,
+                                   552,
+                                   553,
+                                   645,
+                                   647,
+                                   836,
+                                   838,
+                                   990,
+                                   992,
+                                   1081,
+                                   1082
+                                 ], 4, @param_1035},
+                                {:absent, [628, 629], 4, "the chat line 0x2002 of a mob (handle 5991; mobs)"}
+                              ]
+
+  # zone#1 is A (X45A), zone#2 is B (X45B), in sight of each other from the start. Played: the walk and run relay
+  # (169 to 180 s), the sit 0x2020 {7} and the jump, the dance three times and the step that ends it (0x2021 to both,
+  # 0x2025 to A only), B leaving and entering A's sight at run speed (0x1C0E, 0x1C06 with B's emote state), the shout
+  # out of sight and the whisper to an unknown name. Deferred: B's GM setup at 104 to 152 s (items, stats, skills),
+  # the bow in B's later appear (items), abstates, the regular 0x1035, the mob chat. late_ms: 200 as in
+  # walk-run-portals (the tick-driven 0x1C0E / 0x1C06 of B's runs at 305.6 s and 385.0 s).
+  # Blocked (exec report of issue 115): the 0x1047 placeholder sends four boxes where the capture has three (A) and
+  # two (B), and B's move relays from 457 on differ by 1 or 2 units in `from`; neither can be deferred.
+  @tag skip: "blocked: 0x1047 box count and move relay drift, see .agent-loop/115/exec-1.md"
+  test "26_11_21_45_walk-sit-emote-stop-shout-whisper-cast-abort",
+    do:
+      replay(
+        "26_11_21_45_walk-sit-emote-stop-shout-whisper-cast-abort",
+        :walk_sit_emote,
+        {:cut, 471, "&mb ArchMageBook: the mob, B's death and town revive, casts (combat, milestone 4)"},
+        deferrals: @walk_sit_emote_deferrals,
         late_ms: 200
       )
 end
