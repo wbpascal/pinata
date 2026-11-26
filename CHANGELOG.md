@@ -21,6 +21,9 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - Leaving the world (back to the character list, quit, lost connection) saves map, position, HP, SP, play minutes and the logout time, and the character can be selected again at once (#111).
 - Every character in the world is saved every 10 minutes; a crashed map disconnects its players and loses what happened since their last save; stopping the server saves every player first (#111).
 - A second login of an account waits until the first session's character is saved; when that takes more than 5 s the login is refused and an `error` line is written (#111).
+- Gates: a click on a Gate NPC within reach asks "Do you want to move to … field?"; "Yes" takes the character to the destination of `LinkTable`, saved first, on the Zone node that runs the target map (#112).
+- The town portal request takes the character to the destination of `TownPortal.shn` (level limit `MinLevel`); the town portal window of the NPC itself waits for NPC menus (#112).
+- A gate whose target map runs on no Zone node does nothing for the player and writes an `info` line naming the gate, its map and the destination (#112).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 - `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
@@ -37,6 +40,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - A whisper whose size does not match its item links is ignored; the original copied past its buffer and any player could stop WorldManager with it (W04-B2) (#114).
 - The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).
 - No exit countdown on the server: the character leaves the world at once (the original kept it for up to 13 s); a character select right after "back to character select" is never refused (#111).
+- The town portal answers success only after WorldManager accepted the target map, and "cannot be used now" when the map runs nowhere; the original said success and then did nothing (#112).
+- The town portal works only within 1000 units of a town portal NPC; the original accepted the request anywhere, a free teleport for a modified client (#112).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 

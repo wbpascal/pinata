@@ -245,6 +245,62 @@ defmodule Zone.MapInstanceTest do
     end
   end
 
+  # a player in mode 1 at a point; the packets of its entry are flushed
+  defp standing(pid, {x, y}, conn \\ :none) do
+    {:ok, handle} = Zone.MapInstance.enter(pid, %{player(conn) | x: x, y: y, last_good: {x, y}})
+    {:ok, _} = Zone.MapInstance.login_complete(pid, handle)
+    flush()
+    handle
+  end
+
+  defp flush do
+    receive do
+      {:cluster, _} -> flush()
+    after
+      20 -> :ok
+    end
+  end
+
+  defp some_npc(pid), do: pid |> :sys.get_state() |> Map.fetch!(:npc_index) |> Map.values() |> hd()
+
+  test "npc/3: within 1000 units of a shown NPC, not 1001 away, not an unknown handle, not in mode 0" do
+    pid = start("Rou")
+    npc = some_npc(pid)
+    near = standing(pid, {npc.x, npc.y + 1000})
+    far = standing(pid, {npc.x, npc.y + 1001})
+    assert {:ok, %Zone.Npc{handle: h}, {x, y}} = Zone.MapInstance.npc(pid, near, npc.handle)
+    assert {h, x, y} == {npc.handle, npc.x, npc.y + 1000}
+    assert :error = Zone.MapInstance.npc(pid, far, npc.handle)
+    assert :error = Zone.MapInstance.npc(pid, near, 1)
+    assert :error = Zone.MapInstance.npc(pid, 9499, npc.handle)
+    {:ok, loading} = Zone.MapInstance.enter(pid, %{player() | x: npc.x, y: npc.y, last_good: {npc.x, npc.y}})
+    assert :error = Zone.MapInstance.npc(pid, loading, npc.handle)
+  end
+
+  test "near_npc?/3: by mob name within 1000 units" do
+    pid = start("Rou")
+    npc = some_npc(pid)
+    near = standing(pid, {npc.x + 600, npc.y + 800})
+    far = standing(pid, {npc.x + 601, npc.y + 800})
+    assert Zone.MapInstance.near_npc?(pid, near, npc.row.mob_name)
+    refute Zone.MapInstance.near_npc?(pid, near, "NoSuchMob")
+    refute Zone.MapInstance.near_npc?(pid, far, npc.row.mob_name)
+    refute Zone.MapInstance.near_npc?(pid, 9499, npc.row.mob_name)
+  end
+
+  test "relocate/3: the new position in mode 0, the handle kept, 0x1805 to a player in sight" do
+    pid = start("Rou")
+    _watcher = standing(pid, {500, 500}, self())
+    mover = standing(pid, {600, 600})
+    flush()
+    :sys.replace_state(pid, &put_in(&1.players[mover].chat.ring, [1]))
+    assert {:ok, %Zone.Player{handle: ^mover} = p} = Zone.MapInstance.relocate(pid, mover, {700, 800})
+    assert {p.x, p.y, p.last_good, p.mode, p.mover, p.move, p.chat.ring} == {700, 800, {700, 800}, 0, :none, :none, []}
+    assert_receive {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: ^mover}]}}
+    assert {:ok, ^p} = Zone.MapInstance.player(pid, mover)
+    assert :error = Zone.MapInstance.relocate(pid, 9499, {1, 1})
+  end
+
   test "leave returns the player as it was on the map, player/2 reads it" do
     pid = start("Rou")
     {:ok, handle} = Zone.MapInstance.enter(pid, player())

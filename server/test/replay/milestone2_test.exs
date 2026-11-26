@@ -204,23 +204,48 @@ defmodule Replay.Milestone2Test do
         drop_after: [386, 547]
       )
 
+  @target "0x2401 target select and its 0x2402 (combat)"
+  @town_npc "0x200A on the town portal NPC with 0x243D and the menu 0x201C (NPC menus); only the Gate role is built"
+
+  @kq_again "a later 0x581B of the session, answered by nothing: with the first one left out (the order race at 49) the rebuild would answer this one with 0x581C; only the first of a session is answered (test/map_entry_test.exs)"
+
+  @border "an NPC appear at the sight border after the arrival in RouN at 608: the original placed the player at x + 25, so its positions cross the border in other slices; the placement search comes with mob spawns"
+
   @walk_run_deferrals @deferrals ++
                         @in_world ++
                         [
                           {:unsent, 44, [47], 2, @prison_race},
-                          {:unsent, 49, [54, 55, 56, 57], 10, @kq_race},
+                          {:unsent, 49, [54, 55, 56, 57], 10, @kq_race}
+                        ] ++
+                        for(i <- [254, 370, 480, 610, 882], do: {:unsent, i, [], 10, @kq_again}) ++
+                        [
                           {:unsent, 58, [124], 2, @inventory_race},
                           {:unsent, 59, [131], 2, @inventory_race},
-                          {:absent, [139, 172, 173], 4,
-                           "the late 0x1035 of the abstate reset (parameters); the built one at 127 stays"},
-                          {:unsent, 222, [223], 4, "0x2401 target select and its 0x2402 (combat)"},
-                          {:unsent, 224, [225, 227], 3,
-                           "0x200A NPC click with 0x243D and the menu 0x201C (NPC menus); the town portal is issue 112"}
+                          {:absent, [139, 172, 173, 331, 444, 451, 452, 557, 698, 787, 788, 966, 1016, 1017], 4,
+                           "the late 0x1035 of the abstate resets (parameters); the built one of each map entry stays"},
+                          {:unsent, 222, [223], 4, @target},
+                          {:unsent, 336, [337], 4, @target},
+                          {:unsent, 445, [448], 4, @target},
+                          {:unsent, 567, [568], 4, @target},
+                          {:unsent, 846, [849], 4, @target},
+                          {:unsent, 224, [225, 227], 3, @town_npc},
+                          {:unsent, 338, [340, 341], 3, @town_npc},
+                          {:unsent, 446, [449, 450], 3, @town_npc},
+                          {:unsent, 569, [571, 572], 3, @town_npc},
+                          {:absent, [851], 4, "0x243D cease fire after the target select of the gate click (combat)"},
+                          {:absent, [706, 733], 4, @border},
+                          {:absent, [761], 4,
+                           "0x1C0E of handle 14204, an object never shown on this connection (no mob or NPC of the map; mobs)"},
+                          {:payload, [368, 608], P.MapLoginAck, :x, 4,
+                           "the original moves an arriving player off an occupied cell (x + 25 at the town portal NPC of RouN); the placement search comes with mob spawns"}
                         ]
 
   # zone#1 walks and runs through RouN: every 0x2017, 0x2019 and 0x2012 is played (no refusal, nothing relayed: no
   # other player), the NPCs that come into sight appear with 0x1C08 on the tick; the mob moves are in the :mobs
-  # deferral. late_ms: 200 because the original handled each move 5 to 60 ms after its capture time and ticked at its
+  # deferral. Then five map changes: the town portal 0x181A (228, 343, 453, 583: RouN to RouVal01 and back, twice)
+  # with 0x181B and 0x180A, and the gate of RouN to RouCos02 (0x200A at 847, the menu 0x3C01, "Yes" 0x3C02 at 856,
+  # 0x180A). Each new Zone connection enters with the full burst; the WorldManager connection sends only 0x5826 and
+  # 0x182A. The client closed each old Zone connection after its 0x180A (close_after). late_ms: 200 because the original handled each move 5 to 60 ms after its capture time and ticked at its
   # own phase, so a tick-driven appear can lie before the tick that sends it here; without it the replay fails at the
   # first NPC appear (146) for every tick phase, with it it passes for all (testing.md, "Clock").
   test "26_11_15_walk-run-portals",
@@ -228,8 +253,9 @@ defmodule Replay.Milestone2Test do
       replay(
         "26_11_15_walk-run-portals",
         :walk_run_portals,
-        {:cut, 73.8, "the town portal 0x181A and the map change (issue 112)"},
+        :end,
         deferrals: @walk_run_deferrals,
+        close_after: [231, 346, 456, 586, 857],
         late_ms: 200
       )
 end

@@ -302,7 +302,7 @@ defmodule EnterWorldTest do
   end
 
   describe "handlers" do
-    @reservation %{character_id: 7, name: "Test1235", map: "RouN", node: :a@x}
+    @reservation %{kind: :first_entry, character_id: 7, name: "Test1235", map: "RouN", node: :a@x}
 
     defp wm_state(fields),
       do: struct!(WorldManager.Handler, Map.merge(%{worlds: [0], world_no: 0, step: :open, user_no: 1}, fields))
@@ -329,6 +329,29 @@ defmodule EnterWorldTest do
 
       assert {{:ok, %{kind: :first_entry, character_id: 7, map: "RouN"}}, %{reservation: :none}, [_watch]} =
                WorldManager.Handler.handle_call(state, {:redeem, "Test1235", :a@x, self()})
+    end
+
+    test "a map-change reservation: another node is :wrong_node and keeps it, the right node gets the struct" do
+      parked = %{placeholder: :player}
+      reserve = %{character_id: 7, map: "RouVal01", x: 13_658, y: 7812, node: :a@x, player: parked}
+      state = wm_state(%{character: "Test1235", handle: 0x445C})
+
+      assert {{:ok, 0x445C}, %{reservation: %{kind: :map_change}} = reserved, []} =
+               WorldManager.Handler.handle_call(state, {:reserve, reserve})
+
+      assert {{:error, :wrong_node}, ^reserved, []} =
+               WorldManager.Handler.handle_call(reserved, {:redeem, "Test1235", :b@x, self()})
+
+      me = self()
+
+      assert {{:ok, %{kind: :map_change, character_id: 7, map: "RouVal01", x: 13_658, y: 7812, player: ^parked}},
+              %{reservation: :none, character: "Test1235"}, [{:perform, {:watch_zone, ^me}}]} =
+               WorldManager.Handler.handle_call(reserved, {:redeem, "Test1235", :a@x, me})
+    end
+
+    test "a reserve on a session without a character in the world is :no_session" do
+      state = wm_state(%{handle: 1})
+      assert {{:error, :no_session}, ^state, []} = WorldManager.Handler.handle_call(state, {:reserve, %{}})
     end
 
     test "the Zone answers :wrong_node with 0x1804 {0x141, 0xFF} and closes" do

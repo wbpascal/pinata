@@ -212,3 +212,10 @@ defmodule Proto.Packets.ActSomeoneshoutCmd do
   field :content, {:counted, :u8}
   field :links, {:records, :item_link_count, 0x67}
 end
+
+defmodule Proto.Packets.ActNpcclickCmd do
+  @moduledoc "0x200A NC_ACT_NPCCLICK_CMD, client to server: the player clicked an NPC."
+  use Proto.Packet, opcode: 0x200A
+  # official: npchandle
+  field :npc_handle, :u16
+end

@@ -34,6 +34,12 @@ defmodule Zone.MapInstance do
   rules and the player's `chat` state, sends a passed line to the other receivers (the players in sight for normal
   chat, every player in mode 1 for a shout) and returns the speaker's own packets: its copy of the line, `0x0848`
   for a spam block, or nothing.
+
+  Map change (flow: `docs/technical/flows/map-change.md`): `npc/3` answers a click on an NPC within 1000 units of the
+  player (mode 1, mover stepped to now) with the NPC and the player's position; `near_npc?/3` tells whether the player
+  stands within 1000 units of a shown NPC of a mob name (the town portal check); `relocate/3` moves a player inside
+  the map instance for `0x1809`: `0x1805` to the players in sight, the new position, mode 0, mover and chat state
+  reset, the handle kept.
   """
 
   use GenServer
@@ -60,6 +66,8 @@ defmodule Zone.MapInstance do
   @reach2 40_001
   # the block check probes around a blocked step only when the last good position is farther than 30 units
   @stuck2 899
+  # an NPC acts on a click within 1000 units: dist² ≤ 1 000 000 (Z02 §6.2)
+  @npc_reach2 1_000_000
 
   @spec start_link({Cluster.Registry.world_id(), binary(), Path.t()}) :: GenServer.on_start()
   def start_link({world_id, map_name, _data_dir} = arg),
@@ -137,6 +145,26 @@ defmodule Zone.MapInstance do
   @spec chat(pid(), 8000..9499, :normal | :shout, Zone.Chat.line()) :: [struct()]
   def chat(pid, handle, kind, line) when kind in [:normal, :shout],
     do: GenServer.call(pid, {:chat, handle, kind, line})
+
+  @doc """
+  The NPC the player of the handle clicked (`0x200A`) and the player's position: the player is in mode 1 (its mover
+  stepped to now) and stands within 1000 units of a shown NPC with this handle; else `:error`.
+  """
+  @spec npc(pid(), 8000..9499, non_neg_integer()) :: {:ok, Zone.Npc.t(), Zone.Grid.point()} | :error
+  def npc(pid, handle, npc_handle), do: GenServer.call(pid, {:npc, handle, npc_handle})
+
+  @doc "Whether the player of the handle (mode 1, mover stepped to now) stands within 1000 units of a shown NPC of the mob name."
+  @spec near_npc?(pid(), 8000..9499, binary()) :: boolean()
+  def near_npc?(pid, handle, mob_name), do: GenServer.call(pid, {:near_npc?, handle, mob_name})
+
+  @doc """
+  Moves the player of the handle to a point of the same map instance (`0x1809`): `0x1805` to the players in sight
+  (mode 1 only), then the new position, mode 0, no mover, no move, the chat state of a fresh entry; the handle stays.
+  Returns the stored player; `:error` for an unknown handle.
+  """
+  @spec relocate(pid(), 8000..9499, Zone.Grid.point()) :: {:ok, Zone.Player.t()} | :error
+  def relocate(pid, handle, {x, y} = point) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
+    do: GenServer.call(pid, {:relocate, handle, point})
 
   @impl GenServer
   def init({world_id, name, data_dir}) do
@@ -243,6 +271,53 @@ defmodule Zone.MapInstance do
     end
   end
 
+  def handle_call({:npc, handle, npc_handle}, _from, state) do
+    case stepped(state, handle) do
+      {:ok, state, %Zone.Player{x: x, y: y}} ->
+        npc = Map.get(state.npc_index, npc_handle)
+        reply = if match?(%Zone.Npc{}, npc) and near?(npc, {x, y}), do: {:ok, npc, {x, y}}, else: :error
+        {:reply, reply, state}
+
+      :error ->
+        {:reply, :error, state}
+    end
+  end
+
+  def handle_call({:near_npc?, handle, mob_name}, _from, state) do
+    case stepped(state, handle) do
+      {:ok, state, %Zone.Player{x: x, y: y}} ->
+        near = Enum.any?(Map.values(state.npc_index), &(&1.row.mob_name == mob_name and near?(&1, {x, y})))
+        {:reply, near, state}
+
+      :error ->
+        {:reply, false, state}
+    end
+  end
+
+  def handle_call({:relocate, handle, {x, y}}, _from, state) do
+    case state.players do
+      %{^handle => %Zone.Player{} = player} ->
+        if player.mode == 1, do: broadcast(state, player, [%MapLogoutCmd{handle: handle}])
+
+        moved = %{
+          player
+          | x: x,
+            y: y,
+            last_good: {x, y},
+            mover: :none,
+            move: :none,
+            mode: 0,
+            chat: Zone.Player.__struct__().chat
+        }
+
+        grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
+        {:reply, {:ok, moved}, %{state | players: Map.put(state.players, handle, moved), grid: grid}}
+
+      %{} ->
+        {:reply, :error, state}
+    end
+  end
+
   def handle_call({:move, handle, kind, from, to}, _from, state),
     do: movement(state, handle, fn state, player, now -> check_move(state, player, kind, from, to, now) end)
 
@@ -336,6 +411,21 @@ defmodule Zone.MapInstance do
 
     :ok
   end
+
+  # a player in mode 1 with its mover stepped to now; the packets of the steps go out
+  defp stepped(state, handle) do
+    case state.players do
+      %{^handle => %Zone.Player{mode: 1}} ->
+        {state, deliveries} = advance(state, handle, Clock.monotonic_time(:millisecond))
+        deliver(deliveries)
+        {:ok, state, state.players[handle]}
+
+      %{} ->
+        :error
+    end
+  end
+
+  defp near?(%Zone.Npc{x: nx, y: ny}, point), do: dist2({nx, ny}, point) <= @npc_reach2
 
   # -- movement (docs/technical/movement.md); each step returns {state, deliveries in order}
 

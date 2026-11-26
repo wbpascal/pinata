@@ -31,9 +31,12 @@ defmodule Zone.GridTest do
     assert Grid.query(g, {0, 0}, 451, 9) == [2, 1]
   end
 
-  test "walk order: below the centre descending, then above ascending, ties by handle" do
+  test "walk order: below the centre descending, then above ascending, equal y by descending handle" do
     entries = [{1, {0, 90}}, {2, {0, 50}}, {3, {0, 110}}, {4, {0, 100}}, {9, {0, 100}}]
-    assert Grid.walk_order(entries, {0, 100}, 5) == [4, 1, 2, 9, 3]
+    assert Grid.walk_order(entries, {0, 100}, 5) == [9, 1, 2, 4, 3]
+    # the capture order of the three NPCs at y 7862 of RouVal01, seen from y 7812
+    entries = [{17_225, {0, 7862}}, {17_226, {0, 7862}}, {17_289, {0, 7862}}]
+    assert Grid.walk_order(entries, {0, 7812}, 8000) == [17_289, 17_226, 17_225]
   end
 
   test "1500 players over one map: every query equals brute force, mean time bounded" do

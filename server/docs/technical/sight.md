@@ -43,8 +43,10 @@ that reads the cells; it returns the handles with `dist² < r²` other than the 
 The result is in the original's order (`Zone.Grid.walk_order/3`): the original walks its y-sorted object list from the
 centre object first towards smaller y, then towards larger y (`so_AllOfRangeNomal` @ FUN_0054c900, `so_AllInMapNomal`
 @ FUN_0054be00). The capture `idle_in_world` confirms it: the player at y 9844 gets NPCs with y 9821, 8999, … 4370,
-then 9934, 10005, … 10579. Objects with equal y are ordered by handle; the original's order of equal keys depends on
-the history of its list and cannot be reproduced.
+then 9934, 10005, … 10579. Objects with equal y lie in descending handle order: three captures (`walk-run-portals`
+294 and 520, `stale-tutorial-rename-kickout-shn`) show the NPCs at y 7862 of RouVal01 seen from below as 17289, 17226,
+17225, the order of a list that keeps a later insert before equal keys. Beyond that the original's order of equal keys
+depends on the history of its list (players inserted later) and is not reproduced.
 
 **Cost.** `test/zone/grid_test.exs` puts 1500 players on a fixed lattice over a 20 000 × 20 000 map (x = i · 7919 mod 20 000, y = i · 104729 mod 20 000; deterministic, not random) with cell 1600 and compares
 every query at radius 1600 with a brute-force filter. Measured on 2026-11-22 (Apple M1 Pro, Erlang/OTP 29, Elixir

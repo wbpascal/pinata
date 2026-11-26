@@ -5,15 +5,39 @@ defmodule Cluster.Sessions do
   `docs/technical/flows/enter-world.md`). A session whose character is in the world is a member of the `:pg` group
   `{:character, world_no, key}` (`key` = the name with ASCII letters lower-cased): a whisper finds its receiver by it
   and the sessions pass the whisper on in messages (flow: `docs/technical/flows/whisper.md`).
+
+  A map change (flow: `docs/technical/flows/map-change.md`): the old Zone connection parks the player struct in the
+  session with `reserve/2`; the reservation is the map-login ticket the new Zone connection redeems with `redeem/2`
+  as an entry of kind `:map_change`. It has no timer and ends with the session process.
   """
 
-  @type entry :: %{
-          kind: :first_entry,
-          world_no: Cluster.Registry.world_id(),
-          user_no: pos_integer(),
+  @type entry ::
+          %{
+            kind: :first_entry,
+            world_no: Cluster.Registry.world_id(),
+            user_no: pos_integer(),
+            character_id: pos_integer(),
+            name: binary(),
+            map: String.t()
+          }
+          | %{
+              kind: :map_change,
+              world_no: Cluster.Registry.world_id(),
+              user_no: pos_integer(),
+              character_id: pos_integer(),
+              name: binary(),
+              map: String.t(),
+              x: non_neg_integer(),
+              y: non_neg_integer(),
+              player: struct()
+            }
+  @type reservation :: %{
           character_id: pos_integer(),
-          name: binary(),
-          map: String.t()
+          map: String.t(),
+          x: non_neg_integer(),
+          y: non_neg_integer(),
+          node: node(),
+          player: struct()
         }
   @type whisper :: %{
           talker: binary(),
@@ -116,6 +140,14 @@ defmodule Cluster.Sessions do
       {pid, {:ok, entry}} -> {:ok, pid, entry}
       nil -> first_refusal(results)
     end
+  end
+
+  @doc "Parks a player in its session as the reservation of a map change; the answer is the session handle for 0x180A."
+  @spec reserve(pid(), reservation()) :: {:ok, 0..0xFFFF} | {:error, :no_session}
+  def reserve(pid, reservation) do
+    GenServer.call(pid, {:cluster, {:reserve, reservation}})
+  catch
+    :exit, _ -> {:error, :no_session}
   end
 
   @doc "Tells the session process that its character has loaded the map (`0x1803`): it sends the WorldManager burst."

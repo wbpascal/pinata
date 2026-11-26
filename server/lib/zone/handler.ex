@@ -47,6 +47,16 @@ defmodule Zone.Handler do
   `0x0830 {ShoutLevel, ShoutDelay}`, which the 2016 client ignores (Z01-B5). Absent until their milestones: the GM
   chat ban and the GM colour bit (7), font and balloon colours (9), the pet keyword (9), Lua chat triggers (10), the
   chat-title counter `0x6006` (6), the megaphone `0x204B` (6), party chat (6).
+
+  Map change (flow: `docs/technical/flows/map-change.md`, `Zone.Link`): in the world, `0x200A` on a Gate NPC within
+  1000 units opens the menu `0x3C01` with the `LinkTable` destination; the answer `0x3C02 {0}` within 1000 units of
+  where the menu opened runs the change, any other answer closes the menu. `0x181A` near a town portal NPC
+  (`Gate_Town`) runs the change to the `TownPortal.shn` row and answers `0x181B` (`0x19C1` before `0x180A`, or the
+  refusal code). The change to another map instance saves the player, removes it from the map, parks it in the
+  session and sends `0x180A`; the connection stays open in step `:left` until the client closes it. A change inside
+  the map instance sends `0x1809` and returns to step `:loading`; the next `0x1803` runs the burst again (one auto-save
+  timer per connection). The new connection redeems the reservation as an entry of kind `:map_change`: no database
+  load, the parked player arrives on the reserved map and position (`Zone.Player.arrive/4`).
   """
 
   @behaviour Net.Handler
@@ -54,6 +64,7 @@ defmodule Zone.Handler do
   alias Proto.Packets.ActChatReq
   alias Proto.Packets.ActEndoftradeCmd
   alias Proto.Packets.ActMoverunCmd
+  alias Proto.Packets.ActNpcclickCmd
   alias Proto.Packets.ActMovewalkCmd
   alias Proto.Packets.ActShoutCmd
   alias Proto.Packets.ActStopReq
@@ -65,15 +76,21 @@ defmodule Zone.Handler do
   alias Proto.Packets.MapLogincompleteCmd
   alias Proto.Packets.MapLoginfailAck
   alias Proto.Packets.MapLoginReq
+  alias Proto.Packets.MapTownportalAck
+  alias Proto.Packets.MapTownportalReq
+  alias Proto.Packets.MenuServermenuAck
   alias Proto.Packets.MiscServerparameterAck
   alias Proto.Packets.MiscServerparameterReq
   alias Zone.MapEntry.Placeholders
 
   # above it the relayed 0x201F can exceed the frame limit of Net.Connection
   @max_item_links 76
+  # the answer to a gate menu counts within 1000 units of where it opened: dist² ≤ 1 000 000 (Z02 §6.6)
+  @menu_reach2 1_000_000
 
   @enforce_keys [:checksums]
-  defstruct [:checksums, step: :login, session: :none, entry: :none, map: :none, player: :none, entered_at: :none]
+  defstruct [:checksums, step: :login, session: :none, entry: :none, map: :none, player: :none, entered_at: :none] ++
+              [menu: :none, auto_save?: false]
 
   @type t :: %__MODULE__{
           checksums: [GameData.ClientData.checksum()],
@@ -82,7 +99,9 @@ defmodule Zone.Handler do
           entry: :none | Cluster.Sessions.entry(),
           map: :none | pid() | :stopped,
           player: :none | Zone.Player.t(),
-          entered_at: :none | integer()
+          entered_at: :none | integer(),
+          menu: :none | {Zone.Link.dest(), Zone.Grid.point(), binary()},
+          auto_save?: boolean()
         }
 
   @type entry_failure :: :not_found | :database | :no_map | :game_data | :no_block_data | :full
@@ -107,7 +126,7 @@ defmodule Zone.Handler do
   end
 
   def handle_packet(%__MODULE__{step: :loading, player: %Zone.Player{} = p} = state, %MapLogincompleteCmd{}),
-    do: {state, [{:perform, {:login_complete, state.map, p.handle, state.session}}]}
+    do: {state, [{:perform, {:login_complete, state.map, p.handle, state.session, state.auto_save?}}]}
 
   # Accepted without an answer, as the original after a map login (issue 88).
   def handle_packet(%__MODULE__{step: step} = state, %ActEndoftradeCmd{}) when step in [:loading, :in_world],
@@ -153,6 +172,25 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActShoutCmd{} = req),
     do: {state, [{:perform, {:chat, state.map, p.handle, :shout, line(req)}}]}
 
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActNpcclickCmd{npc_handle: h}),
+    do: {state, [{:perform, {:npc_click, state.map, p.handle, h}}]}
+
+  def handle_packet(
+        %__MODULE__{step: :in_world, player: %Zone.Player{} = p, menu: {dest, origin, name}} = state,
+        %MenuServermenuAck{reply: 0}
+      ),
+      do:
+        {%{state | menu: :none},
+         [{:perform, {:link, {:gate, name, origin}, state.map, p, state.entered_at, state.session, dest}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world} = state, %MenuServermenuAck{}), do: {%{state | menu: :none}, []}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %MapTownportalReq{index: i}),
+    do: {state, [{:perform, {:town_portal, i, state.map, p, state.entered_at, state.session}}]}
+
+  def handle_packet(%__MODULE__{step: :loading} = state, %MapTownportalReq{}),
+    do: {state, [{:send, %MapTownportalAck{error: 0x19C2}}]}
+
   def handle_packet(%__MODULE__{step: step} = state, %MiscServerparameterReq{}) when step in [:loading, :in_world],
     do: {state, [{:perform, :server_parameters}]}
 
@@ -191,7 +229,7 @@ defmodule Zone.Handler do
        ]}
 
   def handle_info(state, {:login_completed, {:ok, packets}}),
-    do: {%{state | step: :in_world}, for(p <- packets, do: {:send, p})}
+    do: {%{state | step: :in_world, auto_save?: true}, for(p <- packets, do: {:send, p})}
 
   def handle_info(state, {:login_completed, {:error, :not_entered}}),
     do: {state, [{:close, :warning, "map login complete failed: not on the map"}]}
@@ -238,6 +276,35 @@ defmodule Zone.Handler do
   def handle_info(state, {:auto_saved, id, {:error, reason}}),
     do: {state, [{:log, :error, "auto-save failed: character #{id}, " <> save_text(reason)}]}
 
+  def handle_info(state, {:npc_clicked, :none}), do: {state, []}
+  def handle_info(state, {:npc_clicked, {:log, level, text}}), do: {state, [{:log, level, text}]}
+
+  def handle_info(state, {:npc_clicked, {:menu, menu, packet}}), do: {%{state | menu: menu}, [{:send, packet}]}
+
+  def handle_info(state, {:town_portal_refused, code}), do: {state, [{:send, %MapTownportalAck{error: code}}]}
+
+  def handle_info(state, {:linked, origin, p, dest, {:other, cmd}}),
+    do:
+      {%{state | step: :left, map: :none, player: :none, menu: :none},
+       ack(origin) ++
+         [{:send, cmd}, {:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}]}
+
+  def handle_info(state, {:linked, origin, _p, _dest, {:same, player, cmd}}),
+    do: {%{state | step: :loading, player: player, menu: :none}, ack(origin) ++ [{:send, cmd}]}
+
+  # The player is saved and removed already; nothing to answer.
+  def handle_info(state, {:linked, _origin, _p, _dest, {:error, :no_session}}),
+    do:
+      {%{state | step: :left, map: :none, player: :none, menu: :none},
+       [{:close, :warning, "map change failed: no session"}]}
+
+  def handle_info(state, {:linked, _origin, _p, _dest, {:error, :too_far}}),
+    do: {state, [{:log, :debug, "server menu answer dropped: too far from where the menu opened"}]}
+
+  # The line comes before the answer, as the WorldManager refusals do.
+  def handle_info(state, {:linked, origin, p, dest, {:error, reason}}),
+    do: {state, [{:log, level(reason), refusal_text(origin, p, dest, reason)} | refuse(origin)]}
+
   def handle_info(state, {:left, lines}), do: {%{state | step: :left, map: :none, player: :none}, lines}
 
   # The session leaves the world (0x0C18 {1}); the reply goes out after the save.
@@ -266,7 +333,19 @@ defmodule Zone.Handler do
     {:redeemed, result}
   end
 
-  def perform({:enter, entry}) do
+  def perform({:enter, %{kind: :map_change} = entry}) do
+    result =
+      with {:ok, map} <- whereis(entry),
+           {:ok, player} <- Zone.Player.arrive(entry.player, entry, address(), self()),
+           {:ok, handle} <- Zone.MapInstance.enter(map, player) do
+        _ = Process.monitor(map)
+        {:ok, map, %{player | handle: handle}, Clock.monotonic_time(:millisecond)}
+      end
+
+    {:entered, result}
+  end
+
+  def perform({:enter, %{kind: :first_entry} = entry}) do
     result =
       with {:ok, character} <- Persistence.load_character(entry.world_no, entry.user_no, entry.character_id),
            {:ok, map} <- whereis(entry),
@@ -279,13 +358,14 @@ defmodule Zone.Handler do
     {:entered, result}
   end
 
-  def perform({:login_complete, map, handle, session}) do
+  def perform({:login_complete, map, handle, session, timer?}) do
     result = Zone.MapInstance.login_complete(map, handle)
 
     _ =
       with {:ok, _packets} <- result do
         :ok = Cluster.Sessions.map_login_done(session)
-        auto_save_timer()
+        # after 0x1809 the timer of the first 0x1803 runs on
+        if not timer?, do: auto_save_timer()
       end
 
     {:login_completed, result}
@@ -296,7 +376,7 @@ defmodule Zone.Handler do
 
     result =
       case current(map, p.handle) do
-        {:ok, player} -> Persistence.save_character(p.world_no, p.character.id, saved(player), :auto)
+        {:ok, player} -> Persistence.save_character(p.world_no, p.character.id, Zone.Player.saved(player), :auto)
         :error -> {:error, :not_on_map}
       end
 
@@ -304,6 +384,39 @@ defmodule Zone.Handler do
   end
 
   def perform({:leave, map, player, entered_at}), do: {:left, leave(map, player, entered_at)}
+
+  def perform({:npc_click, map, own, h}) do
+    case Zone.MapInstance.npc(map, own, h) do
+      {:ok, npc, point} -> {:npc_clicked, gate_menu(npc, h, point)}
+      :error -> {:npc_clicked, :none}
+    end
+  end
+
+  def perform({:link, {:gate, _name, origin} = how, map, p, entered_at, session, dest}) do
+    case current(map, p.handle) do
+      {:ok, %Zone.Player{x: x, y: y}} ->
+        if dist2({x, y}, origin) <= @menu_reach2,
+          do: {:linked, how, p, dest, Zone.Link.run(map, p, entered_at, session, dest)},
+          else: {:linked, how, p, dest, {:error, :too_far}}
+
+      :error ->
+        {:linked, how, p, dest, {:error, :not_on_map}}
+    end
+  end
+
+  def perform({:link, :town_portal, map, p, entered_at, session, dest}),
+    do: {:linked, :town_portal, p, dest, Zone.Link.run(map, p, entered_at, session, dest)}
+
+  # not in the original: it accepts 0x181A anywhere, a free teleport for a modified client
+  def perform({:town_portal, i, map, p, entered_at, session}) do
+    with true <- Zone.MapInstance.near_npc?(map, p.handle, "Gate_Town"),
+         {:ok, dest} <- Zone.Link.town_portal(i, p.character.level) do
+      perform({:link, :town_portal, map, p, entered_at, session, dest})
+    else
+      false -> {:town_portal_refused, 0x19C2}
+      {:error, code} -> {:town_portal_refused, code}
+    end
+  end
 
   def perform({:inform, map, own, handle}), do: {:informed, Zone.MapInstance.inform(map, own, handle)}
 
@@ -357,13 +470,54 @@ defmodule Zone.Handler do
     # max/2: a test clock can be set back while a connection is still in the world.
     minutes = max(div(Clock.monotonic_time(:millisecond) - entered_at, 60_000), 0)
 
-    case Persistence.save_character(p.world_no, p.character.id, saved(p), {:leave, minutes}) do
+    case Persistence.save_character(p.world_no, p.character.id, Zone.Player.saved(p), {:leave, minutes}) do
       :ok -> [{:log, :info, "left the world: character #{p.character.id}, map #{p.map}"}]
       {:error, reason} -> [{:log, :error, "save at leave failed: character #{p.character.id}, " <> save_text(reason)}]
     end
   end
 
-  defp saved(p), do: %{map: p.map, x: p.x, y: p.y, hp: p.character.hp, sp: p.character.sp}
+  defp gate_menu(%Zone.Npc{row: %{map: map}} = npc, h, point) do
+    case Zone.Link.gate(npc) do
+      {:error, :no_role} ->
+        {:log, :debug, "NPC click dropped: role #{npc.row.role} is not built"}
+
+      {:error, :no_link} ->
+        {:log, :info, "gate #{npc.row.mob_name} on map #{map}: no LinkTable row for #{npc.row.role_arg}"}
+
+      {:ok, dest} ->
+        case Zone.Link.menu(dest, h, point) do
+          {:ok, packet} ->
+            {:menu, {dest, point, npc.row.mob_name}, packet}
+
+          {:error, :no_map_info} ->
+            {:log, :info, "gate #{npc.row.mob_name} on map #{map}: no MapInfo row for #{dest.map_client}"}
+        end
+    end
+  end
+
+  defp ack(:town_portal), do: [{:send, %MapTownportalAck{error: 0x19C1}}]
+  defp ack({:gate, _name, _origin}), do: []
+
+  defp refuse(:town_portal), do: [{:send, %MapTownportalAck{error: 0x19C2}}]
+  defp refuse({:gate, _name, _origin}), do: []
+
+  defp level(:not_running), do: :info
+  defp level(:no_map_info), do: :info
+  defp level({:save, _reason}), do: :error
+  defp level(:not_on_map), do: :warning
+
+  defp refusal_text({:gate, name, _origin}, p, dest, :not_running),
+    do: "gate #{name} on map #{p.map}: destination #{dest.map} is not running"
+
+  defp refusal_text(:town_portal, _p, dest, :not_running), do: "town portal refused: map #{dest.map} is not running"
+  defp refusal_text(_origin, _p, dest, :no_map_info), do: "map change refused: no MapInfo row for #{dest.map_client}"
+
+  defp refusal_text(_origin, p, _dest, {:save, reason}),
+    do: "map change refused: save failed: character #{p.character.id}, " <> save_text(reason)
+
+  defp refusal_text(_origin, _p, _dest, :not_on_map), do: "map change failed: not on the map"
+
+  defp dist2({ax, ay}, {bx, by}), do: (ax - bx) * (ax - bx) + (ay - by) * (ay - by)
 
   defp save_text(:not_found), do: "character not found"
   defp save_text(:database), do: "database failure"
