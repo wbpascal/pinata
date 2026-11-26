@@ -110,7 +110,18 @@ defmodule Zone.Player do
   end
 
   @doc "The parked player of a map change on its new map: the reserved map and position, everything of the old map instance reset."
-  @spec arrive(t(), Cluster.Sessions.entry(), String.t(), pid()) :: {:ok, t()} | {:error, :game_data}
+  @spec arrive(
+          t(),
+          %{
+            :kind => :map_change,
+            :map => String.t(),
+            :x => non_neg_integer(),
+            :y => non_neg_integer(),
+            optional(atom()) => term()
+          },
+          String.t(),
+          pid()
+        ) :: {:ok, t()} | {:error, :game_data}
   def arrive(%__MODULE__{} = player, %{kind: :map_change, map: map, x: x, y: y}, address, conn) do
     case GameData.lookup(GameData.FieldList, :map_id_client, map) do
       [field | _] ->

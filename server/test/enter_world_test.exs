@@ -9,6 +9,7 @@ defmodule EnterWorldTest do
   alias Proto.Packets.UserClientVersionCheckReq
   alias Proto.Packets.UserLoginworldAck
   alias Proto.Packets.UserLoginworldReq
+  alias Proto.Packets.UserNormallogoutCmd
   alias Proto.Packets.UserUsLoginReq
   alias Proto.Packets.UserWorldselectAck
   alias Proto.Packets.UserWorldselectReq
@@ -334,10 +335,11 @@ defmodule EnterWorldTest do
     test "a map-change reservation: another node is :wrong_node and keeps it, the right node gets the struct" do
       parked = %{placeholder: :player}
       reserve = %{character_id: 7, map: "RouVal01", x: 13_658, y: 7812, node: :a@x, player: parked}
-      state = wm_state(%{character: "Test1235", handle: 0x445C})
+      zone_pid = self()
+      state = wm_state(%{character: "Test1235", handle: 0x445C, zone: zone_pid})
 
-      assert {{:ok, 0x445C}, %{reservation: %{kind: :map_change}} = reserved, []} =
-               WorldManager.Handler.handle_call(state, {:reserve, reserve})
+      assert {{:ok, 0x445C}, %{reservation: %{kind: :map_change}, zone: :none} = reserved, []} =
+               WorldManager.Handler.handle_call(state, {:reserve, zone_pid, reserve})
 
       assert {{:error, :wrong_node}, ^reserved, []} =
                WorldManager.Handler.handle_call(reserved, {:redeem, "Test1235", :b@x, self()})
@@ -351,7 +353,21 @@ defmodule EnterWorldTest do
 
     test "a reserve on a session without a character in the world is :no_session" do
       state = wm_state(%{handle: 1})
-      assert {{:error, :no_session}, ^state, []} = WorldManager.Handler.handle_call(state, {:reserve, %{}})
+      assert {{:error, :no_session}, ^state, []} = WorldManager.Handler.handle_call(state, {:reserve, self(), %{}})
+    end
+
+    test "a reserve from a process that is not the session's Zone connection is :no_session" do
+      other = spawn(fn -> :ok end)
+      state = wm_state(%{character: "Test1235", handle: 1, zone: other})
+      assert {{:error, :no_session}, ^state, []} = WorldManager.Handler.handle_call(state, {:reserve, self(), %{}})
+    end
+
+    test "0x0C18 {1} between two maps drops the map-login ticket with one info line" do
+      reservation = %{kind: :map_change, character_id: 7, name: "Test1235", map: "RouN", node: :a@x}
+      state = wm_state(%{character: "Test1235", zone: :none, reservation: reservation})
+
+      assert {%{reservation: :none}, [{:log, :info, "map-login ticket dropped: back to the character list"}]} =
+               WorldManager.Handler.handle_packet(state, %UserNormallogoutCmd{logout_type: 1})
     end
 
     test "the Zone answers :wrong_node with 0x1804 {0x141, 0xFF} and closes" do

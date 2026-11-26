@@ -76,6 +76,9 @@ connection writes `connection closed: listener stopped` and runs the leave path 
 - **No logout timers.** `0x1071` (exit countdown started) and `0x1072` (cancelled) are accepted without effect; the
   character leaves at once (the original keeps it for up to 13 s). `0x0C18` on the Zone connection is ignored: the
   session drives the leave.
+- **Between two maps.** `0x0C18 {1}` while the session holds an open map-login ticket and no Zone connection (after
+  `0x180A`, or after `0x1003` before the Zone login) drops the ticket with one `info` line; the player is saved
+  already, so nothing else runs ([`map-change.md`](map-change.md)).
 - **Sight.** `0x1805` to the players in sight is sent where the map instance removes a player (`remove/2`), with issue
   109; nobody sees another player yet.
 
@@ -88,4 +91,5 @@ connection writes `connection closed: listener stopped` and runs the leave path 
 | auto-save, player not on the map | `error`, `Zone: auto-save failed: character <id>, not on the map` | none |
 | leave, row gone or database | `error`, `Zone: save at leave failed: character <id>, <reason>` | the player is removed anyway; `0x0C18 {1}` still goes on to the list |
 | leave, saved | `info`, `Zone: left the world: character <id>, map <map>` | |
+| `0x0C18 {1}` with an open map-login ticket and no Zone connection | `info`, `WorldManager: map-login ticket dropped: back to the character list` | the ticket is void; a later `0x1801` with it is refused (`no map-login ticket`) |
 | WorldManager: the Zone connection does not answer the leave in 5 s | `error`, `WorldManager: the Zone connection did not confirm the leave within 5 s` | the session keeps the Zone connection: `0x1001` answers `0x1002 {0x145}` until it ends |

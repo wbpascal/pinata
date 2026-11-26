@@ -106,6 +106,14 @@ defmodule Zone.MapInstanceTest do
     assert {:ok, 8003} = Zone.MapInstance.enter(pid, player())
   end
 
+  test "enter/3 takes the given handle, refuses it in use, and enter/2 skips it" do
+    pid = start("Rou")
+    assert {:ok, 8000} = Zone.MapInstance.enter(pid, player(), 8000)
+    assert %{handle: 8000, mode: 0} = :sys.get_state(pid).players[8000]
+    assert {:error, :handle_taken} = Zone.MapInstance.enter(pid, player(), 8000)
+    assert {:ok, 8001} = Zone.MapInstance.enter(pid, player())
+  end
+
   test "1500 players fill the map" do
     pid = start("Rou")
     {:ok, _} = Zone.MapInstance.enter(pid, player())
@@ -539,6 +547,15 @@ defmodule Zone.MapInstanceTest do
       assert got(pid, :obs) == [%ActSomeonestopCmd{handle: me, x: x, y: 1003}]
       assert got(pid, :me) == []
       assert %{x: ^x, y: 1003, mover: :none, move: :none} = at(pid, me)
+    end
+
+    test "player/2 steps the mover to now, with no tick in between", %{pid: pid} do
+      me = two!(pid)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1400, 1003}, {1450, 1003})
+      clock(5050)
+      x = 1400 + div(50 * 50, 393)
+      assert %{x: ^x, y: 1003} = at(pid, me)
+      assert x > 1400
     end
 
     test "a refused stop: 200 units away and inside the wall; the mover keeps running", %{pid: pid} do

@@ -7,8 +7,10 @@ defmodule Cluster.Sessions do
   and the sessions pass the whisper on in messages (flow: `docs/technical/flows/whisper.md`).
 
   A map change (flow: `docs/technical/flows/map-change.md`): the old Zone connection parks the player struct in the
-  session with `reserve/2`; the reservation is the map-login ticket the new Zone connection redeems with `redeem/2`
-  as an entry of kind `:map_change`. It has no timer and ends with the session process.
+  session with `reserve/2`; the request carries the calling Zone connection and the session accepts it only from its
+  current Zone connection; a `leave` call that arrives during the wait is answered `:ok`. The reservation is the
+  map-login ticket the new Zone connection redeems with `redeem/2` as an entry of kind `:map_change`. It has no timer
+  and ends with the session process, its next `0x1001` or `0x0C18 {1}`.
   """
 
   @type entry ::
@@ -142,12 +144,38 @@ defmodule Cluster.Sessions do
     end
   end
 
-  @doc "Parks a player in its session as the reservation of a map change; the answer is the session handle for 0x180A."
+  @doc """
+  Parks a player in its session as the reservation of a map change; the answer is the session handle for 0x180A.
+  The request names the calling Zone connection, and the session accepts it only from its current Zone connection.
+  A `leave` call (`leave_world/1`) the session makes during the wait is answered `:ok` (the player is saved and off
+  the map already); the session then refuses the reserve. 5 s at most.
+  """
   @spec reserve(pid(), reservation()) :: {:ok, 0..0xFFFF} | {:error, :no_session}
   def reserve(pid, reservation) do
-    GenServer.call(pid, {:cluster, {:reserve, reservation}})
-  catch
-    :exit, _ -> {:error, :no_session}
+    # the reply goes to the monitor's alias, as in GenServer.call/3: a late reply never reaches the mailbox
+    # (Net.Connection would crash on it)
+    ref = Process.monitor(pid, alias: :reply_demonitor)
+    send(pid, {:"$gen_call", {ref, ref}, {:cluster, {:reserve, self(), reservation}}})
+    await_reserved(ref)
+  end
+
+  defp await_reserved(ref) do
+    receive do
+      {^ref, reply} ->
+        reply
+
+      {:DOWN, ^ref, :process, _pid, _reason} ->
+        {:error, :no_session}
+
+      # the session waits for this connection in leave_world/1: the player is saved and off the map already
+      {:"$gen_call", from, {:cluster, :leave}} ->
+        GenServer.reply(from, :ok)
+        await_reserved(ref)
+    after
+      5_000 ->
+        Process.demonitor(ref, [:flush])
+        {:error, :no_session}
+    end
   end
 
   @doc "Tells the session process that its character has loaded the map (`0x1803`): it sends the WorldManager burst."

@@ -6,7 +6,8 @@ How a character in the world goes to another map instance through a Gate NPC or 
 of the target map, saves the player, removes it from its map instance, parks the player struct in the WorldManager
 session as the reservation and sends `0x180A`. The client opens a new Zone connection, which redeems the reservation
 like a first entry and runs the map entry with the parked struct. A target on the player's own map instance sends
-`0x1809` instead, without a reconnect.
+`0x1809` instead, without a reconnect; so does a target on another map instance of the same Zone node whose
+`FieldList` machine number is the one of the player's map (the original's "same zone", Z01 §7.1).
 
 ```mermaid
 sequenceDiagram
@@ -44,6 +45,18 @@ sequenceDiagram
         alt no Zone node runs it
             W-->>Z: :error
             Z->>C: gate: nothing; town portal: 0x181B {0x19C2} (one info line)
+        else map instance B of this node, the same machine number (0x1809)
+            W-->>Z: node (this one), host, port
+            Z->>P: save_character(..., :auto)
+            Z->>B: enter(player at the target position, handle)
+            Note over Z,B: handle in use on B: the reconnect below instead
+            Z->>A: leave(handle)
+            A->>C: 0x1805 to the players in sight
+            Z->>C: (town portal: 0x181B {0x19C1}) 0x1809 {mapIndex, x, y}
+            Note over Z: step :loading, the map is B now
+            C->>Z: 0x1803
+            Z->>C: the 0x1803 burst
+            S->>C: 0x5826, 0x182A
         else
             W-->>Z: node, host, port
             Z->>P: save_character(..., {:leave, minutes})
@@ -90,6 +103,14 @@ sequenceDiagram
      `{:leave, minutes}` (play minutes since the map entry, `logout_at` set as at any leave), `leave/2` on the map
      instance, `Cluster.Sessions.reserve/2` and `0x180A` with the node's `public_host`, its Zone port and the session
      handle. The connection goes to step `:left`: it saves nothing more and stays open until the client closes it.
+   - another map instance of this node (the node `zone_of/2` names is this one, `Zone.MapInstance.whereis/2` finds
+     the instance) whose first `FieldList` row has the machine number (column `Fiesta`) of the player's map: an
+     auto-save (`:auto`, the old map and position), `Zone.MapInstance.enter/3` on the target instance under the
+     player's handle (mode 0, the target position, the reset of `Zone.Player.arrive/4`), `leave/2` on the old
+     instance (`0x1805` to the players in sight) and `0x1809` on the same connection, which goes back to step
+     `:loading` with the target instance as its map. The handle is kept, as the client keeps it. Handles are per map
+     instance: when the handle is in use on the target instance (or the target cannot take the player), the change
+     falls back to the reconnect above, `0x180A`. Play minutes go on counting on the same connection.
 5. **Arrival**: the client connects to the address of `0x180A` (in single-node mode the same address and port) and
    sends `0x1801` with the session handle. The redeem returns an entry of kind `:map_change`; the new connection does
    not load the character from the database but takes the parked struct (`Zone.Player.arrive/4`: the reserved map
@@ -100,8 +121,15 @@ sequenceDiagram
 ## The reservation
 
 - It lives in the WorldManager session process (`reservation` of `WorldManager.Handler`, kind `:map_change`, with
-  the target map, position, node and the player struct). There is no timer: it ends with the session or with the
-  next `0x1001`.
+  the target map, position, node and the player struct). There is no timer: it ends with the session, with the
+  next `0x1001` or with `0x0C18 {1}` (one `info` line; the client went back to the character list between two
+  maps, the player is saved already).
+- While it is open the session has no Zone connection (the old one is left out at the reserve), so `0x1001` always
+  voids the reservation and never answers `0x145`.
+- `reserve` is accepted only from the session's current Zone connection. When the session waits in
+  `Cluster.Sessions.leave_world/1` for that connection while the connection reserves, the connection answers the
+  leave `:ok` (the player is saved and off the map); the session then has no Zone connection and refuses the
+  reserve, and the old connection closes with `map change failed: no session`.
 - A redeem from another node answers `:wrong_node` (`0x1804 {0x141}`) and keeps it; another character name answers
   `:wrong_character`. Only a success uses it up.
 - **The client never arrives**: the player is saved (old map and position) and removed already. When the session
@@ -124,7 +152,7 @@ A gate answers nothing on a refusal.
 
 | Level | Line | When |
 |---|---|---|
-| `info` | `Zone: map change: character <id>, map <from> to <to>` | `0x180A` sent |
+| `info` | `Zone: map change: character <id>, map <from> to <to>` | `0x180A` sent, or `0x1809` to another map instance of this node |
 | `info` | `Zone: gate <npc> on map <map>: destination <map> is not running` | "Yes" on a gate whose target map no Zone node runs |
 | `info` | `Zone: town portal refused: map <map> is not running` | the town portal target no Zone node runs (`0x19C2`) |
 | `info` | `Zone: gate <npc> on map <map>: no LinkTable row for <argument>` | a click on a Gate NPC without a usable `LinkTable` row |
@@ -132,7 +160,8 @@ A gate answers nothing on a refusal.
 | `info` | `Zone: map change refused: no MapInfo row for <client map>` | a town portal target without a `MapInfo` row |
 | `error` | `Zone: map change refused: save failed: character <id>, <reason>` | the save before the change failed; refused (`0x19C2` for a town portal) |
 | `warning` | `Zone: map change failed: not on the map` | the player was gone from the map instance |
-| `warning` | `Zone: connection closed: map change failed: no session` | the session ended between the save and the reservation; the player is saved and removed |
+| `warning` | `Zone: connection closed: map change failed: no session` | the session ended, or the player went back to the character list, between the save and the reservation; the player is saved and removed |
+| `info` | `WorldManager: map-login ticket dropped: back to the character list` | `0x0C18 {1}` while the reservation is open |
 | `debug` | `Zone: NPC click dropped: role <role> is not built` | a click on an NPC of another role |
 | `debug` | `Zone: server menu answer dropped: too far from where the menu opened` | "Yes" more than 1000 units from the menu's point |
 
@@ -145,7 +174,9 @@ A gate answers nothing on a refusal.
 - **Town portal reach check** (new): `0x181A` is accepted only within 1000 units of a `Gate_Town` NPC; the original
   accepts it anywhere, a free teleport for a modified client (`server/AGENTS.md`, "Untrusted input"). The bug
   register has no id for it.
-- **Always a reconnect between map instances**, also between two instances of one Zone node (issue 100).
+- **`0x1809` between map instances** needs the same `FieldList` machine number **and** the same Zone node; the
+  original needs only the same zone (machine number). A handle in use on the target instance falls back to `0x180A`
+  (handles are per map instance here, per zone in the original).
 - **The menu texts are constants** (`Script/MenuString.txt` record `LinkTitle`, `Script/ETC.txt` record `Yes`); no
   loader reads `Script/` yet.
 - **No arrival placement**: the original moves an arriving player off an occupied cell (`so_MapMarking`, x + 25 at
@@ -162,3 +193,5 @@ A gate answers nothing on a refusal.
 - A reconnect of the real client to the same address and port (single-node mode).
 - That the real client closes the old Zone connection itself after `0x180A` (the capture shows it; the replay closes
   it with `close_after:`).
+- The real client after a `0x1809` to a different map (captured only inside one map, `&linkto`).
+- That `0x1827` need not be sent again after such a `0x1809` (every running map has map type 0).

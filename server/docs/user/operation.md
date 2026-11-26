@@ -107,7 +107,7 @@ Lines an administrator acts on:
 | `Zone: left the world: character <id>, map <map>, peer <peer>` | info | a character left the world and was saved |
 | `Zone: auto-save failed: character <id>, <reason>, peer <peer>` | error | the 10-minute save failed (`character not found`, `database failure`, `not on the map`); the character stays in the world. For a database failure look for the `Persistence` line before it |
 | `Zone: save at leave failed: character <id>, <reason>, peer <peer>` | error | the save when the character left failed; what happened since the last save is lost. For a database failure look for the `Persistence` line before it |
-| `Zone: map change: character <id>, map <from> to <to>, peer <peer>` | info | a character went through a gate or the town portal to another map; it was saved and the client reconnects to the Zone node of the target map |
+| `Zone: map change: character <id>, map <from> to <to>, peer <peer>` | info | a character went through a gate or the town portal to another map; it was saved and the client reconnects to the Zone node of the target map, or (both maps on this Zone node with the same machine number, `FieldList` column `Fiesta`) loads the new map on the same connection |
 | `Zone: gate <npc> on map <map>: destination <target> is not running, peer <peer>` | info | a player answered "Yes" at a gate whose target map runs on no Zone node; nothing happens for the player (`EventF` in the 2016 data has no `FieldList` row and never runs) |
 | `Zone: town portal refused: map <map> is not running, peer <peer>` | info | the town portal's target map runs on no Zone node; the client is told it cannot be used now |
 | `Zone: gate <npc> on map <map>: no LinkTable row for <argument>, peer <peer>` | info | a Gate NPC has no usable `LinkTable` row; the click does nothing. Nothing to do unless you edited the data |
@@ -115,7 +115,8 @@ Lines an administrator acts on:
 | `Zone: map change refused: no MapInfo row for <client map>, peer <peer>` | info | a town portal row leads to a map that `MapInfo.shn` does not list; refused. Nothing to do unless you edited the data |
 | `Zone: map change refused: save failed: character <id>, <reason>, peer <peer>` | error | the save before a map change failed (`character not found`, `database failure`); the character stays on its map. For a database failure look for the `Persistence` line before it |
 | `Zone: map change failed: not on the map, peer <peer>` | warning | the character was no longer on its map instance when the map change ran; report it |
-| `Zone: connection closed: map change failed: no session, peer <peer>` | warning | the WorldManager connection ended during a map change; the character was saved at its old position |
+| `Zone: connection closed: map change failed: no session, peer <peer>` | warning | the WorldManager connection ended, or the player went back to character select, during a map change; the character was saved at its old position |
+| `WorldManager: map-login ticket dropped: back to the character list, peer <peer>` | info | the player went back to character select between two maps (or before entering a map); nothing to do |
 | `Zone: NPC click dropped: role <role> is not built, peer <peer>` | debug | a click on an NPC whose role (shop, quest, other gate kinds) this version does not handle |
 | `Zone: server menu answer dropped: too far from where the menu opened, peer <peer>` | debug | "Yes" at a gate menu after the player walked more than 1000 units away |
 | `Zone: connection closed: map instance lost, peer <peer>` | warning | the map process of the player crashed (see the `crashed` line); the client is disconnected, nothing is saved |

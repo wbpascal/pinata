@@ -55,7 +55,9 @@ defmodule Zone.Handler do
   refusal code). The change to another map instance saves the player, removes it from the map, parks it in the
   session and sends `0x180A`; the connection stays open in step `:left` until the client closes it. A change inside
   the map instance sends `0x1809` and returns to step `:loading`; the next `0x1803` runs the burst again (one auto-save
-  timer per connection). The new connection redeems the reservation as an entry of kind `:map_change`: no database
+  timer per connection). A change to another map instance of this node with the same `FieldList` machine number (the
+  original's "same zone") also sends `0x1809` on the same connection, the handle kept; the player moves to the target
+  instance (`Zone.MapInstance.enter/3`), and a handle in use there falls back to `0x180A`. The new connection redeems the reservation as an entry of kind `:map_change`: no database
   load, the parked player arrives on the reserved map and position (`Zone.Player.arrive/4`).
   """
 
@@ -292,6 +294,13 @@ defmodule Zone.Handler do
 
   def handle_info(state, {:linked, origin, _p, _dest, {:same, player, cmd}}),
     do: {%{state | step: :loading, player: player, menu: :none}, ack(origin) ++ [{:send, cmd}]}
+
+  # One connection, one auto-save timer: the next 0x1803 arms it again.
+  def handle_info(state, {:linked, origin, p, dest, {:moved, map, player, cmd}}),
+    do:
+      {%{state | step: :loading, map: map, player: player, menu: :none},
+       ack(origin) ++
+         [{:send, cmd}, {:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}]}
 
   # The player is saved and removed already; nothing to answer.
   def handle_info(state, {:linked, _origin, _p, _dest, {:error, :no_session}}),

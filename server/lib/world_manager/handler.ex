@@ -27,10 +27,11 @@ defmodule WorldManager.Handler do
   (flow: `docs/technical/flows/map-entry.md`); after a map change only `0x5826` and `0x182A`.
 
   A map change (flow: `docs/technical/flows/map-change.md`): the old Zone connection parks the player in the session
-  (`{:reserve, r}`, `Cluster.Sessions.reserve/2`) and gets the session handle for `0x180A`. The reservation has the
-  kind `:map_change`, the target map and position and the player struct; the new Zone connection redeems it like a
-  first entry (wrong node: `:wrong_node`, the reservation stays) and gets the struct in its entry. It has no timer
-  and ends with the session.
+  (`{:reserve, zone, r}`, `Cluster.Sessions.reserve/2`; accepted only from the session's current Zone connection)
+  and gets the session handle for `0x180A`. The reservation has the kind `:map_change`, the target map and position
+  and the player struct; the new Zone connection redeems it like a first entry (wrong node: `:wrong_node`, the
+  reservation stays) and gets the struct in its entry. While it is open the session has no Zone connection. It has
+  no timer and ends with the session, with the next `0x1001` or with `0x0C18 {1}`.
 
   `0x200C` whispers to a character by name (flow: `docs/technical/flows/whisper.md`). Only a session whose character
   is in the world (its map-login ticket was redeemed, until its next accepted `0x1001`) can whisper or be whispered
@@ -167,6 +168,10 @@ defmodule WorldManager.Handler do
   def handle_packet(%__MODULE__{step: :open, zone: zone} = state, %UserNormallogoutCmd{logout_type: 1})
       when is_pid(zone),
       do: {state, [{:perform, {:leave_world, zone}}]}
+
+  # Back to the character list between two maps: the map-login ticket is void (the player is saved already).
+  def handle_packet(%__MODULE__{step: :open, reservation: %{}} = state, %UserNormallogoutCmd{logout_type: 1}),
+    do: {%{state | reservation: :none}, [{:log, :info, "map-login ticket dropped: back to the character list"}]}
 
   # As the original's "PlayingCharNo" refusal: the session already has a character in the world.
   def handle_packet(%__MODULE__{step: :open, zone: zone} = state, %CharLoginReq{}) when is_pid(zone),
@@ -453,8 +458,10 @@ defmodule WorldManager.Handler do
   def handle_call(%__MODULE__{reservation: :none} = state, {:redeem, _name, _node, _zone_pid}),
     do: {{:error, :no_ticket}, state, []}
 
-  # The old Zone connection of a map change parks its player here (Cluster.Sessions.reserve/2).
-  def handle_call(%__MODULE__{character: name, handle: handle} = state, {:reserve, r}) when is_binary(name) do
+  # The old Zone connection of a map change parks its player here (Cluster.Sessions.reserve/2); only the session's
+  # current Zone connection can.
+  def handle_call(%__MODULE__{character: name, handle: handle, zone: zone} = state, {:reserve, zone, r})
+      when is_binary(name) and is_pid(zone) do
     reservation = %{
       kind: :map_change,
       character_id: r.character_id,
@@ -466,10 +473,11 @@ defmodule WorldManager.Handler do
       player: r.player
     }
 
-    {{:ok, handle}, %{state | reservation: reservation}, []}
+    # no character is on a map now, so 0x1001 voids the reservation instead of answering 0x145
+    {{:ok, handle}, %{state | reservation: reservation, zone: :none}, []}
   end
 
-  def handle_call(state, {:reserve, _r}), do: {{:error, :no_session}, state, []}
+  def handle_call(state, {:reserve, _zone, _r}), do: {{:error, :no_session}, state, []}
 
   @impl Net.Handler
   def perform({:create_token, user_no, user_name}),

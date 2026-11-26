@@ -39,7 +39,8 @@ defmodule Zone.MapInstance do
   player (mode 1, mover stepped to now) with the NPC and the player's position; `near_npc?/3` tells whether the player
   stands within 1000 units of a shown NPC of a mob name (the town portal check); `relocate/3` moves a player inside
   the map instance for `0x1809`: `0x1805` to the players in sight, the new position, mode 0, mover and chat state
-  reset, the handle kept.
+  reset, the handle kept. `enter/3` takes a player from another map instance of this node under the handle it has
+  (a `0x1809` between two instances), or refuses with `:handle_taken`.
   """
 
   use GenServer
@@ -88,6 +89,15 @@ defmodule Zone.MapInstance do
   @spec enter(pid(), Zone.Player.t()) :: {:ok, 8000..9499} | {:error, :no_block_data | :full}
   def enter(pid, %Zone.Player{} = player), do: GenServer.call(pid, {:enter, player})
 
+  @doc """
+  As `enter/2`, but under a handle the player already has (a `0x1809` from another map instance of this node);
+  `{:error, :handle_taken}` when the handle is in use here.
+  """
+  @spec enter(pid(), Zone.Player.t(), 8000..9499) ::
+          {:ok, 8000..9499} | {:error, :no_block_data | :full | :handle_taken}
+  def enter(pid, %Zone.Player{} = player, handle) when handle in @first_handle..@last_handle,
+    do: GenServer.call(pid, {:enter, player, handle})
+
   @doc "The player of the handle has loaded the map (`0x1803`): mode 1, and the answer packets of `Zone.MapEntry`."
   @spec login_complete(pid(), 8000..9499) :: {:ok, [struct()]} | {:error, :not_entered}
   def login_complete(pid, handle), do: GenServer.call(pid, {:login_complete, handle})
@@ -96,7 +106,7 @@ defmodule Zone.MapInstance do
   @spec leave(pid(), 8000..9499) :: {:ok, Zone.Player.t()} | :error
   def leave(pid, handle), do: GenServer.call(pid, {:leave, handle})
 
-  @doc "The current player of the handle (for the auto-save)."
+  @doc "The current player of the handle, its mover stepped to now (mode 1)."
   @spec player(pid(), 8000..9499) :: {:ok, Zone.Player.t()} | :error
   def player(pid, handle), do: GenServer.call(pid, {:player, handle})
 
@@ -217,23 +227,14 @@ defmodule Zone.MapInstance do
   end
 
   @impl GenServer
-  def handle_call({:enter, player}, _from, state) do
-    with {:ok, state} <- load_block_data(state),
-         {:ok, handle} <- free_handle(state) do
-      _ = if is_pid(player.conn), do: Process.monitor(player.conn)
-      player = %{player | handle: handle, mode: 0}
+  def handle_call({:enter, player}, _from, state), do: enter_with(state, player, &next_free/1)
 
-      state = %{
-        state
-        | players: Map.put(state.players, handle, player),
-          grid: put_grid(state.grid, player),
-          next_handle: if(handle == @last_handle, do: @first_handle, else: handle + 1)
-      }
-
-      {:reply, {:ok, handle}, start_ticking(state)}
-    else
-      {:error, reason} -> {:reply, {:error, reason}, state}
-    end
+  def handle_call({:enter, player, handle}, _from, state) do
+    enter_with(state, player, fn state ->
+      if Map.has_key?(state.players, handle),
+        do: {:error, :handle_taken},
+        else: {:ok, handle, state.next_handle}
+    end)
   end
 
   def handle_call({:login_complete, handle}, _from, state) do
@@ -257,7 +258,13 @@ defmodule Zone.MapInstance do
     end
   end
 
-  def handle_call({:player, handle}, _from, state), do: {:reply, Map.fetch(state.players, handle), state}
+  def handle_call({:player, handle}, _from, state) do
+    case stepped(state, handle) do
+      {:ok, state, player} -> {:reply, {:ok, player}, state}
+      # mode 0 has no mover
+      :error -> {:reply, Map.fetch(state.players, handle), state}
+    end
+  end
 
   def handle_call({:step, handle, point}, _from, state) do
     case state.players do
@@ -410,6 +417,26 @@ defmodule Zone.MapInstance do
     end
 
     :ok
+  end
+
+  # choose = the handle and the next_handle after it, or a refusal
+  defp enter_with(state, player, choose) do
+    with {:ok, state} <- load_block_data(state),
+         {:ok, handle, next_handle} <- choose.(state) do
+      _ = if is_pid(player.conn), do: Process.monitor(player.conn)
+      player = %{player | handle: handle, mode: 0}
+
+      state = %{
+        state
+        | players: Map.put(state.players, handle, player),
+          grid: put_grid(state.grid, player),
+          next_handle: next_handle
+      }
+
+      {:reply, {:ok, handle}, start_ticking(state)}
+    else
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
   end
 
   # a player in mode 1 with its mover stepped to now; the packets of the steps go out
@@ -619,6 +646,11 @@ defmodule Zone.MapInstance do
   end
 
   defp put_grid(grid, %{handle: handle, x: x, y: y}), do: Zone.Grid.put(grid, handle, {x, y})
+
+  defp next_free(state) do
+    with {:ok, handle} <- free_handle(state),
+         do: {:ok, handle, if(handle == @last_handle, do: @first_handle, else: handle + 1)}
+  end
 
   # The next free handle from next_handle on, wrapping from 9499 to 8000.
   defp free_handle(state) do

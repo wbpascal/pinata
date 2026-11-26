@@ -388,4 +388,116 @@ defmodule MapChangeTest do
     assert on_map?("RouN", p.handle)
     close_all([p.wm, zone])
   end
+
+  test "0x1001 between two maps voids the reservation: 0x1003, the new connection enters by first entry" do
+    cid = character!("admin", "Test1235", @town)
+    p = in_world("admin", "Test1235")
+    zone = p.zone |> town_portal(1) |> recv!(<<0x1B, 0x18, 0x19C1::little-16>>)
+    {<<0x0A, 0x18, _::binary>>, zone} = next!(zone)
+
+    # the old Zone connection is still open
+    wm = send!(p.wm, <<0x01, 0x10, 0>>)
+    assert {:ok, <<0x03, 0x10, _::binary>>, wm} = TestClient.recv_raw(wm)
+
+    {zone2, handle2} = TestPorts.endpoint(:zone) |> connect() |> enter_zone(p.wm_handle, "Test1235")
+    [base | _] = Process.get(:first_burst)
+
+    assert <<0x38, 0x10, ^cid::little-32, _::binary-62, "RouN", 0::64, 5874::little-32, 6600::little-32, _::binary>> =
+             base
+
+    assert on_map?("RouN", handle2)
+    {_burst, wm} = until!(wm, 0x182A)
+    close_all([wm, zone, zone2])
+  end
+
+  test "0x0C18 {1} between two maps drops the reservation: the new connection is refused" do
+    _cid = character!("admin", "Test1235", @town)
+    p = in_world("admin", "Test1235")
+    zone = p.zone |> town_portal(1) |> recv!(<<0x1B, 0x18, 0x19C1::little-16>>)
+    {<<0x0A, 0x18, _::binary>>, zone} = next!(zone)
+
+    log =
+      TestLog.capture(fn ->
+        _wm = p.wm |> send!(<<0x18, 0x0C, 1>>) |> nothing!()
+
+        TestPorts.endpoint(:zone)
+        |> connect()
+        |> send!(map_login(p.wm_handle, "Test1235"))
+        |> recv!(<<0x04, 0x18, 0x41, 0x01, 0xFF>>)
+        |> TestClient.close()
+
+        # the line of the closed Zone connection
+        Process.sleep(100)
+      end)
+
+    assert log =~ "[info] WorldManager: map-login ticket dropped: back to the character list, peer"
+    assert log =~ "[info] Zone: connection closed: map login refused: no map-login ticket, peer"
+    close_all([p.wm, zone])
+  end
+
+  # GateRou4 of RouN (7222, 4370) leads to RouCos03 (7514, 15412); both maps have machine number 0 in FieldList
+  defp cos03_gate!(name) do
+    wait_until(fn -> match?({:ok, _}, WorldManager.World.zone_of(0, "RouCos03")) end)
+    {:ok, %{id: index}} = GameData.fetch(GameData.MapInfo, "RouCos03")
+    {npc_handle(name, &(&1.role_arg == "GateRou4")), index}
+  end
+
+  test "a gate inside one machine number: 0x1809, 0x1805 to the others, the handle kept, the bursts" do
+    cid = character!("admin", "Test1235", {7222, 4450})
+    _b = character!("bobby", "Bobby", {7250, 4500})
+    a = in_world("admin", "Test1235")
+    b = in_world("bobby", "Bobby")
+    {gate, index} = cos03_gate!("RouN")
+    {_appears, a_zone} = bodies!(a.zone)
+    {[menu], a_zone} = a_zone |> click(gate) |> bodies!()
+    assert op(menu) == 0x3C01
+
+    log =
+      TestLog.capture(fn ->
+        a_zone
+        |> send!(<<0x02, 0x3C, 0>>)
+        |> recv!(<<0x09, 0x18, index::little-16, 7514::little-32, 15_412::little-32>>)
+        |> then(&Process.put(:a_zone, &1))
+      end)
+
+    a_zone = Process.get(:a_zone)
+
+    assert log =~ "[info] Zone: map change: character #{cid}, map RouN to RouCos03, peer"
+    {bodies, b_zone} = bodies!(b.zone)
+    assert <<0x05, 0x18, a.handle::little-16>> in bodies
+    refute on_map?("RouN", a.handle)
+
+    assert %Zone.Player{map: "RouCos03", x: 7514, y: 15_412, mode: 0} =
+             :sys.get_state(map!("RouCos03")).players[a.handle]
+
+    {_burst, a_zone} = a_zone |> send!(<<0x03, 0x18>>) |> until!(0x245F)
+    assert {[<<0x26, 0x58, 0::16>>, <<0x2A, 0x18, 0>>], a_wm} = until!(a.wm, 0x182A)
+    close_all([a_wm, a_zone, b.wm, b_zone])
+    # under PINATA_TEST_TOPOLOGY=multi close_all/1 waits for the peers' sessions, not for this node's
+    wait_until(fn -> row(cid).login_map == "RouCos03" end)
+    r = row(cid)
+    assert {r.login_map, r.login_x, r.login_y} == {"RouCos03", 7514, 15_412}
+  end
+
+  test "a gate inside one machine number whose handle is in use on the target: 0x180A" do
+    _cid = character!("admin", "Test1235", {7222, 4450})
+    p = in_world("admin", "Test1235")
+    {gate, index} = cos03_gate!("RouN")
+    cos03 = map!("RouCos03")
+    me = :sys.get_state(map!("RouN")).players[p.handle]
+    :sys.replace_state(cos03, &%{&1 | players: Map.put(&1.players, p.handle, %{me | mode: 0, conn: :none})})
+    on_exit(fn -> :sys.replace_state(cos03, &%{&1 | players: Map.delete(&1.players, p.handle)}) end)
+    {[menu], zone} = p.zone |> click(gate) |> bodies!()
+    assert op(menu) == 0x3C01
+
+    zone = send!(zone, <<0x02, 0x3C, 0>>)
+    assert {<<0x0A, 0x18, ^index::little-16, 7514::little-32, 15_412::little-32, _::binary>>, zone} = next!(zone)
+    refute on_map?("RouN", p.handle)
+
+    # the parked player arrives through a new connection, under another handle
+    {zone2, handle2} = TestPorts.endpoint(:zone) |> connect() |> enter_zone(p.wm_handle, "Test1235")
+    assert handle2 != p.handle and on_map?("RouCos03", handle2)
+    {_burst, wm} = until!(p.wm, 0x182A)
+    close_all([wm, zone, zone2])
+  end
 end

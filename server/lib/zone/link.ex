@@ -8,7 +8,11 @@ defmodule Zone.Link do
   player, removes it from the map instance and parks it in the session as the reservation
   (`Cluster.Sessions.reserve/2`); the answer is `0x180A` with the node's address and the session handle. A target on
   the player's own map instance saves, moves the player inside the instance (`Zone.MapInstance.relocate/3`) and
-  answers `0x1809`. The first failing step is the result and nothing after it runs.
+  answers `0x1809`. A target on another map instance of this node whose `FieldList` machine number is the one of the
+  player's map (the original's "same zone", Z01 §7.1) saves (`:auto`), enters the player into the target instance
+  under its handle (`Zone.MapInstance.enter/3`), removes it from the old one (`0x1805` to the players in sight) and
+  answers `0x1809` on the same connection; a handle in use on the target, or any other failure before the save,
+  falls back to the reconnect. The first failing step is the result and nothing after it runs.
 
   The GM command `&linkto` (issue 116) enters through the same path: `Zone.Handler.perform/1` with
   `{:link, origin, map, player, entered_at, session, dest}`.
@@ -75,7 +79,10 @@ defmodule Zone.Link do
   monotonic millisecond of the map entry, `session` = the WorldManager session process).
   """
   @spec run(pid(), Zone.Player.t(), integer(), pid(), dest()) ::
-          {:other, MapLinkotherCmd.t()} | {:same, Zone.Player.t(), MapLinksameCmd.t()} | {:error, refusal()}
+          {:other, MapLinkotherCmd.t()}
+          | {:same, Zone.Player.t(), MapLinksameCmd.t()}
+          | {:moved, pid(), Zone.Player.t(), MapLinksameCmd.t()}
+          | {:error, refusal()}
   def run(map, %Zone.Player{} = player, entered_at, session, dest) do
     with {:ok, info} <- tagged(GameData.fetch(GameData.MapInfo, dest.map_client), :no_map_info),
          {:ok, current} <- tagged(current(map, player.handle), :not_on_map) do
@@ -97,6 +104,7 @@ defmodule Zone.Link do
     minutes = max(div(Clock.monotonic_time(:millisecond) - entered_at, 60_000), 0)
 
     with {:ok, zone} <- tagged(Cluster.WorldManager.zone_of(current.world_no, dest.map), :not_running),
+         :reconnect <- local(map, current, zone, map_index, dest),
          :ok <- save(current, {:leave, minutes}),
          {:ok, parked} <- tagged(remove(map, current.handle), :not_on_map),
          reservation = %{
@@ -118,6 +126,53 @@ defmodule Zone.Link do
          wm_handle: handle
        }}
     end
+  end
+
+  # As the original (Z01 §7.1), no reconnect inside one zone: here the same FieldList machine number and both map
+  # instances on this node. Handles are per map instance, so a handle in use on the target falls back to the reconnect.
+  defp local(map, current, zone, map_index, dest) do
+    with true <- zone.node == node() and same_machine?(current.map, dest.map),
+         {:ok, target} <- Zone.MapInstance.whereis(current.world_no, dest.map),
+         {:ok, arriving} <-
+           Zone.Player.arrive(
+             current,
+             %{kind: :map_change, map: dest.map, x: dest.x, y: dest.y},
+             current.address,
+             current.conn
+           ),
+         :ok <- save(current, :auto),
+         {:ok, handle} <- enter(target, %{arriving | handle: current.handle}, current.handle) do
+      hand_over(map, target, %{arriving | handle: handle, mode: 0}, map_index, dest)
+    else
+      {:error, {:save, _reason}} = refused -> refused
+      _other -> :reconnect
+    end
+  end
+
+  defp hand_over(map, target, entered, map_index, dest) do
+    case remove(map, entered.handle) do
+      {:ok, _left} ->
+        _ = Process.monitor(target)
+        {:moved, target, entered, %MapLinksameCmd{map_index: map_index, x: dest.x, y: dest.y}}
+
+      :error ->
+        _ = remove(target, entered.handle)
+        {:error, :not_on_map}
+    end
+  end
+
+  defp same_machine?(from, to) do
+    case {GameData.lookup(GameData.FieldList, :map_id_client, from),
+          GameData.lookup(GameData.FieldList, :map_id_client, to)} do
+      {[%{machine: m} | _], [%{machine: m} | _]} -> true
+      _other -> false
+    end
+  end
+
+  defp enter(target, player, handle) do
+    Zone.MapInstance.enter(target, player, handle)
+  catch
+    :exit, _ -> {:error, :map_lost}
   end
 
   defp save(p, kind) do
