@@ -33,7 +33,7 @@ defmodule Load do
     --hold <seconds>      the hold window (300)
     --stop-after-hold     stop after the hold; exit 0 only when every player entered and nothing failed
     --prepare <file>      log every player in, create missing characters, write the placement list to <file>
-    --data-dir <dir>      data directory for --prepare (data)
+    --data-dir <dir>      data directory: block data of the move targets, placement of --prepare (data)
     --map <map>           the map of the Crowd scenario (Rou)
   See docs/technical/load-run.md.
   """
@@ -70,7 +70,8 @@ defmodule Load do
           moves: non_neg_integer(),
           moves_refused: non_neg_integer(),
           chats: non_neg_integer(),
-          maps: %{String.t() => pos_integer()}
+          maps: %{String.t() => pos_integer()},
+          entered: %{pos_integer() => {String.t(), integer(), integer()}}
         }
 
   @doc "Parses the command line of the task."
@@ -137,15 +138,20 @@ defmodule Load do
     IO.puts("load run: #{o.scenario}, #{o.players} players, #{o.host}:#{o.port}, seed #{o.seed}")
     names = for i <- 1..o.players, do: o.prefix <> String.pad_leading(Integer.to_string(i), 4, "0")
 
-    # the placement first, so that a bad data directory fails before any login
+    # the data directory first, so that a bad one fails before any login
+    maps = Load.Placement.maps(o.data_dir)
+
     lines =
       if o.prepare != :none do
         Random.seed(o.seed)
-        Load.Placement.list(o.scenario, names, o.data_dir, o.map, Load.Placement.maps(o.data_dir))
+        Load.Placement.list(o.scenario, names, o.data_dir, o.map, maps)
       end
 
+    # the players check their move targets against the block data; prepared players never move
+    blocks = if o.prepare == :none, do: Load.Placement.blocks(o.data_dir, maps), else: %{}
+
     state = %{result: result(o.players), alive: %{}, pending: MapSet.new(1..o.players)}
-    state = ramp(o, names, state)
+    state = ramp(o, names, blocks, state)
     state = await_outcomes(state)
 
     if o.prepare != :none do
@@ -176,11 +182,12 @@ defmodule Load do
       moves: 0,
       moves_refused: 0,
       chats: 0,
-      maps: %{}
+      maps: %{},
+      entered: %{}
     }
   end
 
-  defp ramp(o, names, state) do
+  defp ramp(o, names, blocks, state) do
     checksums = checksums()
     password = Base.encode16(:crypto.hash(:md5, o.password), case: :lower)
     runner = self()
@@ -199,7 +206,8 @@ defmodule Load do
         seed: o.seed,
         mode: if(o.prepare == :none, do: :play, else: :prepare),
         chat_ms: o.chat_ms,
-        ping_ms: o.ping_ms
+        ping_ms: o.ping_ms,
+        blocks: blocks
       }
 
       {pid, ref} = spawn_monitor(fn -> Load.Player.run(config) end)
@@ -275,11 +283,12 @@ defmodule Load do
     end
   end
 
-  defp handle(state, {:load, :in_world, index, map}) do
+  defp handle(state, {:load, :in_world, index, map, {x, y}}) do
     state
     |> outcome(index)
     |> update(:in_world, &(&1 + 1))
     |> update(:maps, &Map.update(&1, map, 1, fn n -> n + 1 end))
+    |> update(:entered, &Map.put(&1, index, {map, x, y}))
   end
 
   defp handle(state, {:load, :prepared, index}), do: state |> outcome(index) |> update(:prepared, &(&1 + 1))

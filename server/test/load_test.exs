@@ -1,6 +1,6 @@
 defmodule LoadTest do
   # The code of the CI job load-smoke (docs/technical/load-run.md, "CI smoke run") against the test application:
-  # prepare, place, run with 3 players over real sockets.
+  # prepare, place on Rou (not the start map RouN), run with 3 players over real sockets.
   use ExUnit.Case, async: false
 
   @moduletag capture_log: true
@@ -8,7 +8,7 @@ defmodule LoadTest do
   import ExUnit.CaptureIO
 
   setup do
-    wait_until(fn -> match?({:ok, _}, WorldManager.World.zone_of(0, "RouN")) end)
+    wait_until(fn -> match?({:ok, _}, WorldManager.World.zone_of(0, "Rou")) end)
     :ok = TestSessions.wait_none()
     Persistence.Repo.active().query!("DELETE FROM accounts")
     md5 = Base.encode16(:crypto.hash(:md5, "load"), case: :lower)
@@ -16,7 +16,7 @@ defmodule LoadTest do
     data_dir = System.fetch_env!("PINATA_TEST_DATA_DIR")
     file = Path.join(Path.expand(System.tmp_dir!()), "pinata-load-#{System.unique_integer([:positive])}.csv")
     on_exit(fn -> File.rm(file) end)
-    {:ok, options} = Load.parse(~w(--scenario crowd --players 3 --map RouN --data-dir #{data_dir}))
+    {:ok, options} = Load.parse(~w(--scenario crowd --players 3 --map Rou --data-dir #{data_dir}))
     options = %{options | port: TestPorts.app().login, chat_ms: 500, ping_ms: 500}
     %{options: options, data_dir: data_dir, path: file}
   end
@@ -33,14 +33,17 @@ defmodule LoadTest do
     {result, _out} = with_io(fn -> Load.run(%{options | prepare: file}) end)
     assert result.prepared == 3 and Load.ok?(result)
 
-    {:ok, block} = GameData.BlockData.load(data_dir, "RouN")
+    {:ok, block} = GameData.BlockData.load(data_dir, "Rou")
     lines = file |> File.read!() |> String.split("\n", trim: true)
 
-    for {line, i} <- Enum.with_index(lines, 1) do
-      ["load000" <> n, "RouN", x, y] = String.split(line, ",")
-      assert n == Integer.to_string(i)
-      refute GameData.BlockData.blocked?(block, String.to_integer(x), String.to_integer(y))
-    end
+    placed =
+      for {line, i} <- Enum.with_index(lines, 1), into: %{} do
+        ["load000" <> n, "Rou", x, y] = String.split(line, ",")
+        assert n == Integer.to_string(i)
+        {x, y} = {String.to_integer(x), String.to_integer(y)}
+        refute GameData.BlockData.blocked?(block, x, y)
+        {i, {"Rou", x, y}}
+      end
 
     assert length(lines) == 3
     assert capture_io(File.read!(file), fn -> Persistence.Release.place_characters() end) =~ "Placed 3 characters."
@@ -48,9 +51,25 @@ defmodule LoadTest do
     {result, out} = with_io(fn -> Load.run(%{options | hold_ms: 2500, stop_after_hold: true}) end)
     assert out =~ ~r/hold started\n(.|\n)*hold complete\n/
     assert Load.ok?(result)
-    assert result.in_world == 3 and result.maps == %{"RouN" => 3}
-    assert result.moves > 0 and result.chats > 0 and result.rtt != []
+    # Rou is not the start map (RouN): map and position at entry come from the placement
+    assert result.in_world == 3 and result.maps == %{"Rou" => 3}
+    assert result.entered == placed
+    assert result.moves > 0 and result.moves_refused == 0 and result.chats > 0 and result.rtt != []
     :ok = TestSessions.wait_none()
+  end
+
+  test "a move target is one the server accepts", %{data_dir: data_dir} do
+    {:ok, block} = GameData.BlockData.load(data_dir, "RouN")
+    Random.seed(1)
+    [line] = Load.Placement.list(:crowd, ["a"], data_dir, "RouN", ["RouN"])
+    [_, _, x, y] = String.split(line, ",")
+
+    Enum.reduce(1..2000, {String.to_integer(x), String.to_integer(y)}, fn _, pos ->
+      {tx, ty} = to = Load.Player.target(block, pos)
+      assert to != pos and GameData.BlockData.free_cell?(block, tx, ty)
+      refute GameData.BlockData.line_blocked?(block, pos, to, 2)
+      to
+    end)
   end
 
   test "placement of the World scenario and the options", %{data_dir: data_dir} do

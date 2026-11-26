@@ -1,15 +1,17 @@
 defmodule Load.Player do
   @moduledoc """
   The script of one simulated player of the load run (`docs/technical/load-run.md`, "Script per player"): log in,
-  create the character when the account has none, enter the map, run to a nearby point every 1 to 2 s, a chat line
+  create the character when the account has none, enter the map, run to a nearby point the block data allows every 1 to 2 s, a chat line
   every `chat_ms`, a heartbeat round trip every `ping_ms`. The process seeds itself with `Random.seed/1`, draws only
   through `Random` and reads time only through `Clock`.
 
-  The runner gets exactly one outcome of the login phase: `{:load, :in_world, index, map}`,
+  The runner gets exactly one outcome of the login phase: `{:load, :in_world, index, map, pos}`,
   `{:load, :prepared, index}`, `{:load, :connect_failed, index, part}` or `{:load, :failed, index, text}`; then
   `{:load, :rtt, ms}`, `{:load, :move}`, `{:load, :move_refused}`, `{:load, :chat}` and at most one
   `{:load, :disconnected, index}`.
   """
+
+  alias GameData.BlockData
 
   alias Proto.Packets.{
     ActChatReq,
@@ -45,7 +47,8 @@ defmodule Load.Player do
           seed: integer(),
           mode: :play | :prepare,
           chat_ms: pos_integer(),
-          ping_ms: pos_integer()
+          ping_ms: pos_integer(),
+          blocks: %{String.t() => BlockData.t()}
         }
 
   @doc "Plays the script of one player; returns when the player is prepared, failed or disconnected."
@@ -72,7 +75,7 @@ defmodule Load.Player do
 
       {:in_world, s} ->
         report(config, {:load, :rtt, s.rtt})
-        report(config, {:load, :in_world, config.index, s.map})
+        report(config, {:load, :in_world, config.index, s.map, s.pos})
         if loop(start(config, s)) == :closed, do: report(config, {:load, :disconnected, config.index})
         :ok
     end
@@ -117,11 +120,19 @@ defmodule Load.Player do
          {:ok, zone} <-
            put(zone, %MapLoginReq{wm_handle: wm_handle, char_name: char_name, checksums: c.checksums}, "map login"),
          {:ok, {map, pos}, zone} <- map_login(zone, ""),
+         {:ok, block} <- block(c, map),
          {:ok, zone} <- put(zone, %MapLogincompleteCmd{}, "map entry"),
          sent = now(),
          {:ok, zone} <- put(zone, <<0x04, 0x08>>, "map entry"),
          {:ok, _, zone} <- await(zone, "map entry", &pong/1) do
-      {:in_world, %{zone: zone, wm: wm, map: map, pos: pos, rtt: now() - sent}}
+      {:in_world, %{zone: zone, wm: wm, map: map, pos: pos, block: block, rtt: now() - sent}}
+    end
+  end
+
+  defp block(c, map) do
+    case c.blocks do
+      %{^map => block} -> {:ok, block}
+      %{} -> {:failed, "map entry: no block data for map #{map} (not a plain field map)"}
     end
   end
 
@@ -330,14 +341,32 @@ defmodule Load.Player do
   end
 
   defp move(%{pos: {px, py}} = s, now) do
-    # at most 127 units: run speed 127 covers it within the shortest pause, so `from` stays near the server position
-    to = {max(px + Random.uniform(181) - 91, 0), max(py + Random.uniform(181) - 91, 0)}
-    {tx, ty} = if to == s.pos, do: {px + 1, py}, else: to
+    {tx, ty} = target(s.block, s.pos)
 
     with {:ok, s} <- zone_send(s, Proto.encode(%ActMoverunCmd{from_x: px, from_y: py, to_x: tx, to_y: ty})) do
       report(s.c, {:load, :move})
       {:ok, %{s | pos: {tx, ty}, next_move: now + 999 + Random.uniform(1001)}}
     end
+  end
+
+  @target_tries 20
+
+  @doc """
+  A run target near `pos` that the server accepts (`Zone.MapInstance`, `docs/technical/movement.md`): at most 90 units
+  away in x and y, its cell not blocked and the straight line to it not blocked. After 20 draws without one the last
+  draw is returned; the server then refuses it.
+  """
+  @spec target(BlockData.t(), {integer(), integer()}) :: {integer(), integer()}
+  def target(block, pos), do: target(block, pos, @target_tries)
+
+  defp target(block, {px, py} = pos, tries) do
+    # at most 127 units: run speed 127 covers it within the shortest pause, so `from` stays near the server position
+    to = {max(px + Random.uniform(181) - 91, 0), max(py + Random.uniform(181) - 91, 0)}
+    {tx, ty} = to = if to == pos, do: {px + 1, py}, else: to
+
+    if tries == 1 or (not BlockData.blocked?(block, tx, ty) and not BlockData.line_blocked?(block, pos, to)),
+      do: to,
+      else: target(block, pos, tries - 1)
   end
 
   defp chat(s, now) do

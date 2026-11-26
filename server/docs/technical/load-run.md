@@ -29,7 +29,7 @@ MIX_ENV=test mix pinata.load --host <Login address> --port <Login port> --scenar
 | `--hold` | `300` | the hold window in seconds |
 | `--stop-after-hold` | off | stop the players after the hold; exit 0 only when every player entered the world and nothing failed, 1 otherwise |
 | `--prepare <file>` | off | log every player in, create the missing characters, write the placement list to `<file>`, exit (see "Placement") |
-| `--data-dir` | `data` | the data directory the placement is computed from (only with `--prepare`) |
+| `--data-dir` | `data` | the data directory: the block data the players check their move targets against, and the placement of `--prepare` |
 | `--map` | `Rou` | the map of the Crowd scenario |
 
 A missing or invalid option prints the usage text on standard error and exits with status 2. The task connects to
@@ -46,8 +46,10 @@ Players start at 50 per second.
    gender 0, hair 1, hair colour 1, face 5); it skips the tutorial question.
 3. Zone: map login with the 49 checksums of a 2016 client (from the transcript `26_11_15_idle_in_world.txt`),
    login complete, one heartbeat round trip.
-4. Then, until the task ends: run to a point at most 91 units away in x and y every 1 to 2 s (a refused move or a pull
-   back puts the player where the server says), one chat line `load run <name>` every 30 s (the first one at a random
+4. Then, until the task ends: run to a point at most 90 units away in x and y every 1 to 2 s; the point is drawn
+   until its cell is free and the straight line to it is not blocked in the block data of `--data-dir`, as the server
+   checks it ([`movement.md`](movement.md)), so a run has close to no refused moves (a refused move or a pull back
+   still puts the player where the server says), one chat line `load run <name>` every 30 s (the first one at a random
    moment), one heartbeat `0x0804` every 10 s. Heartbeats of the server are answered on the Zone and WorldManager
    connections.
 
@@ -116,6 +118,8 @@ then `--prepare`, the placement with `docker compose exec -T`, the run and the f
 - Create many hashes every password: 2500 accounts take minutes. Auto-create in single-node mode hashes at the first
   login instead.
 - On one machine the task's own load is part of what the server measures.
+- The task loads the block data of all plain field maps (about 90 MB) and needs the data directory on its machine; a
+  character on another map fails its login with `no block data for map <map>`.
 
 ## CI smoke run
 
@@ -124,7 +128,8 @@ single-node mode and runs `mix pinata.load --host 127.0.0.1 --port 9010 --scenar
 --stop-after-hold` (the accounts are created at their first login; without `--prepare` the new characters stand on the
 start map). It then prints `Pinata.Figures.print()`, stops the node and fails on a non-zero exit of the task or an
 `[error]` line in the node output. It never fails on latency. `test/load_test.exs` runs the same code (`Load.run/1`)
-against the test application with 3 players: prepare, place, run.
+against the test application with 3 players: prepare, place on `Rou` (not the start map), run; it asserts map and
+position at entry and that no move is refused.
 
 Locally, in `server/` after `MIX_ENV=prod mix release`, with the data directory in `data`
 (`_build/prod/rel/pinata/bin/pinata eval "GameData.Release.import_data(~S(<repo>/Files/Server/2016/9Data), ~s(data))"`),

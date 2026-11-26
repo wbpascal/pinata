@@ -47,6 +47,10 @@ defmodule Load.Placement do
     lines
   end
 
+  @doc "The block data of `maps`, by map name."
+  @spec blocks(Path.t(), [String.t()]) :: %{String.t() => GameData.BlockData.t()}
+  def blocks(data_dir, maps), do: Map.new(maps, &{&1, block!(data_dir, &1)})
+
   defp block!(data_dir, map) do
     case GameData.BlockData.load(data_dir, map) do
       {:ok, block} -> block
