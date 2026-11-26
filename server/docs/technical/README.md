@@ -83,11 +83,15 @@ Two Ecto repos (PostgreSQL, SQLite) sit behind `Persistence`; the adapter follow
 
 ## Time and randomness
 
-Server code reads time through `Clock` and random numbers through `Random`, never directly ([ADR 0008](../../../docs/adr/0008-byte-compatibility-proven-by-capture-replay.md)). Each forwards to a source module taken from the application environment (`:clock_source`, `:random_source`), so a test can put its own source in place. `Clock.local_time/1` turns a Unix time into local wall-clock time (the system source uses the time zone of the operating system). `Clock.send_after/3` schedules the tick of a map instance, so a replay test can fire it at a captured time; other timers are real ones.
+Server code reads time through `Clock` and random numbers through `Random`, never directly ([ADR 0008](../../../docs/adr/0008-byte-compatibility-proven-by-capture-replay.md)). Each forwards to a source module taken from the application environment (`:clock_source`, `:random_source`), so a test can put its own source in place. `Clock.local_time/1` turns a Unix time into local wall-clock time (the system source uses the time zone of the operating system). `Clock.send_after/3` schedules the tick of a map instance, so a replay test can fire it at a captured time; other timers are real ones. `Random.seed/1` seeds the generator of the calling process, so that its draws from the default source repeat; the simulated players of the load run use it.
 
 ## Testing
 
 [`testing.md`](testing.md) describes the transcripts under `server/test/replay/transcripts/` and how a capture is converted into one. It also describes the test client and the replay harness in `server/test/support/`.
+
+## Load run
+
+[`load-run.md`](load-run.md) describes the load run task `mix pinata.load` (many test clients against a running server, the scenarios World and Crowd, the placement command, the CI job `load-smoke`). [`load-run-results.md`](load-run-results.md) records the results of load runs.
 
 ## The gate
 

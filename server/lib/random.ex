@@ -8,4 +8,11 @@ defmodule Random do
 
   @spec bytes(non_neg_integer()) :: binary()
   def bytes(n), do: Application.get_env(:pinata, :random_source, Random.Rand).bytes(n)
+
+  @doc "Seeds the generator of the calling process, so that its draws from the default source repeat (the load run). An injected source ignores it."
+  @spec seed(integer()) :: :ok
+  def seed(n) do
+    _ = :rand.seed(:exsss, n)
+    :ok
+  end
 end

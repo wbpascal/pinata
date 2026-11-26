@@ -34,7 +34,7 @@ defmodule Pinata.MixProject do
   end
 
   def cli do
-    [preferred_envs: [check: :test]]
+    [preferred_envs: [check: :test, "pinata.load": :test]]
   end
 
   def application do
@@ -77,6 +77,8 @@ defmodule Pinata.MixProject do
   defp aliases do
     [
       test: ["test --no-start"],
+      # the load run, a developer task outside the release (docs/technical/load-run.md)
+      "pinata.load": ["run --no-start test/support/load.exs"],
       check: [
         "format --check-formatted",
         "deps.unlock --check-unused",

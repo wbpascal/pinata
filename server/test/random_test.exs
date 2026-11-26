@@ -22,6 +22,13 @@ defmodule RandomTest do
     assert Random.uniform(6) == 6
   end
 
+  test "equal seeds give equal draws" do
+    Random.seed(7)
+    first = for _ <- 1..10, do: Random.uniform(1000)
+    Random.seed(7)
+    assert first == for(_ <- 1..10, do: Random.uniform(1000))
+  end
+
   test "draws bytes from :crypto by default" do
     assert byte_size(Random.bytes(16)) == 16
   end

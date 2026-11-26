@@ -16,8 +16,16 @@ defmodule TestClient do
   @doc "Opens a connection; raises when it fails. Reads nothing."
   @spec connect(charlist(), :inet.port_number()) :: t()
   def connect(host, port) do
-    {:ok, socket} = :gen_tcp.connect(host, port, [:binary, active: false])
-    %__MODULE__{socket: socket, cipher: nil, buffer: <<>>}
+    {:ok, client} = try_connect(host, port)
+    client
+  end
+
+  @doc "Opens a connection; returns the error when it fails (the load run counts them). Reads nothing."
+  @spec try_connect(charlist(), :inet.port_number()) :: {:ok, t()} | {:error, term()}
+  def try_connect(host, port) do
+    with {:ok, socket} <- :gen_tcp.connect(host, port, [:binary, active: false]) do
+      {:ok, %__MODULE__{socket: socket, cipher: nil, buffer: <<>>}}
+    end
   end
 
   @doc "Receives the next body (opcode and payload) without decoding it."
@@ -31,6 +39,25 @@ defmodule TestClient do
         case :gen_tcp.recv(socket, 0, timeout) do
           {:ok, data} -> recv_raw(%{client | buffer: buffer <> data}, timeout)
           {:error, :timeout} -> {:error, :timeout}
+          {:error, _reason} -> {:error, :closed}
+        end
+    end
+  end
+
+  @doc """
+  Like `recv_raw/2`, but a timeout returns the client with the bytes read so far, so that a client that polls with
+  short timeouts never loses a partial frame.
+  """
+  @spec poll(t(), timeout()) :: {:ok, binary(), t()} | {:timeout, t()} | {:error, :closed}
+  def poll(%__MODULE__{socket: socket, buffer: buffer} = client, timeout) do
+    case Proto.Framing.split(buffer) do
+      {:ok, body, rest} ->
+        {:ok, body, started(%{client | buffer: rest}, body)}
+
+      :more ->
+        case :gen_tcp.recv(socket, 0, timeout) do
+          {:ok, data} -> poll(%{client | buffer: buffer <> data}, 0)
+          {:error, :timeout} -> {:timeout, client}
           {:error, _reason} -> {:error, :closed}
         end
     end

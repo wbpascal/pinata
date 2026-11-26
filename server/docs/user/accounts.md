@@ -29,8 +29,11 @@ Run them from the release with `bin/pinata eval`, or from a source checkout with
 | Action | From the release | From source |
 |---|---|---|
 | create | `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` | `mix pinata.account.create <name>` |
+| create many | `bin/pinata eval "Persistence.Release.create_accounts(~s(<prefix>), <count>)"` | `mix pinata.account.create --count <n> --prefix <prefix>` |
 | block | `bin/pinata eval "Persistence.Release.block(~s(<name>))"` | `mix pinata.account.block <name>` |
 | unblock | `bin/pinata eval "Persistence.Release.unblock(~s(<name>))"` | `mix pinata.account.unblock <name>` |
+
+Create many makes the accounts `<prefix>0001` to `<prefix><count>` (the number has four digits, the count is 1 to 9999), for example `load0001` to `load2500` for a [load run](../technical/load-run.md). It asks for the password once and gives it to every account. A name that exists already is skipped and counted. It ends with `Created <n> accounts, <m> existed already: <first> to <last>.` Every account hashes its password, so 2500 accounts take some minutes.
 
 Create asks `Password: `. The password is echoed while you type it. The game client sends the MD5 of the typed password, so the server stores the hash of that MD5; that the client's MD5 covers only the typed password is not yet verified against a capture.
 
@@ -43,6 +46,26 @@ Every command exits non-zero with one of these messages:
 | `The database failed; see the log line above.` | the database could not be reached or queried |
 | `<name> is not a valid account name: ...` | breaks the name rules above |
 | `No account named <name>.` | block or unblock of a missing account |
-| `Usage: mix pinata.account.create <name>` (alike for the others) | wrong number of arguments |
+| `The count must be 1 to 9999.` | create many with a count outside 1 to 9999 |
+| `Usage: mix pinata.account.create <name> \| --count <n> --prefix <prefix>`, `Usage: mix pinata.account.block <name>` (alike for unblock) | wrong arguments |
 
 The setting `login.auto_create_accounts` exists (see [`settings.md`](settings.md)); at login, an unknown name is created when it applies (it is on in single-node mode) and the stored password is the one sent at that first login; a name that is not valid gets the same refusal as a wrong password. There is no command for the login-able flag yet: call `Persistence.set_login_able/2` from `bin/pinata remote` or `iex`.
+
+## Placing characters
+
+This command exists for the [load run](../technical/load-run.md): it puts characters on a map and position before they enter the world. It reads one line `<character name>,<map>,<x>,<y>` per character from standard input and sets the stored map and position of those characters of world 0, all or nothing.
+
+| From the release | From source |
+|---|---|
+| `bin/pinata eval "Persistence.Release.place_characters()" < placement.csv` | `mix pinata.character.place < placement.csv` |
+| Compose: `docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.place_characters()' < placement.csv` | |
+
+Names are compared without regard to ASCII letter case. The map is a map name (letters, digits, `_`, `-`, at most 12 characters); `x` and `y` are whole numbers from 0. Empty lines and a `\r` at the line end are ignored. Run it only for characters that are not in the world: a character in the world writes its own position when it is saved. It ends with `Placed <n> characters.` or exits non-zero with one of these messages, and then nothing was placed:
+
+| Message | Meaning |
+|---|---|
+| `No placement lines given.` | empty input |
+| `Line <n> is not <character name>,<map>,<x>,<y>: "<line>"` | a malformed line |
+| `No character named <name> in world 0; nothing was placed.` | an unknown character |
+| `The database failed; see the log line above.` | the database could not be reached or queried |
+| `Usage: mix pinata.character.place < <file with name,map,x,y lines>` | an argument was given |

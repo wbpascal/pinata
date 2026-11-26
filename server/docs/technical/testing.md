@@ -62,7 +62,7 @@ In the two-client captures (scenarios 14, 45, 52) the connections are numbered i
 
 ## Test code layout
 
-`server/test/support/` holds test-only code: `TestClock`, `TestClient`, `TestPorts`, `Replay` and the `Replay.*` modules. `server/test/test_helper.exs` loads it. It is not part of the application, so the `boundary` compiler and Dialyzer do not see it.
+`server/test/support/` holds test-only code: `TestClock`, `TestClient`, `TestPorts`, `Replay` and the `Replay.*` modules, and the load run (`Load`, `Load.Player`, `Load.Placement` and the script `load.exs` of `mix pinata.load`, see [`load-run.md`](load-run.md)). `server/test/test_helper.exs` loads it. It is not part of the application, so the `boundary` compiler and Dialyzer do not see it.
 
 The telemetry tests are in `server/test/pinata/`: `figures_test.exs` (buckets, percentiles, merge, the printed text), `figures_peers_test.exs` (`Pinata.Figures.collect/0` over the three peer nodes) and `otel_test.exs`. `otel_test.exs` restarts the OpenTelemetry applications of the test VM and changes its `OTEL_TRACES_EXPORTER`, `OTEL_METRIC_READERS` and `OTEL_EXPORTER_OTLP_ENDPOINT` variables, so it is `async: false`; it restores both when it ends.
 
@@ -85,8 +85,10 @@ A port is free when chosen and is bound a moment later; another process can take
 | Function | What |
 |---|---|
 | `connect(host, port)` | opens the connection, reads nothing, raises on failure |
+| `try_connect(host, port)` | opens the connection, reads nothing: `{:ok, client}` or `{:error, reason}` |
 | `recv_raw(client, timeout)` | next body (opcode and payload): `{:ok, body, client}` or `{:error, :timeout \| :closed}` |
 | `recv(client, timeout)` | `recv_raw/2` and `Proto.decode/1`; adds `:unknown_opcode`, `:bad_size` |
+| `poll(client, timeout)` | like `recv_raw/2`, but a timeout returns `{:timeout, client}` with the bytes read so far, so a client that polls loses no partial frame |
 | `send_raw(client, body)` | encrypts, frames, sends; raises before the seed was received |
 | `send_packet(client, packet)` | `send_raw/2` of `Proto.encode/1` |
 | `expect(client, packet, timeout)` | asserts that the next packet is exactly `packet` |
@@ -295,6 +297,8 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 - `windows-smoke` against a release built on Windows in single-node mode with SQLite (see "Windows").
 
 The job `otel-smoke` (Linux) runs the release with OpenTelemetry ([`telemetry.md`](telemetry.md)). With export off and `OTEL_TRACES_EXPORTER=otlp` set it checks with the script `test/support/otel_apps.exs` that the three OpenTelemetry applications run, that `Pinata.Figures.print()` answers and that the node output has no line containing `OTLP`, `opentelemetry` or `CA(s)`. Then it starts an OpenTelemetry Collector container (`otel/opentelemetry-collector`, configuration `test/support/otel-collector.yaml`, debug exporter), starts the release with `telemetry.otlp_enabled = true` and `trace_ratio = 1.0`, runs the smoke script, enters one map with the script `test/support/otel_enter.exs` so that it ticks, flushes both providers and waits until the Collector log holds the span `pinata.packet` and the metrics `pinata.packet.duration` and `pinata.tick.duration`. The job runs both scripts with `bin/pinata rpc "Code.eval_file(…)"`, and `test/workflow_test.exs` loads both, so a change to `Zone.Player` or `Zone.MapInstance.enter/2` fails `mix check`; the same test compares the job names of `server.yml` with the table "CI jobs" in `server/AGENTS.md`. Locally, in `server/` after `MIX_ENV=prod mix release`, with the data directory in `data`, run the commands of the job's steps with `R=_build/prod/rel/pinata` and a temporary directory for `$RUNNER_TEMP`; afterwards remove `data`, `otel.toml` and the container (`docker rm -f otelcol`).
+
+The job `load-smoke` (Linux) starts the release in single-node mode and runs `mix pinata.load` with 50 players for 10 s; it fails when a player does not reach the world, disconnects or crashes, or the node writes an `error` line. `test/load_test.exs` runs the same code (`Load.run/1`) against the test application. See [`load-run.md`](load-run.md), "CI smoke run".
 
 `test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
 
