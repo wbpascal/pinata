@@ -119,6 +119,53 @@ defmodule Zone.Player do
     end
   end
 
+  @doc "The parked player of a map change on its new map: the reserved map and position, everything of the old map instance reset."
+  @spec arrive(
+          t(),
+          %{
+            :kind => :map_change,
+            :map => String.t(),
+            :x => non_neg_integer(),
+            :y => non_neg_integer(),
+            optional(atom()) => term()
+          },
+          String.t(),
+          pid()
+        ) :: {:ok, t()} | {:error, :game_data}
+  def arrive(%__MODULE__{} = player, %{kind: :map_change, map: map, x: x, y: y}, address, conn) do
+    case GameData.lookup(GameData.FieldList, :map_id_client, map) do
+      [field | _] ->
+        fresh = __struct__()
+
+        {:ok,
+         %{
+           player
+           | map: map,
+             x: x,
+             y: y,
+             last_good: {x, y},
+             map_type: field.kq,
+             address: address,
+             conn: conn,
+             handle: fresh.handle,
+             mode: fresh.mode,
+             dir: fresh.dir,
+             dimension: fresh.dimension,
+             sub_layer: fresh.sub_layer,
+             mover: fresh.mover,
+             move: fresh.move,
+             chat: fresh.chat
+         }}
+
+      [] ->
+        {:error, :game_data}
+    end
+  end
+
+  @doc "The values a save stores of the player (`Persistence.save_character/4`)."
+  @spec saved(t()) :: Persistence.saved_character()
+  def saved(%__MODULE__{} = p), do: %{map: p.map, x: p.x, y: p.y, hp: p.character.hp, sp: p.character.sp}
+
   defp class(item_id) do
     case GameData.fetch(GameData.ItemInfo, item_id) do
       {:ok, %{class: class}} -> class

@@ -15,7 +15,7 @@ defmodule Replay.Masks do
   @type mask :: {module(), path(), reason :: String.t()}
   @type handle :: {module(), path(), namespace :: atom(), reason :: String.t()}
 
-  # The other entries of ADR 0008 (the address in 0x180A, uninitialised memory with its bug id) are added by the
+  # The other entries of ADR 0008 (uninitialised memory with its bug id) are added by the
   # issue that defines each packet; the 0x0C0C and 0x1003 addresses and the 0x0C14 and 0x1110 entries are masks.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
@@ -31,6 +31,14 @@ defmodule Replay.Masks do
          "server address: the capture has the LAN address of the original Zone, the rebuild sends the public_host of the Zone node"},
         {Proto.Packets.CharLoginAck, :zone_port,
          "server address: the Zone node of this topology listens on another port than the capture's"},
+        {Proto.Packets.MapLinkotherCmd, :zone_ip,
+         "server address: the capture has the LAN address of the original Zone, the rebuild sends the public_host of the Zone node"},
+        {Proto.Packets.MapLinkotherCmd, :zone_port,
+         "server address: the Zone node of this topology listens on another port than the capture's"},
+        {Proto.Packets.MenuServermenuReq, :x,
+         "the player's server position at the click: the original's mover lags by its tick phase"},
+        {Proto.Packets.MenuServermenuReq, :y,
+         "the player's server position at the click: the original's mover lags by its tick phase"},
         {Proto.Packets.CharTutorialPopupReq, :unused,
          "uninitialised memory (P02-B28): the original never writes this byte, the rebuild sends 0"}
       ] ++
@@ -101,7 +109,12 @@ defmodule Replay.Masks do
          "identifier: the character number comes from the database sequence"},
         {Proto.Packets.MapLoginReq, :wm_handle, :wm_session,
          "session handle: the client sends back the handle of 0x0C14"},
-        {Proto.Packets.MapLoginAck, :handle, :object, "object handle: the map instance gives the next free handle"}
+        {Proto.Packets.MapLoginAck, :handle, :object, "object handle: the map instance gives the next free handle"},
+        {Proto.Packets.MapLinkotherCmd, :wm_handle, :wm_session,
+         "session handle: the handle of 0x0C14, sent back in the next 0x1801"},
+        {Proto.Packets.ActNpcclickCmd, :npc_handle, :object,
+         "object handle: the client sends back a handle it was shown"},
+        {Proto.Packets.MenuServermenuReq, :npc_handle, :object, "object handle: the NPC the menu belongs to"}
       ] ++ brief_handles() ++ sight_handles()
 
   defp sight_handles,

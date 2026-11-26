@@ -24,7 +24,14 @@ defmodule WorldManager.Handler do
   answers of `WorldManager.Placeholders`; the first `0x581B` gets `0x581C` with the server time (the Kingdom Quest
   list `0x581D` is milestone 10), later ones nothing. When the Zone reports `0x1803` (`{:cluster, :map_login_done}`)
   the session sends its burst: `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9` (placeholders), `0x0849` and `0x182A`
-  (flow: `docs/technical/flows/map-entry.md`).
+  (flow: `docs/technical/flows/map-entry.md`); after a map change only `0x5826` and `0x182A`.
+
+  A map change (flow: `docs/technical/flows/map-change.md`): the old Zone connection parks the player in the session
+  (`{:reserve, zone, r}`, `Cluster.Sessions.reserve/2`; accepted only from the session's current Zone connection)
+  and gets the session handle for `0x180A`. The reservation has the kind `:map_change`, the target map and position
+  and the player struct; the new Zone connection redeems it like a first entry (wrong node: `:wrong_node`, the
+  reservation stays) and gets the struct in its entry. While it is open the session has no Zone connection. It has
+  no timer and ends with the session, with the next `0x1001` or with `0x0C18 {1}`.
 
   `0x200C` whispers to a character by name (flow: `docs/technical/flows/whisper.md`). Only a session whose character
   is in the world (its map-login ticket was redeemed, until its next accepted `0x1001`) can whisper or be whispered
@@ -88,9 +95,20 @@ defmodule WorldManager.Handler do
   defstruct [:worlds, :world_no, :handle] ++
               [step: :login, user_no: :none, user_name: :none, tutorial: :none, reservation: :none, zone: :none] ++
               [character: :none] ++
-              [kq_time_sent?: false]
+              [kq_time_sent?: false, burst_sent?: false]
 
-  @type reservation :: %{character_id: pos_integer(), name: binary(), map: String.t(), node: node()}
+  @type reservation ::
+          %{kind: :first_entry, character_id: pos_integer(), name: binary(), map: String.t(), node: node()}
+          | %{
+              kind: :map_change,
+              character_id: pos_integer(),
+              name: binary(),
+              map: String.t(),
+              node: node(),
+              x: non_neg_integer(),
+              y: non_neg_integer(),
+              player: struct()
+            }
 
   @type t :: %__MODULE__{
           worlds: [Cluster.Registry.world_id()],
@@ -103,7 +121,8 @@ defmodule WorldManager.Handler do
           reservation: :none | reservation(),
           zone: :none | pid(),
           character: :none | binary(),
-          kq_time_sent?: boolean()
+          kq_time_sent?: boolean(),
+          burst_sent?: boolean()
         }
 
   # above it the relayed 0x200D can exceed the frame limit of Net.Connection
@@ -150,6 +169,10 @@ defmodule WorldManager.Handler do
       when is_pid(zone),
       do: {state, [{:perform, {:leave_world, zone}}]}
 
+  # Back to the character list between two maps: the map-login ticket is void (the player is saved already).
+  def handle_packet(%__MODULE__{step: :open, reservation: %{}} = state, %UserNormallogoutCmd{logout_type: 1}),
+    do: {%{state | reservation: :none}, [{:log, :info, "map-login ticket dropped: back to the character list"}]}
+
   # As the original's "PlayingCharNo" refusal: the session already has a character in the world.
   def handle_packet(%__MODULE__{step: :open, zone: zone} = state, %CharLoginReq{}) when is_pid(zone),
     do: {state, [{:send, %CharLoginfailAck{error: 0x145}}]}
@@ -163,7 +186,7 @@ defmodule WorldManager.Handler do
       when is_integer(user_no) do
     leave = if is_binary(state.character), do: [{:perform, {:leave_world, state.world_no, state.character}}], else: []
 
-    {%{state | tutorial: :none, reservation: :none, character: :none},
+    {%{state | tutorial: :none, reservation: :none, character: :none, burst_sent?: false},
      leave ++ [{:perform, {:select_character, state.world_no, user_no, slot}}]}
   end
 
@@ -290,8 +313,10 @@ defmodule WorldManager.Handler do
 
   def handle_info(state, {:zone_found, c, {:ok, zone}}),
     do:
-      {%{state | reservation: %{character_id: c.id, name: c.name, map: c.login_map, node: zone.node}},
-       [{:send, %CharLoginAck{zone_ip: zone.host, zone_port: zone.port}}]}
+      {%{
+         state
+         | reservation: %{kind: :first_entry, character_id: c.id, name: c.name, map: c.login_map, node: zone.node}
+       }, [{:send, %CharLoginAck{zone_ip: zone.host, zone_port: zone.port}}]}
 
   def handle_info(state, {:zone_found, c, :error}),
     do:
@@ -319,10 +344,13 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:kq_list_time, unix, local}),
     do: {state, [{:send, %KqListTimeAck{server_time: unix, tm: WorldManager.ServerTime.tm(local)}}]}
 
-  # A map change (issue 112) repeats only 0x5826 and 0x182A.
+  # After a map change the capture repeats only 0x5826 and 0x182A (walk-run-portals 324/325).
+  def handle_info(%__MODULE__{burst_sent?: true} = state, {:map_login_done, _unix, _local}),
+    do: {state, [{:send, WorldManager.Placeholders.kq_joining_alarm()}, {:send, %MapLinkendClientCmd{unused: 0}}]}
+
   def handle_info(state, {:map_login_done, unix, local}),
     do:
-      {state,
+      {%{state | burst_sent?: true},
        [
          {:send, WorldManager.Placeholders.guild_academy()},
          {:send, WorldManager.Placeholders.guild()},
@@ -384,7 +412,10 @@ defmodule WorldManager.Handler do
 
   # A Zone connection redeems the map-login ticket (Cluster.Sessions.redeem/2); only a success uses it up.
   @impl Net.Handler
-  def handle_call(%__MODULE__{reservation: %{name: name, node: node} = r} = state, {:redeem, name, node, zone_pid}) do
+  def handle_call(
+        %__MODULE__{reservation: %{kind: :first_entry, name: name, node: node} = r} = state,
+        {:redeem, name, node, zone_pid}
+      ) do
     entry = %{
       kind: :first_entry,
       world_no: state.world_no,
@@ -398,6 +429,26 @@ defmodule WorldManager.Handler do
      [{:perform, {:enter_world, state.world_no, name, zone_pid}}]}
   end
 
+  # The character is in the world already (Cluster.Sessions.enter_world/2 ran at its first entry).
+  def handle_call(
+        %__MODULE__{reservation: %{kind: :map_change, name: name, node: node} = r} = state,
+        {:redeem, name, node, zone_pid}
+      ) do
+    entry = %{
+      kind: :map_change,
+      world_no: state.world_no,
+      user_no: state.user_no,
+      character_id: r.character_id,
+      name: name,
+      map: r.map,
+      x: r.x,
+      y: r.y,
+      player: r.player
+    }
+
+    {{:ok, entry}, %{state | reservation: :none}, [{:perform, {:watch_zone, zone_pid}}]}
+  end
+
   def handle_call(%__MODULE__{reservation: %{name: name}} = state, {:redeem, name, _node, _zone_pid}),
     do: {{:error, :wrong_node}, state, []}
 
@@ -406,6 +457,27 @@ defmodule WorldManager.Handler do
 
   def handle_call(%__MODULE__{reservation: :none} = state, {:redeem, _name, _node, _zone_pid}),
     do: {{:error, :no_ticket}, state, []}
+
+  # The old Zone connection of a map change parks its player here (Cluster.Sessions.reserve/2); only the session's
+  # current Zone connection can.
+  def handle_call(%__MODULE__{character: name, handle: handle, zone: zone} = state, {:reserve, zone, r})
+      when is_binary(name) and is_pid(zone) do
+    reservation = %{
+      kind: :map_change,
+      character_id: r.character_id,
+      name: name,
+      map: r.map,
+      node: r.node,
+      x: r.x,
+      y: r.y,
+      player: r.player
+    }
+
+    # no character is on a map now, so 0x1001 voids the reservation instead of answering 0x145
+    {{:ok, handle}, %{state | reservation: reservation, zone: :none}, []}
+  end
+
+  def handle_call(state, {:reserve, _zone, _r}), do: {{:error, :no_session}, state, []}
 
   @impl Net.Handler
   def perform({:create_token, user_no, user_name}),
@@ -476,6 +548,11 @@ defmodule WorldManager.Handler do
 
   def perform({:enter_world, world_no, name, pid}) do
     :ok = Cluster.Sessions.enter_world(world_no, name)
+    _ = Process.monitor(pid)
+    {:zone_connected, pid}
+  end
+
+  def perform({:watch_zone, pid}) do
     _ = Process.monitor(pid)
     {:zone_connected, pid}
   end

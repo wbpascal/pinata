@@ -61,15 +61,16 @@ defmodule Zone.Grid do
   end
 
   @doc """
-  The original's walk order: with the key `{y, handle}`, first the entries below the centre key `{centre y, from}`
-  in descending order, then the entries above it in ascending order.
+  The original's walk order: with the key `{y, -handle}`, first the entries below the centre key `{centre y, -from}`
+  in descending order, then the entries above it in ascending order. Equal y lie in descending handle order (the
+  NPCs at y 7862 of RouVal01 in three captures: the original's list keeps a later insert before equal keys).
   """
   @spec walk_order([{handle(), point()}], point(), handle()) :: [handle()]
   def walk_order(entries, {_x, y}, from) do
-    centre = {y, from}
-    keys = for {handle, {_ex, ey}} <- entries, do: {ey, handle}
+    centre = {y, -from}
+    keys = for {handle, {_ex, ey}} <- entries, do: {ey, -handle}
     {below, above} = keys |> Enum.reject(&(&1 == centre)) |> Enum.split_with(&(&1 < centre))
-    for {_y, handle} <- Enum.sort(below, :desc) ++ Enum.sort(above), do: handle
+    for {_y, key} <- Enum.sort(below, :desc) ++ Enum.sort(above), do: -key
   end
 
   defp key(%__MODULE__{cell: cell}, {x, y}), do: {div(x, cell), div(y, cell)}

@@ -15,4 +15,13 @@ defmodule Cluster.WorldManager do
   @spec join_zone(Cluster.Registry.world_id(), pid(), {String.t(), pos_integer()}, [binary()]) :: [binary()]
   def join_zone(world_id, zone, address, offered),
     do: GenServer.call(Cluster.Registry.world_manager(world_id), {:join_zone, zone, address, offered})
+
+  @doc "The Zone node that runs the map (the map table); `:error` when no node runs it or the world is not registered."
+  @spec zone_of(Cluster.Registry.world_id(), binary()) ::
+          {:ok, %{node: node(), host: String.t(), port: pos_integer()}} | :error
+  def zone_of(world_id, map_name) do
+    GenServer.call(Cluster.Registry.world_manager(world_id), {:zone_of, map_name})
+  catch
+    :exit, _ -> :error
+  end
 end

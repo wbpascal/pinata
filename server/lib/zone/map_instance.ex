@@ -35,6 +35,13 @@ defmodule Zone.MapInstance do
   chat, every player in mode 1 for a shout) and returns the speaker's own packets: its copy of the line, `0x0848`
   for a spam block, or nothing.
 
+  Map change (flow: `docs/technical/flows/map-change.md`): `npc/3` answers a click on an NPC within 1000 units of the
+  player (mode 1, mover stepped to now) with the NPC and the player's position; `near_npc?/3` tells whether the player
+  stands within 1000 units of a shown NPC of a mob name (the town portal check); `relocate/3` moves a player inside
+  the map instance for `0x1809`: `0x1805` to the players in sight, the new position, mode 0, mover and chat state
+  reset, the handle kept. `enter/3` takes a player from another map instance of this node under the handle it has
+  (a `0x1809` between two instances), or refuses with `:handle_taken`.
+
   Actions (`docs/technical/flows/actions.md`): `action/3` relays an emote (`0x2021`) or an emote stop (`0x2023`) to
   the players in sight and the player itself, a jump (`0x2025`) or a stance change (`0x2009`) to the players in sight
   only, and keeps the emote state of `Zone.Player` that later appears show. `login_complete/2`, an accepted move, a
@@ -69,6 +76,8 @@ defmodule Zone.MapInstance do
   @reach2 40_001
   # the block check probes around a blocked step only when the last good position is farther than 30 units
   @stuck2 899
+  # an NPC acts on a click within 1000 units: dist² ≤ 1 000 000 (Z02 §6.2)
+  @npc_reach2 1_000_000
   # ShineObject::so_defstopmotion: what ClearEmoticon writes (Z02 §2 says {0, 0}; the binary and capture 45 win)
   @no_emote {0xFF, 0xFFFF}
 
@@ -93,6 +102,15 @@ defmodule Zone.MapInstance do
   @spec enter(pid(), Zone.Player.t()) :: {:ok, 8000..9499} | {:error, :no_block_data | :full}
   def enter(pid, %Zone.Player{} = player), do: GenServer.call(pid, {:enter, player})
 
+  @doc """
+  As `enter/2`, but under a handle the player already has (a `0x1809` from another map instance of this node);
+  `{:error, :handle_taken}` when the handle is in use here.
+  """
+  @spec enter(pid(), Zone.Player.t(), 8000..9499) ::
+          {:ok, 8000..9499} | {:error, :no_block_data | :full | :handle_taken}
+  def enter(pid, %Zone.Player{} = player, handle) when handle in @first_handle..@last_handle,
+    do: GenServer.call(pid, {:enter, player, handle})
+
   @doc "The player of the handle has loaded the map (`0x1803`): mode 1, and the answer packets of `Zone.MapEntry`."
   @spec login_complete(pid(), 8000..9499) :: {:ok, [struct()]} | {:error, :not_entered}
   def login_complete(pid, handle), do: GenServer.call(pid, {:login_complete, handle})
@@ -101,7 +119,7 @@ defmodule Zone.MapInstance do
   @spec leave(pid(), 8000..9499) :: {:ok, Zone.Player.t()} | :error
   def leave(pid, handle), do: GenServer.call(pid, {:leave, handle})
 
-  @doc "The current player of the handle (for the auto-save)."
+  @doc "The current player of the handle, its mover stepped to now (mode 1)."
   @spec player(pid(), 8000..9499) :: {:ok, Zone.Player.t()} | :error
   def player(pid, handle), do: GenServer.call(pid, {:player, handle})
 
@@ -168,6 +186,26 @@ defmodule Zone.MapInstance do
   def chat(pid, handle, kind, line) when kind in [:normal, :shout],
     do: GenServer.call(pid, {:chat, handle, kind, line})
 
+  @doc """
+  The NPC the player of the handle clicked (`0x200A`) and the player's position: the player is in mode 1 (its mover
+  stepped to now) and stands within 1000 units of a shown NPC with this handle; else `:error`.
+  """
+  @spec npc(pid(), 8000..9499, non_neg_integer()) :: {:ok, Zone.Npc.t(), Zone.Grid.point()} | :error
+  def npc(pid, handle, npc_handle), do: GenServer.call(pid, {:npc, handle, npc_handle})
+
+  @doc "Whether the player of the handle (mode 1, mover stepped to now) stands within 1000 units of a shown NPC of the mob name."
+  @spec near_npc?(pid(), 8000..9499, binary()) :: boolean()
+  def near_npc?(pid, handle, mob_name), do: GenServer.call(pid, {:near_npc?, handle, mob_name})
+
+  @doc """
+  Moves the player of the handle to a point of the same map instance (`0x1809`): `0x1805` to the players in sight
+  (mode 1 only), then the new position, mode 0, no mover, no move, the chat state of a fresh entry; the handle stays.
+  Returns the stored player; `:error` for an unknown handle.
+  """
+  @spec relocate(pid(), 8000..9499, Zone.Grid.point()) :: {:ok, Zone.Player.t()} | :error
+  def relocate(pid, handle, {x, y} = point) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
+    do: GenServer.call(pid, {:relocate, handle, point})
+
   @impl GenServer
   def init({world_id, name, data_dir}) do
     # terminate/2 runs on a supervisor shutdown only when exits are trapped.
@@ -219,23 +257,14 @@ defmodule Zone.MapInstance do
   end
 
   @impl GenServer
-  def handle_call({:enter, player}, _from, state) do
-    with {:ok, state} <- load_block_data(state),
-         {:ok, handle} <- free_handle(state) do
-      _ = if is_pid(player.conn), do: Process.monitor(player.conn)
-      player = %{player | handle: handle, mode: 0}
+  def handle_call({:enter, player}, _from, state), do: enter_with(state, player, &next_free/1)
 
-      state = %{
-        state
-        | players: Map.put(state.players, handle, player),
-          grid: put_grid(state.grid, player),
-          next_handle: if(handle == @last_handle, do: @first_handle, else: handle + 1)
-      }
-
-      {:reply, {:ok, handle}, start_ticking(state)}
-    else
-      {:error, reason} -> {:reply, {:error, reason}, state}
-    end
+  def handle_call({:enter, player, handle}, _from, state) do
+    enter_with(state, player, fn state ->
+      if Map.has_key?(state.players, handle),
+        do: {:error, :handle_taken},
+        else: {:ok, handle, state.next_handle}
+    end)
   end
 
   def handle_call({:login_complete, handle}, _from, state) do
@@ -261,7 +290,13 @@ defmodule Zone.MapInstance do
     end
   end
 
-  def handle_call({:player, handle}, _from, state), do: {:reply, Map.fetch(state.players, handle), state}
+  def handle_call({:player, handle}, _from, state) do
+    case stepped(state, handle) do
+      {:ok, state, player} -> {:reply, {:ok, player}, state}
+      # mode 0 has no mover
+      :error -> {:reply, Map.fetch(state.players, handle), state}
+    end
+  end
 
   def handle_call({:step, handle, point}, _from, state) do
     case state.players do
@@ -272,6 +307,53 @@ defmodule Zone.MapInstance do
 
       %{} ->
         {:reply, {:error, :not_entered}, state}
+    end
+  end
+
+  def handle_call({:npc, handle, npc_handle}, _from, state) do
+    case stepped(state, handle) do
+      {:ok, state, %Zone.Player{x: x, y: y}} ->
+        npc = Map.get(state.npc_index, npc_handle)
+        reply = if match?(%Zone.Npc{}, npc) and near?(npc, {x, y}), do: {:ok, npc, {x, y}}, else: :error
+        {:reply, reply, state}
+
+      :error ->
+        {:reply, :error, state}
+    end
+  end
+
+  def handle_call({:near_npc?, handle, mob_name}, _from, state) do
+    case stepped(state, handle) do
+      {:ok, state, %Zone.Player{x: x, y: y}} ->
+        near = Enum.any?(Map.values(state.npc_index), &(&1.row.mob_name == mob_name and near?(&1, {x, y})))
+        {:reply, near, state}
+
+      :error ->
+        {:reply, false, state}
+    end
+  end
+
+  def handle_call({:relocate, handle, {x, y}}, _from, state) do
+    case state.players do
+      %{^handle => %Zone.Player{} = player} ->
+        if player.mode == 1, do: broadcast(state, player, [%MapLogoutCmd{handle: handle}])
+
+        moved = %{
+          player
+          | x: x,
+            y: y,
+            last_good: {x, y},
+            mover: :none,
+            move: :none,
+            mode: 0,
+            chat: Zone.Player.__struct__().chat
+        }
+
+        grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
+        {:reply, {:ok, moved}, %{state | players: Map.put(state.players, handle, moved), grid: grid}}
+
+      %{} ->
+        {:reply, :error, state}
     end
   end
 
@@ -371,6 +453,41 @@ defmodule Zone.MapInstance do
 
     :ok
   end
+
+  # choose = the handle and the next_handle after it, or a refusal
+  defp enter_with(state, player, choose) do
+    with {:ok, state} <- load_block_data(state),
+         {:ok, handle, next_handle} <- choose.(state) do
+      _ = if is_pid(player.conn), do: Process.monitor(player.conn)
+      player = %{player | handle: handle, mode: 0}
+
+      state = %{
+        state
+        | players: Map.put(state.players, handle, player),
+          grid: put_grid(state.grid, player),
+          next_handle: next_handle
+      }
+
+      {:reply, {:ok, handle}, start_ticking(state)}
+    else
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  # a player in mode 1 with its mover stepped to now; the packets of the steps go out
+  defp stepped(state, handle) do
+    case state.players do
+      %{^handle => %Zone.Player{mode: 1}} ->
+        {state, deliveries} = advance(state, handle, Clock.monotonic_time(:millisecond))
+        deliver(deliveries)
+        {:ok, state, state.players[handle]}
+
+      %{} ->
+        :error
+    end
+  end
+
+  defp near?(%Zone.Npc{x: nx, y: ny}, point), do: dist2({nx, ny}, point) <= @npc_reach2
 
   # -- movement (docs/technical/movement.md); each step returns {state, deliveries in order}
 
@@ -592,6 +709,11 @@ defmodule Zone.MapInstance do
   end
 
   defp put_grid(grid, %{handle: handle, x: x, y: y}), do: Zone.Grid.put(grid, handle, {x, y})
+
+  defp next_free(state) do
+    with {:ok, handle} <- free_handle(state),
+         do: {:ok, handle, if(handle == @last_handle, do: @first_handle, else: handle + 1)}
+  end
 
   # The next free handle from next_handle on, wrapping from 9499 to 8000.
   defp free_handle(state) do

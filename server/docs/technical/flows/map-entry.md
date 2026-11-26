@@ -99,7 +99,7 @@ sequenceDiagram
 | `0x3021 {0x1041, 3, 0}` | `0x3020` at the Zone | empty | 9 |
 | nothing | `0x200B` at the Zone | real | 2 |
 
-A map change (issue 112) repeats only `0x5826` and `0x182A`.
+After a map change (`0x1803` on the new Zone connection, or again after `0x1809`) the session sends only `0x5826` and `0x182A`, as in the capture `walk-run-portals` after each of its five changes ([`map-change.md`](map-change.md)).
 
 ## Map instance
 

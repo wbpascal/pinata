@@ -276,3 +276,10 @@ defmodule Proto.Packets.ActSomeeonejumpCmd do
   # official: handle
   field :handle, :u16
 end
+
+defmodule Proto.Packets.ActNpcclickCmd do
+  @moduledoc "0x200A NC_ACT_NPCCLICK_CMD, client to server: the player clicked an NPC."
+  use Proto.Packet, opcode: 0x200A
+  # official: npchandle
+  field :npc_handle, :u16
+end

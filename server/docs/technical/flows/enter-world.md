@@ -77,6 +77,7 @@ sequenceDiagram
 - The session joins the `:pg` group `{:wm_handle, handle}` at world login. The Zone asks every member (`Cluster.Sessions.redeem/2`); the name and the node decide, so a handle that repeats after 65536 logins is harmless.
 - Only a successful redeem uses the ticket up. A wrong name or a wrong node leaves it, so a stranger cannot void it.
 - A new `0x1001` voids an open reservation and an open tutorial question. A `0x1111` without an open question is ignored.
+- A map change leaves a reservation of kind `:map_change` (`Cluster.Sessions.reserve/2`): the target map and position, the Zone node and the parked player struct. Its redeem follows the same rules (name and node decide, only a success uses it up) and gives the new Zone connection the struct instead of a database load; the session does not join its character group again ([`map-change.md`](map-change.md)).
 
 ## Client data check
 
