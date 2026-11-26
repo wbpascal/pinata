@@ -1,9 +1,9 @@
 defmodule Load.Player do
   @moduledoc """
   The script of one simulated player of the load run (`docs/technical/load-run.md`, "Script per player"): log in,
-  create the character when the account has none, enter the map, run to a nearby point the block data allows every 1 to 2 s, a chat line
-  every `chat_ms`, a heartbeat round trip every `ping_ms`. The process seeds itself with `Random.seed/1`, draws only
-  through `Random` and reads time only through `Clock`.
+  create the character when the account has none, enter the map, run to a nearby point the block data allows every 1
+  to 2 s, a chat line every `chat_ms`, a heartbeat round trip every `ping_ms`. The process seeds itself with
+  `Random.seed/1`, draws only through `Random` and reads time only through `Clock`.
 
   The runner gets exactly one outcome of the login phase: `{:load, :in_world, index, map, pos}`,
   `{:load, :prepared, index}`, `{:load, :connect_failed, index, part}` or `{:load, :failed, index, text}`; then

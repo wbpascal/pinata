@@ -332,7 +332,8 @@ defmodule Load do
         median = Enum.at(sorted, div(length(sorted), 2))
 
         IO.puts(
-          "round-trip time: #{length(sorted)} samples, min #{hd(sorted)} ms, median #{median} ms, max #{List.last(sorted)} ms"
+          "round-trip time: #{length(sorted)} samples, min #{hd(sorted)} ms, median #{median} ms, " <>
+            "max #{List.last(sorted)} ms"
         )
     end
 

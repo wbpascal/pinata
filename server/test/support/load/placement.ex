@@ -6,7 +6,9 @@ defmodule Load.Placement do
 
   @tries 1000
 
-  @doc "The plain field maps of a data directory: the `FieldList` rows with `KQ = 0` and no sub-map range, in file order."
+  @doc """
+  The plain field maps of a data directory: the `FieldList` rows with `KQ = 0` and no sub-map range, in file order.
+  """
   @spec maps(Path.t()) :: [String.t()]
   def maps(data_dir) do
     path = Path.join(data_dir, "tables/World/Field/FieldList.csv")
