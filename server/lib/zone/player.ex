@@ -4,13 +4,15 @@ defmodule Zone.Player do
   (`Zone.MapEntry`). Built by the Zone connection from the stored character and the session entry; the map
   instance sets `handle` and `mode` (0 after the entry, 1 after `0x1803`).
 
-  `admin_level` is always 0 when loaded: the column is issue 116.
+  `admin_level` is the stored admin level of the character (0 for a player, above 0 for a GM), read at every map
+  login; the GM commands check it (`Zone.GmCommand`).
 
   `dir` is the direction the player faces (90 after the entry, the original's `0x1803` handler sets it; no column
   holds one). `dimension` and `sub_layer` decide with the sight radius who sees whom (`Zone.Sight`): objects see each
   other only in the same dimension or when one of them is in dimension -1, and the sub-layer (0 Base, 1 RangerStealth,
   2 Observer, 3 AdminHide, 4 GMDoor, 5 GMPlayer) decides one way whether an object is shown to another. Both are 0
-  after the entry and are set by `Zone.MapInstance.set_layer/4`.
+  after the entry and on every map change; the GM commands `&hide`, `&show` and `&dimension` set them
+  (`Zone.MapInstance.action/3`), `Zone.MapInstance.set_layer/4` too.
 
   Movement (`docs/technical/movement.md`): `mover` is the running move (`Zone.Mover`, `:none` while standing), `move`
   the last relayed move packet (`0x2018` / `0x201A`, sent again after an appear; `:none` after a stop), `last_good`
@@ -112,7 +114,8 @@ defmodule Zone.Player do
          map_type: field.kq,
          equipment: Enum.map(character.equipment, &Map.put(&1, :class, class(&1.item_id))),
          address: address,
-         conn: conn
+         conn: conn,
+         admin_level: character.admin_level
        }}
     else
       _missing -> {:error, :game_data}

@@ -1,9 +1,4 @@
 # Stand-ins for the packets nobody defines yet: the `:absent` deferral needs a module with `opcode/0`.
-defmodule Replay.Milestone2Test.Unbuilt.BatAbstateinformNoeffectCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x242A
-end
-
 defmodule Replay.Milestone2Test.Unbuilt.BatAbstateinformCmd do
   @spec opcode() :: 0..0xFFFF
   def opcode, do: 0x2429
@@ -32,11 +27,6 @@ end
 defmodule Replay.Milestone2Test.Unbuilt.GameoptionCmd do
   @spec opcode() :: 0..0xFFFF
   def opcode, do: 0x7034
-end
-
-defmodule Replay.Milestone2Test.Unbuilt.BatAbstateresetCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x2428
 end
 
 defmodule Replay.Milestone2Test.Unbuilt.ItemEquipchangeCmd do
@@ -71,6 +61,71 @@ defmodule Replay.Milestone2Test.Unbuilt.CharUseitemMinimonUseBroadCmd do
   def opcode, do: 0x112C
 end
 
+defmodule Replay.Milestone2Test.Unbuilt.BriefinfoDropeditemCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x1C0A
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatTargetinfoCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2402
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatExpgainCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x240B
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSkillbashCastSucAck do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2435
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatCeaseFireCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x243D
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSwingStartCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2447
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSwingDamageCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2448
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSomeoneswingDamageCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2449
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatPkinpkfieldWmsCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x244A
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSkillbashHitObjStartCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x244E
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSomeoneskillbashHitObjStartCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x244F
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSkillbashHitDamageCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2452
+end
+
+defmodule Replay.Milestone2Test.Unbuilt.BatSkillbashHitBlastCmd do
+  @spec opcode() :: 0..0xFFFF
+  def opcode, do: 0x2457
+end
+
 defmodule Replay.Milestone2Test do
   # The harness swaps the global clock source, so it cannot run async.
   use ExUnit.Case, async: false
@@ -87,17 +142,45 @@ defmodule Replay.Milestone2Test do
     Replay.assert_replay(transcript,
       stop: stop,
       endpoints: Replay.Topology.endpoints(),
-      deferrals: opts[:deferrals] || [],
+      deferrals: (opts[:deferrals] || []) ++ from_notices(transcript) ++ admin_levels(transcript),
       close_after: opts[:close_after] || [],
       drop_after: opts[:drop_after] || [],
       late_ms: opts[:late_ms] || 0,
       masks: opts[:masks] || [],
-      tick_offset: opts[:tick_offset] || 0
+      tick_offset: opts[:tick_offset] || 0,
+      before: opts[:before] || %{},
+      handles: opts[:handles] || []
     )
   end
 
+  @from "the address of the capture's client in the \"From\" notice; the rebuild sends the address of the test client. No milestone removes it"
+
+  # the "From <address>" notices of the map entries of a GM (0x2011, text starting with "From ")
+  defp from_notices(transcript) do
+    indices =
+      for %{dir: :server, opcode: 0x2011, payload: <<_unused, _len, "From ", _::binary>>, index: i} <-
+            transcript.packets,
+          do: i
+
+    if indices == [], do: [], else: [{:payload, indices, P.ActNoticeCmd, :all, 2, @from}]
+  end
+
+  @admin_race "order race of the original: &adminlevel sent right after 0x1803 is answered inside the 0x1803 burst; the rebuild answers after it (test/gm_command_test.exs)"
+
+  # the client's &adminlevel after each 0x1803 of a GM and its answer "Admin level is <n>" on the same connection
+  defp admin_levels(transcript) do
+    packets = transcript.packets
+
+    for %{dir: :client, opcode: 0x2001, payload: <<_count, _len, "&adminlevel">>, conn: conn, index: i} <- packets,
+        answer = Enum.find(packets, &(&1.index > i and &1.conn == conn and &1.opcode == 0x2011 and admin?(&1.payload))),
+        answer != nil,
+        do: {:unsent, i, [answer.index], 2, @admin_race}
+  end
+
+  defp admin?(<<_unused, _len, "Admin level is ", _::binary>>), do: true
+  defp admin?(_payload), do: false
+
   @options "the option pushes 0x7032 to 0x7034 after 0x1003 (stored shortcuts, key map, game options): issue 132 decides"
-  @admin "the admin level column is issue 116; a loaded character has level 0"
 
   @deferrals [
     {:absent, U.ShortcutdataCmd, 2, @options},
@@ -105,7 +188,6 @@ defmodule Replay.Milestone2Test do
     {:absent, U.GameoptionCmd, 2, @options},
     {:payload, P.CharClientBaseCmd, :fame, 4, "fame has no column yet; the rebuild sends 0"},
     {:payload, P.CharClientBaseCmd, :stat_distribute, 4, "stat distribution has no column yet; the rebuild sends 0"},
-    {:payload, P.CharClientBaseCmd, :admin_level, 2, @admin},
     {:payload, P.CharClientQuestReadCmd, :all, 5, "the read quests of the captured character (quests)"},
     {:payload, P.QuestResetTimeClientCmd, :all, 5, "the quest reset times (quests); the rebuild sends 0"},
     {:payload, P.CharClientSkillCmd, :all, 4, "the skills of the captured character (skills)"},
@@ -126,14 +208,11 @@ defmodule Replay.Milestone2Test do
        about: [{P.ActSomeonemovewalkCmd, :handle}, {P.ActSomeonemoverunCmd, :handle}, {P.ActSomeonestopCmd, :handle}],
        npc?: &__MODULE__.npc?/2
      }, 4, "the monsters of the map and their moves (mobs); the NPC elements of 0x1C09 are compared"},
-    {:absent, U.BatAbstateinformNoeffectCmd, 4, "the abstates 345 and 291 of the captured character (abstates)"},
+    {:absent, P.BatAbstateinformNoeffectCmd, 4, "the abstates 345 and 291 of the captured character (abstates)"},
     {:absent, U.BatAbstateinformCmd, 4, "the title abstates and abstate 728 (abstates)"},
     {:absent, U.BriefinfoAbstateChangeCmd, 4, "the abstates of the captured character (abstates)"},
     {:payload, P.CharStatRemainpointCmd, :remain, 4, "the unspent stat points of the captured character (stat points)"},
-    {:absent, P.ActNoticeCmd, 2,
-     "the \"From\" notice needs an admin level and \"Admin level is 100\" answers &adminlevel: issue 116"},
     {:absent, U.CharClientAutoPickAck, 9, "the auto-pick state of the captured character (auto-pick)"},
-    {:absent, P.CharAdminLevelInformCmd, 2, @admin},
     {:payload, P.CharChangeparamchangeCmd, [:params, :value], 4,
      "the parameter values (parameters); the rebuild sends stored HP and SP and 0 elsewhere"},
     {:payload, P.KqJoiningAlarmList, :all, 10, "the Kingdom Quests open to join (Kingdom Quest)"},
@@ -152,7 +231,7 @@ defmodule Replay.Milestone2Test do
   @kq_race "order race of the original (its 0x581C comes after the WorldManager burst) and the Kingdom Quest list 0x581D (Kingdom Quest); the answer is checked by test/map_entry_test.exs"
   # Behind a map entry: abstate resets and the Kingdom Quest notices (mob moves are in the :mobs deferral).
   @in_world [
-    {:absent, U.BatAbstateresetCmd, 4, "the reset of abstate 291 (abstates)"},
+    {:absent, P.BatAbstateresetCmd, 4, "the reset of abstate 291 (abstates)"},
     {:absent, U.KqListUpdateAck, 10, "the Kingdom Quest list updates (Kingdom Quest)"},
     {:absent, U.KqJoiningAlarmCmd, 10, "the Kingdom Quest joining alarm (Kingdom Quest)"}
   ]
@@ -210,7 +289,7 @@ defmodule Replay.Milestone2Test do
   # Steps 1 to 5 of the scenario up to the first &getmoney. Closed by the client: 144 (zone#1, 1 s after 0x0C18 {1}),
   # 154 (wm#1 after 0x0C34), 164, 405 and 415 (Login connections that ended with 0x0C18 {0}), 718 and 722 (the killed
   # client, zone#4 and wm#4). Dropped: zone#2 and zone#3 at their last played line, for the capture's server-side
-  # resets at 292.5 s and 423.4 s. 0x2001 (&adminlevel) is sent and dropped (issue 116); 0x2012 and 0x2019 are
+  # resets at 292.5 s and 423.4 s. 0x2001 (&adminlevel) and its answer are unsent (the order race of admin_levels/1); 0x2012 and 0x2019 are
   # handled and answer nothing (no other player in sight, no refusal).
   test "26_11_16_38_session-loss-kicks-char-select",
     do:
@@ -401,4 +480,229 @@ defmodule Replay.Milestone2Test do
         masks: @walk_sit_emote_masks,
         late_ms: 200
       )
+
+  @running_inform "the position of a running player at the instant the original answered a 0x1C01 about it: its handling delay is not in the capture. No milestone removes it"
+  @mob_inform "0x1C01 for a monster the client was shown and its 0x1C08 answer (mobs)"
+  @combat "step 5 of the scenario: B targets and fights the mob 5375, A targets B (combat); its packets and the HP and SP changes of the fight"
+  # X14B is created in the capture: its number comes from the database sequence (8 in the capture), which other tests
+  # move on (SQLite keeps the highest id it gave), so every packet that carries it binds it as an identifier.
+  @x14b_number for(
+                 mod <- [
+                   P.CharClientBaseCmd,
+                   P.CharClientQuestDoingCmd,
+                   P.CharClientQuestDoneCmd,
+                   P.CharClientQuestRepeatCmd
+                 ],
+                 do: {mod, :chrregnum, :character, "identifier: the character number of X14B, created in the capture"}
+               )
+
+  @tick_position "B's position at the tick that brings it into sight: the original's tick phase and handling delays are not in the capture. No milestone removes it"
+  @npc_order "two NPCs at B's sight border enter 46 ms apart in the original and in the other order in the rebuild: the positions of B's run between its requests (tick phase, handling delay) are not in the capture. No milestone removes it"
+
+  # the module-wide abstate deferrals hide the &hide and &show packets; this test defers them by index
+  defp without_abstates(deferrals),
+    do:
+      Enum.reject(
+        deferrals,
+        &match?({:absent, m, _, _} when m in [P.BatAbstateinformNoeffectCmd, P.BatAbstateresetCmd], &1)
+      )
+
+  @second_client_deferrals [
+    {:payload, [10_853], P.BatHpchangeCmd, :order, 4,
+     "the HP change counter after the map change counts the HP changes of the fight (combat)"},
+    {:unsent, 10_776, [], 10, @kq_again},
+    {:payload, [10_724], P.BriefinfoLogincharacterCmd, :x, 2, @running_inform},
+    {:payload, [10_724], P.BriefinfoLogincharacterCmd, :y, 2, @running_inform},
+    {:payload, [10_724], P.BriefinfoLogincharacterCmd, :dir, 2, @running_inform},
+    {:payload, [1130], P.BriefinfoLogincharacterCmd, :y, 2, @running_inform},
+    {:absent, U.BriefinfoDropeditemCmd, 3, "the item the mob drops (items)"},
+    {:absent, [1153], 3, "0x1805 of the dropped item 10500 when it vanishes (items)"},
+    {:absent, [1057, 1058], 4, "0x1805 of the killed mob 5375 (combat)"},
+    {:absent, [898, 913, 930, 955, 966, 973, 995, 1020, 992, 1017, 1043], 4, @combat},
+    {:absent, [916, 918], 4, "the chat line 0x2002 of the mob 5375 (mobs)"},
+    {:unsent, 653, [], 4, @combat},
+    {:unsent, 720, [], 4, @combat},
+    {:unsent, 843, [], 4, @combat},
+    {:unsent, 867, [], 4, @combat},
+    {:unsent, 878, [], 4, @combat},
+    {:unsent, 934, [], 4, @combat},
+    {:unsent, 978, [], 4, @combat},
+    {:unsent, 1003, [], 4, @combat},
+    {:unsent, 1023, [], 4, @combat},
+    {:absent, U.BatTargetinfoCmd, 4, @combat},
+    {:absent, U.BatExpgainCmd, 4, @combat},
+    {:absent, U.BatSkillbashCastSucAck, 4, @combat},
+    {:absent, U.BatCeaseFireCmd, 4, @combat},
+    {:absent, U.BatSwingStartCmd, 4, @combat},
+    {:absent, U.BatSwingDamageCmd, 4, @combat},
+    {:absent, U.BatSomeoneswingDamageCmd, 4, @combat},
+    {:absent, U.BatPkinpkfieldWmsCmd, 4, @combat},
+    {:absent, U.BatSkillbashHitObjStartCmd, 4, @combat},
+    {:absent, U.BatSomeoneskillbashHitObjStartCmd, 4, @combat},
+    {:absent, U.BatSkillbashHitDamageCmd, 4, @combat},
+    {:absent, U.BatSkillbashHitBlastCmd, 4, @combat},
+    {:payload, P.BriefinfoLogincharacterCmd, :equip, 3,
+     "Equ_LeftHand: B's starting weapon, which the rebuild does not equip on the new character (items)"},
+    {:payload, [383], P.BriefinfoLogincharacterCmd, :x, 2, @tick_position},
+    {:payload, [383], P.BriefinfoLogincharacterCmd, :y, 2, @tick_position},
+    {:payload, P.BriefinfoLogincharacterCmd, :title_type, 6, "the current title of Test1235 (titles)"},
+    {:payload, P.BriefinfoLogincharacterCmd, :title_element, 6, "the current title of Test1235 (titles)"},
+    {:absent, [372], 4,
+     "0x1C0E of object 14204: no packet of the capture introduces this handle, it is not a player and not an NPC of the rebuild (objects)"},
+    {:payload, [354, 356], P.BriefinfoRegenmobCmd, :all, 2, @npc_order},
+    {:unsent, 231, [290], 2, @inventory_race},
+    {:unsent, 232, [298], 2, @inventory_race},
+    {:payload, [273], P.ChargedBoothslotsizeCmd, :size, 6,
+     "the booth slot count of the new character X14B (booth size); the placeholder sends 5"},
+    {:absent, [307], 9, "the 0x9010 at 114.8 s with the item change (charged items)"},
+    {:absent, [297, 310], 3, "the 0x3001 item cell changes of the new character (items)"},
+    {:unsent, 299, [300], 3, "0x200A on an NPC whose role is not Gate and its 0x4401 menu (NPC menus)"},
+    {:absent, [265], 3,
+     "B's starting weapon (1750) the original shows at the first map login of the new character; its 0x1406 lists no worn item (items)"},
+    {:unsent, 214, [216], 2, @prison_race},
+    {:extra, P.CharClientItemCmd, 3,
+     "the placeholder sends an empty 0x1047 for each of the boxes 9, 8, 12 and 15; the original leaves out an empty box other than 15, which needs the loaded boxes (items)"},
+    {:absent,
+     [139, 142, 143, 304, 305, 306, 308, 309, 462, 463, 464, 465, 639, 640, 641, 642, 711, 712, 713, 714] ++
+       [956, 957, 958, 959, 1088, 1111, 1135, 1136, 1137, 1138, 8861, 8862, 8863, 8864, 10_864] ++
+       [10_926, 10_927, 10_929, 10_930], 4, @param_1035},
+    {:unsent, 49, [55, 56, 57, 58], 10, @kq_race},
+    {:unsent, 225, [286, 287, 288, 289], 10, @kq_race},
+    {:absent, [96, 98, 269, 10_818, 10_820, 10_822, 10_824, 10_826, 10_828, 10_830], 4,
+     "the abstates 345 and 291 of the captured characters (abstates); the 0x242A of &hide at 1086 is compared"},
+    {:absent, [138, 303, 1089, 1090, 10_863], 4,
+     "the abstate resets of the login protection (abstates); the 0x2428 of &show at 1110 and 1112 are compared"},
+    {:payload, P.CharClientCoininfoCmd, :exchangeable, 11,
+     "the exchangeable coins of the captured characters (coins); the placeholder sends the value of idle_in_world"},
+    {:payload, P.CharMysteryvaultUiStateCmd, :state, 11,
+     "the mystery vault window state of the captured characters (mystery vault); the placeholder sends 0"},
+    {:payload, P.BriefinfoLogincharacterCmd, :abstatebit, 4, "the abstate bits (abstates)"},
+    {:payload, P.BriefinfoCharacterCmd, [:chars, :abstatebit], 4, "the abstate bits (abstates)"},
+    {:absent, U.BriefinfoAbstateChangeListCmd, 4, "the abstate list of a player in sight (abstates)"},
+    {:absent, U.BatAbstatesetCmd, 4, "the abstate set of a player in sight (abstates)"},
+    {:absent, U.CharUseitemMinimonUseBroadCmd, 9, "the mini-mon broadcast of a player that enters (charged items)"}
+  ]
+
+  @p02_b27 "P02-B27, 431 s to 492 s (between &dimension 1 and &dimension 0): the original sends an appear and a delete of every object near the GM for each of its steps across dimensions; fixed by decision (issue 90). No milestone removes it"
+
+  # The storm of P02-B27 in the window between &dimension 1 (1149) and &dimension 0 (10702): appears (0x1C06 of the
+  # other player; to the GM A also 0x1C08 of an NPC), the move resent right behind an appear of the same handle and
+  # time, deletes (0x1C0E of the other player; to A also of an NPC), and the client's 0x1C01 answered inside it.
+  # Monsters are left to the :mobs deferral, with their moves and deletes by index (monster_packets/2).
+  defp computed_deferrals(transcript) do
+    npcs = npc_handles(transcript, true)
+    window = for p <- transcript.packets, p.index > 1149 and p.index < 10_702, do: p
+
+    storm =
+      window
+      |> Enum.chunk_every(2, 1, [nil])
+      |> Enum.flat_map(fn [p, next] -> storm(p, next, npcs) end)
+      |> MapSet.new()
+
+    informs = informs(transcript)
+
+    # a 0x1C01 for a monster: its 0x1C08 answer stays for the :mobs deferral, which takes it out and learns the handle
+    mob_informs =
+      for {c, a} <- informs, a.opcode == 0x1C08 and handle(a) not in npcs, do: {:unsent, c.index, [], 4, @mob_inform}
+
+    storm_informs = for {c, a} <- informs, a.index in storm, do: {:unsent, c.index, [a.index], 2, @p02_b27}
+    answers = MapSet.new(storm_informs, fn {:unsent, _c, [a], _m, _r} -> a end)
+
+    [
+      {:absent, storm |> MapSet.difference(answers) |> Enum.sort(), 2, @p02_b27},
+      {:absent, monster_packets(transcript, npc_handles(transcript, false)), 4,
+       "the moves and deletes of the monsters of the map (mobs)"}
+    ] ++ storm_informs ++ mob_informs
+  end
+
+  # the handles of the NPCs (true) or the monsters (false) of the 0x1C08 appears
+  defp npc_handles(transcript, npc?) do
+    for %{dir: :server, opcode: 0x1C08, payload: <<h::little-16, _mode, mob_id::little-16, _::binary>>} <-
+          transcript.packets,
+        npc?("RouN", mob_id) == npc?,
+        into: MapSet.new(),
+        do: h
+  end
+
+  # 0x1C01 requests with the first server packet of the connection about the handle
+  defp informs(transcript) do
+    for %{dir: :client, opcode: 0x1C01, payload: <<_own::16, _command::16, h::little-16>>} = c <- transcript.packets,
+        answer = Enum.find(transcript.packets, &answer?(&1, c, h)),
+        answer != nil,
+        do: {c, answer}
+  end
+
+  # The :mobs deferral leaves out a monster only from an appear to its delete, but to a GM in dimension -1 the
+  # original relays monster moves before their next appear.
+  defp monster_packets(transcript, monsters) do
+    for %{dir: :server, opcode: op} = p <- transcript.packets,
+        op in [0x2018, 0x201A, 0x2013, 0x1C0E] and handle(p) in monsters,
+        do: p.index
+  end
+
+  defp deferred_indices({:absent, indices, _m, _r}) when is_list(indices), do: indices
+  defp deferred_indices({:unsent, c, answers, _m, _r}), do: [c | answers]
+  defp deferred_indices({:payload, indices, _mod, _path, _m, _r}), do: indices
+  defp deferred_indices(_entry), do: []
+
+  defp answer?(p, c, h), do: p.index > c.index and p.conn == c.conn and p.dir == :server and handle(p) == h
+
+  @other %{"zone#1" => 0x1F41, "zone#2" => 0x1F40}
+
+  defp storm(%{dir: :server, opcode: op, conn: conn} = p, next, npcs) when op in [0x1C06, 0x1C08] do
+    h = handle(p)
+
+    cond do
+      not storm_object?(op, conn, h, npcs) -> []
+      resent?(p, next, h) -> [p.index, next.index]
+      true -> [p.index]
+    end
+  end
+
+  defp storm(%{dir: :server, opcode: 0x1C0E, conn: conn} = p, _next, npcs),
+    do: if(storm_object?(0x1C08, conn, handle(p), npcs), do: [p.index], else: [])
+
+  defp storm(_p, _next, _npcs), do: []
+
+  # the other player on either connection; an NPC only on the GM's connection
+  defp storm_object?(op, conn, h, npcs), do: h == @other[conn] or (op == 0x1C08 and conn == "zone#1" and h in npcs)
+
+  defp resent?(p, next, h),
+    do:
+      next != nil and next.conn == p.conn and next.time == p.time and next.opcode in [0x2018, 0x201A] and
+        handle(next) == h
+
+  defp handle(%{payload: <<h::little-16, _::binary>>}), do: h
+  defp handle(_p), do: :none
+
+  # zone#1 is A (Test1235, admin level 100), zone#2 is B (X14B, created in the capture by 0x1401, admin level 0).
+  # Played to the end: B's login, character creation and tutorial skip, both entries, the moves and the sight between
+  # them, the shouts, the whispers, the stance, the emotes and jumps, and A's GM commands: &hide (0x242A to A, 0x1805
+  # to B), &show (0x2428 to both), &dimensio 1 ("Invalid command"), &dimension 1, -1, -1, 70000 and 0 (0x1805 to B
+  # where B saw A before), &linkto (0x1809 to a free cell of RouN: TestRandomSpot gives the captured x 4975, y 5825)
+  # and the map entry after it. B's &adminlevel (level 0) is played and answers nothing. Deferred: the combat of step
+  # 5 (milestone 4), the P02-B27 storm between &dimension 1 and &dimension 0 (computed_deferrals/1), abstates,
+  # monsters, items, the regular 0x1035. late_ms: 200 as in walk-run-portals.
+  test "26_11_15_14_second-client-in-sight" do
+    name = "26_11_15_14_second-client-in-sight"
+    transcript = "transcripts/#{name}.txt" |> Path.expand(__DIR__) |> Replay.Transcript.read!()
+    on_exit(fn -> Replay.Topology.all(Application, :delete_env, [:pinata, :random_source]) end)
+    deferrals = without_abstates(@deferrals ++ @in_world) ++ @second_client_deferrals ++ computed_deferrals(transcript)
+
+    # the GM command lines are sent and their answers compared (none of them deferred)
+    touched = Enum.flat_map(deferrals, &deferred_indices/1)
+    gm_lines = [1085, 1109, 1147, 1149, 6453, 7138, 8417, 10_702, 10_773]
+    answers = [1086, 1087, 1110, 1112, 1148, 1150, 7139, 8418, 10_774, 10_775]
+    assert Enum.filter(gm_lines ++ answers, &(&1 in touched)) == []
+
+    replay(name, :second_client_in_sight, :end,
+      deferrals: deferrals,
+      masks: @walk_sit_emote_masks,
+      late_ms: 200,
+      handles: @x14b_number,
+      before: %{
+        10_773 => fn -> Replay.Topology.all(Application, :put_env, [:pinata, :random_source, TestRandomSpot]) end
+      }
+    )
+  end
 end

@@ -11,6 +11,10 @@ defmodule Cluster.Sessions do
   current Zone connection; a `leave` call that arrives during the wait is answered `:ok`. The reservation is the
   map-login ticket the new Zone connection redeems with `redeem/2` as an entry of kind `:map_change`. It has no timer
   and ends with the session process, its next `0x1001` or `0x0C18 {1}`.
+
+  A kick (`&kickout`, flow: `docs/technical/flows/gm-commands.md`): the GM's Zone connection finds the session by
+  character name (`find_character/2`) and sends it `kick/2`; the session sends `0x0C17` and tells its Zone connection
+  with `kicked/1`, which closes. Neither waits for an answer.
   """
 
   @type entry ::
@@ -223,6 +227,20 @@ defmodule Cluster.Sessions do
   @spec whisper_refused(pid(), binary()) :: :ok
   def whisper_refused(pid, receiver) do
     send(pid, {:cluster, {:whisper_refused, receiver}})
+    :ok
+  end
+
+  @doc "Kicks the character of a session process: the session sends `0x0C17` with the code and leaves the world."
+  @spec kick(pid(), 0..0xFFFF) :: :ok
+  def kick(pid, code) do
+    send(pid, {:cluster, {:kick, code}})
+    :ok
+  end
+
+  @doc "Tells a Zone connection that its session kicked the character: the connection closes (and saves)."
+  @spec kicked(pid()) :: :ok
+  def kicked(zone_pid) do
+    send(zone_pid, {:cluster, :kicked})
     :ok
   end
 

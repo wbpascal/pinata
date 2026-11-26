@@ -14,8 +14,8 @@ defmodule Zone.Link do
   answers `0x1809` on the same connection; a handle in use on the target, or any other failure before the save,
   falls back to the reconnect. The first failing step is the result and nothing after it runs.
 
-  The GM command `&linkto` (issue 116) enters through the same path: `Zone.Handler.perform/1` with
-  `{:link, origin, map, player, entered_at, session, dest}`.
+  The GM command `&linkto` (flow: `docs/technical/flows/gm-commands.md`) enters through the same path:
+  `Zone.Handler.perform/1` with `{:link, :gm, map, player, entered_at, session, dest}`.
   """
 
   alias Proto.Packets.MapLinkotherCmd

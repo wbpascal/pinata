@@ -229,7 +229,8 @@ defmodule Persistence.CharactersTest do
           gender: 1,
           hair: 4,
           hair_color: 5,
-          face: 6
+          face: 6,
+          admin_level: 100
         })
 
       Factory.item(c.id, 25, 30_817)
@@ -257,6 +258,7 @@ defmodule Persistence.CharactersTest do
                hair: 4,
                hair_color: 5,
                face: 6,
+               admin_level: 100,
                equipment: [%{slot: 10, item_id: 1250, upgrade: 3}, %{slot: 25, item_id: 30_817, upgrade: 0}]
              }
     end
@@ -385,5 +387,17 @@ defmodule Persistence.CharactersTest do
 
     assert {:error, {:no_character, "Alpha"}} =
              Persistence.place_characters(1, [%{name: "Alpha", map: "Rou", x: 1, y: 1}])
+  end
+
+  test "set_admin_level names without letter case, per world", %{id: id} do
+    c = Factory.character(id, %{name: "Boss"})
+    level = fn -> Persistence.Repo.active().get!(Persistence.Character, c.id).admin_level end
+    assert level.() == 0
+
+    assert :ok = Persistence.set_admin_level(0, "BOSS", 100)
+    assert level.() == 100
+    assert {:error, :unknown} = Persistence.set_admin_level(0, "Nobody", 1)
+    assert {:error, :unknown} = Persistence.set_admin_level(1, "Boss", 1)
+    assert level.() == 100
   end
 end

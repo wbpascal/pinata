@@ -393,6 +393,23 @@ defmodule Proto.Packets.BatHpchangeCmd do
   field :order, :u16
 end
 
+defmodule Proto.Packets.BatAbstateinformNoeffectCmd do
+  @moduledoc "0x242A NC_BAT_ABSTATEINFORM_NOEFFECT_CMD, server to client: an abnormal state of the receiver and its keep time in ms (`&hide`)."
+  use Proto.Packet, opcode: 0x242A
+  # official: abstateIndex
+  field :abstate, :u32
+  # official: keepTime
+  field :keep_time, :u32
+end
+
+defmodule Proto.Packets.BatAbstateresetCmd do
+  @moduledoc "0x2428 NC_BAT_ABSTATERESET_CMD, server to client: an abnormal state of an object ends (`&show`)."
+  use Proto.Packet, opcode: 0x2428
+  field :handle, :u16
+  # official: abstateIndex
+  field :abstate, :u32
+end
+
 defmodule Proto.Packets.BatSpchangeCmd do
   @moduledoc "0x240F NC_BAT_SPCHANGE_CMD, server to client: the current SP."
   use Proto.Packet, opcode: 0x240F

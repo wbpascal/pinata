@@ -195,6 +195,7 @@ defmodule Replay.Setups do
         slot: 3,
         name: "X45A",
         level: 40,
+        admin_level: 100,
         race: 1,
         class: 21,
         gender: 1,
@@ -238,6 +239,7 @@ defmodule Replay.Setups do
         slot: 1,
         name: "X45B",
         level: 40,
+        admin_level: 100,
         race: 2,
         class: 14,
         exp: 1_389_279,
@@ -250,6 +252,54 @@ defmodule Replay.Setups do
         kq_date: ~U[2026-11-21 17:22:02Z]
       })
 
+    :ok
+  end
+
+  @doc """
+  Setup of `re-data/captures/26_11_15_14_second-client-in-sight.md`. The account `admin` with the three characters
+  its 0x0C14 lists, `Test1235` with the stored values its first 0x1038 shows (experience, position, HP, SP, money,
+  stones) and its one equipped item, and the account `testaccountB` without a character: B creates `X14B` in the
+  capture (0x1401). The capture gave it character number 8; the highest id here is 7, so the next one is 8.
+  """
+  @spec second_client_in_sight() :: :ok
+  def second_client_in_sight do
+    account_id = accounts()
+
+    :ok =
+      test1235(
+        account_id,
+        %{
+          kq_x: 6502,
+          kq_y: 10_199,
+          kq_date: ~U[2026-11-15 09:44:23Z],
+          exp: 13,
+          login_x: 6443,
+          login_y: 9850,
+          hp: 3033,
+          sp: 2794,
+          money: 99_999_634_524,
+          hp_stones: 386,
+          sp_stones: 364
+        },
+        [{10, 1250}]
+      )
+
+    :ok = test2(account_id, %{level: 8, kq_x: 6652, kq_y: 8601, kq_date: ~U[2026-11-15 11:06:59Z]})
+
+    _ =
+      Factory.character(account_id, %{
+        id: 7,
+        slot: 2,
+        name: "X37Del",
+        race: 1,
+        class: 21,
+        gender: 1,
+        hair: 4,
+        tutorial_state: 0,
+        kq_date: ~U[2026-11-15 16:08:48Z]
+      })
+
+    {:ok, _b} = Persistence.create_account("testaccountB", "098f6bcd4621d373cade4e832627b4f6")
     :ok
   end
 
@@ -274,7 +324,8 @@ defmodule Replay.Setups do
     id
   end
 
-  # "Test1235" as in `login-logout` and `create-char`; a later capture overrides what changed since.
+  # "Test1235" as in `login-logout` and `create-char`; a later capture overrides what changed since. Admin level 100:
+  # every Zone connection of it has 0x10C6 {100}.
   defp test1235(
          account_id,
          attrs \\ %{kq_x: 6477, kq_y: 9844, kq_date: ~U[2026-11-13 11:57:15Z]},
@@ -283,7 +334,20 @@ defmodule Replay.Setups do
     character =
       Factory.character(
         account_id,
-        Map.merge(%{id: 2, name: "Test1235", level: 120, race: 2, class: 11, gender: 1, hair: 4, kq_map: "RouN"}, attrs)
+        Map.merge(
+          %{
+            id: 2,
+            name: "Test1235",
+            level: 120,
+            race: 2,
+            class: 11,
+            gender: 1,
+            hair: 4,
+            kq_map: "RouN",
+            admin_level: 100
+          },
+          attrs
+        )
       )
 
     for {slot, item_id} <- items, do: Factory.item(character.id, slot, item_id)

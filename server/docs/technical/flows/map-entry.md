@@ -38,7 +38,7 @@ sequenceDiagram
 
 | Step | Packets | Kind | Milestone |
 |---|---|---|---|
-| `base` | `0x1038`: the stored character, map, position, direction 90, `admin_level`; fame, stat distribution, power and guard stones, LP, PK values, prison minutes and flags are 0 | real | 2 (admin level: issue 116) |
+| `base` | `0x1038`: the stored character, map, position, direction 90, `admin_level`; fame, stat distribution, power and guard stones, LP, PK values, prison minutes and flags are 0 | real | 2 |
 | `shape` | `0x1039` | real | 2 |
 | `quest_doing` | `0x103A {id, need_clear 1, 0}` | empty | 5 |
 | `quest_done` | `0x103B {id, 0, 12, 0, 0}` | empty | 5 |
@@ -67,13 +67,13 @@ sequenceDiagram
 | `move_speed` | `0x203E {WalkSpeed, RunSpeed}` of `ChrCommon` (33, 127) | real | 2 |
 | `booth_size` | `0x9010 {5}` | empty | 6 |
 | `can_use_revive_item` | `0x182B {1}` (the default of a field map) | real | 2 |
-| `connect_from` | `0x2011 {0, "From <address>"}`, only with an admin level | real | 2 (admin level: issue 116) |
+| `connect_from` | `0x2011 {0, "From <address>"}`, only with an admin level | real | 2 |
 | – | auto-pick `0x10BD` | absent | 9 |
 | `minimon_info` | `0x1123 {0, 0, 12 x 0xFFFF, 12 x 0xFFFF}` | empty | 9 |
 | – | title abstates `0x1C18` / `0x2429` | absent | 4 |
 | `rest_minute` | nothing: `0x0810` belongs to instance dungeons | real | 2 |
 | – | prison `0x7C05` | absent | 11 |
-| `admin_level` | `0x10C6 {level}`, only when it is not 0 | real | 2 (admin level: issue 116) |
+| `admin_level` | `0x10C6 {level}`, only when it is not 0 (the column `characters.admin_level`, see [`gm-commands.md`](gm-commands.md)) | real | 2 |
 | `item_action_cooltime` | `0x482C {0}` | empty | 4 |
 | `mystery_vault` | `0x10D4 {0}` | empty | 11 |
 | `field_attribute` | `0x1827 {FieldList.KQ}` | real | 2 |

@@ -22,6 +22,7 @@ defmodule Zone.MapEntryTest do
       hair: 4,
       hair_color: 0,
       face: 0,
+      admin_level: 0,
       equipment: []
     }
 

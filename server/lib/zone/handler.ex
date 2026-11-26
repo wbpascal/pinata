@@ -41,7 +41,7 @@ defmodule Zone.Handler do
   Chat (flow: `docs/technical/flows/chat.md`): in the world, `0x2001` (normal chat) and `0x201E` (shout) go to the
   map instance (`Zone.MapInstance.chat/4`), which checks them with `Zone.Chat` and relays `0x2002` to the speaker and
   the players in sight, or `0x201F` to every player of the map; a refusal is silent, a spam block answers `0x0848`.
-  A `0x2001` line starting with `&` is dropped and never shown: the GM command frame is issue 116. A line with more
+  A `0x2001` line starting with `&` is a GM command and never shown as chat (see "GM commands"). A line with more
   than 76 item links is dropped with an `info` line (above it the relayed `0x201F` can exceed the frame limit). A
   chat packet before `0x1803` is ignored. `0x082F` (in `:loading` and `:in_world`) is answered with
   `0x0830 {ShoutLevel, ShoutDelay}`, which the 2016 client ignores (Z01-B5). Absent until their milestones: the GM
@@ -68,6 +68,18 @@ defmodule Zone.Handler do
   ignored with an `info` line; the connection stays open. Before `0x1803` the four packets are ignored. Absent until
   their milestones: the gamble-game refusal of `0x2020`, `CancelOnAction`, charged emotes `0x2067` (9), the pet
   dance (9), the tent shape of `0x2008`, the Lua jump triggers (10), the quest hook (5).
+
+  GM commands (flow: `docs/technical/flows/gm-commands.md`, `Zone.GmCommand`): in the world, a `0x2001` line that
+  starts with `&` is checked before every chat rule. A character with admin level 0 gets no answer and no log line.
+  Otherwise the line is cut at 100 bytes, logged (`info`, `GM command: character …: …`, Z11-B1 fixed) and parsed;
+  an unknown word answers `0x2011` "Invalid command : <word>", a known word with too low a level nothing.
+  `&adminlevel` answers "Admin level is <n>". `&hide`, `&show` and `&dimension <n>` go to the map instance
+  (`Zone.MapInstance.action/3`). `&kickout <name>` finds the session of the name on any node and kicks it
+  (`Cluster.Sessions.kick/2`), answering "<name> is banned" (P02-B41 fixed) or "<name> is not in game" (Z11-B6
+  fixed); it does not wait for the kick. `&linkto` runs the map change (`Zone.Link.run/5`) to a free spot of the own
+  map (no argument), the `RegenX` / `RegenY` point of `MapInfo` (`<map>`) or a point (`<map> <x> <y>`); an unknown
+  map, a map that is not running and `&linkto -` answer "Invalid map name". A kick of this connection's character
+  (`{:cluster, :kicked}` from the session) closes the connection; `terminate/1` saves the player.
   """
 
   @behaviour Net.Handler
@@ -79,6 +91,7 @@ defmodule Zone.Handler do
   alias Proto.Packets.ActEndoftradeCmd
   alias Proto.Packets.ActJumpCmd
   alias Proto.Packets.ActMoverunCmd
+  alias Proto.Packets.ActNoticeCmd
   alias Proto.Packets.ActNpcclickCmd
   alias Proto.Packets.ActMovewalkCmd
   alias Proto.Packets.ActShoutCmd
@@ -172,8 +185,16 @@ defmodule Zone.Handler do
   def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActStopReq{x: x, y: y}),
     do: {state, [{:perform, {:stop, state.map, p.handle, {x, y}}}]}
 
-  # The GM command frame is issue 116; until then a line starting with & is dropped. It is never shown as chat.
-  def handle_packet(%__MODULE__{step: :in_world} = state, %ActChatReq{content: "&" <> _}), do: {state, []}
+  # A line starting with & is a GM command, checked before every chat rule; never shown as chat.
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{admin_level: 0}} = state, %ActChatReq{
+        content: "&" <> _
+      }),
+      do: {state, []}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActChatReq{
+        content: "&" <> _ = content
+      }),
+      do: {state, gm_command(state, p, content)}
 
   def handle_packet(%__MODULE__{step: :in_world} = state, %ActChatReq{item_link_count: n}) when n > @max_item_links,
     do: {state, [{:log, :info, "chat dropped: #{n} item links"}]}
@@ -308,6 +329,10 @@ defmodule Zone.Handler do
   def handle_info(state, {:cluster, {:map_stopped, _player}}), do: {state, []}
 
   def handle_info(state, {:cluster, :session_replaced}), do: {state, [{:close, :info, "session replaced"}]}
+  def handle_info(state, {:cluster, :kicked}), do: {state, [{:close, :info, "kicked"}]}
+
+  def handle_info(state, {:gm_notice, text}), do: {state, [{:send, %ActNoticeCmd{unused: 0, text: text}}]}
+  def handle_info(state, {:gm_ignored, text}), do: {state, [{:log, :info, text}]}
 
   def handle_info(%__MODULE__{step: :in_world, map: map, player: %Zone.Player{} = p} = state, {:timer, :auto_save})
       when is_pid(map),
@@ -352,6 +377,9 @@ defmodule Zone.Handler do
 
   def handle_info(state, {:linked, _origin, _p, _dest, {:error, :too_far}}),
     do: {state, [{:log, :debug, "server menu answer dropped: too far from where the menu opened"}]}
+
+  def handle_info(state, {:linked, :gm, _p, _dest, {:error, reason}}) when reason in [:not_running, :no_map_info],
+    do: {state, [{:send, %ActNoticeCmd{unused: 0, text: "Invalid map name"}}]}
 
   # The line comes before the answer, as the WorldManager refusals do.
   def handle_info(state, {:linked, origin, p, dest, {:error, reason}}),
@@ -459,6 +487,40 @@ defmodule Zone.Handler do
   def perform({:link, :town_portal, map, p, entered_at, session, dest}),
     do: {:linked, :town_portal, p, dest, Zone.Link.run(map, p, entered_at, session, dest)}
 
+  def perform({:link, :gm, map, p, entered_at, session, dest}),
+    do: {:linked, :gm, p, dest, Zone.Link.run(map, p, entered_at, session, dest)}
+
+  def perform({:kickout, world_no, name}) do
+    case Cluster.Sessions.find_character(world_no, name) do
+      {:ok, pid} ->
+        :ok = Cluster.Sessions.kick(pid, 0x068B)
+        {:gm_notice, name <> " is banned"}
+
+      :error ->
+        {:gm_notice, name <> " is not in game"}
+    end
+  end
+
+  def perform({:gm_linkto, [], map, p, entered_at, session}) do
+    case free_spot(map) do
+      {:ok, {x, y}} -> perform({:link, :gm, map, p, entered_at, session, %{map: p.map, map_client: p.map, x: x, y: y}})
+      :error -> {:gm_ignored, "&linkto ignored: no free spot found"}
+    end
+  end
+
+  # shortcut: &linkto - (back to the normal location) is not built (issue 93)
+  def perform({:gm_linkto, ["-" <> _ | _], _map, _p, _entered_at, _session}), do: {:gm_notice, "Invalid map name"}
+
+  def perform({:gm_linkto, [name | rest], map, p, entered_at, session}) do
+    with {:ok, info} <- GameData.fetch(GameData.MapInfo, name),
+         {x, y} when x >= 0 and y >= 0 <- linkto_point(rest, info) do
+      perform({:link, :gm, map, p, entered_at, session, %{map: name, map_client: name, x: x, y: y}})
+    else
+      :error -> {:gm_notice, "Invalid map name"}
+      {_x, _y} -> {:gm_ignored, "&linkto ignored: coordinates out of range"}
+    end
+  end
+
   # not in the original: it accepts 0x181A anywhere, a free teleport for a modified client
   def perform({:town_portal, i, map, p, entered_at, session}) do
     with true <- Zone.MapInstance.near_npc?(map, p.handle, "Gate_Town"),
@@ -479,6 +541,46 @@ defmodule Zone.Handler do
 
   def perform({:chat, map, handle, kind, line}), do: {:chatted, Zone.MapInstance.chat(map, handle, kind, line)}
   def perform(:server_parameters), do: {:server_parameters, Zone.Chat.common().shout}
+
+  # so_ply_AdminCommand (Z11 §1): the line is cut at 100 bytes and logged before the lookup (Z11-B1 fixed)
+  defp gm_command(state, p, content) do
+    line = binary_part(content, 0, min(byte_size(content), 100))
+    {word, args} = Zone.GmCommand.parse(line)
+    log = {:log, :info, "GM command: character #{inspect(p.character.name)}: #{inspect(line)}"}
+    [log | gm(Zone.GmCommand.lookup(word, p.admin_level), word, args, state, p)]
+  end
+
+  defp gm(:unknown, word, _args, _state, _p),
+    do: [{:send, %ActNoticeCmd{unused: 0, text: "Invalid command : " <> word}}]
+
+  defp gm(:denied, _word, _args, _state, _p), do: []
+
+  defp gm({:ok, :adminlevel}, _word, _args, _state, p),
+    do: [{:send, %ActNoticeCmd{unused: 0, text: "Admin level is #{p.admin_level}"}}]
+
+  defp gm({:ok, :hide}, _word, _args, state, p), do: [{:perform, {:action, state.map, p.handle, :hide}}]
+  defp gm({:ok, :show}, _word, _args, state, p), do: [{:perform, {:action, state.map, p.handle, :show}}]
+
+  defp gm({:ok, :dimension}, _word, args, state, p),
+    do: [{:perform, {:action, state.map, p.handle, {:dimension, Zone.GmCommand.number(first(args))}}}]
+
+  defp gm({:ok, :kickout}, _word, args, _state, p), do: [{:perform, {:kickout, p.world_no, first(args)}}]
+
+  defp gm({:ok, :linkto}, _word, args, state, p),
+    do: [{:perform, {:gm_linkto, args, state.map, p, state.entered_at, state.session}}]
+
+  defp first([arg | _]), do: arg
+  defp first([]), do: ""
+
+  # exactly two numbers name the point; any other count takes the regen point of the map
+  defp linkto_point([xs, ys], _info), do: {Zone.GmCommand.number(xs), Zone.GmCommand.number(ys)}
+  defp linkto_point(_rest, info), do: {info.regen_x, info.regen_y}
+
+  defp free_spot(map) do
+    Zone.MapInstance.free_spot(map)
+  catch
+    :exit, _ -> :error
+  end
 
   # the packets the map instance sent this connection before its reply (one sender: they are in the mailbox)
   defp moved(_result), do: {:moved, pushed([])}
@@ -550,9 +652,11 @@ defmodule Zone.Handler do
 
   defp ack(:town_portal), do: [{:send, %MapTownportalAck{error: 0x19C1}}]
   defp ack({:gate, _name, _origin}), do: []
+  defp ack(:gm), do: []
 
   defp refuse(:town_portal), do: [{:send, %MapTownportalAck{error: 0x19C2}}]
   defp refuse({:gate, _name, _origin}), do: []
+  defp refuse(:gm), do: []
 
   defp level(:not_running), do: :info
   defp level(:no_map_info), do: :info

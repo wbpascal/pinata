@@ -79,6 +79,10 @@ connection writes `connection closed: listener stopped` and runs the leave path 
 - **Between two maps.** `0x0C18 {1}` while the session holds an open map-login ticket and no Zone connection (after
   `0x180A`, or after `0x1003` before the Zone login) drops the ticket with one `info` line; the player is saved
   already, so nothing else runs ([`map-change.md`](map-change.md)).
+- **Kicked.** A GM's `&kickout` reaches the session by character name: the session sends `0x0C17 {0x068B}`, drops
+  an open reservation, leaves the character group and tells its Zone connection, which closes with
+  `connection closed: kicked` and runs the leave path (removed, saved). The session stays open until the client
+  closes it with `0x0C18 {0}` (flow: [`gm-commands.md`](gm-commands.md)).
 - **Sight.** `0x1805` to the players in sight is sent where the map instance removes a player (`remove/2`), with issue
   109; nobody sees another player yet.
 

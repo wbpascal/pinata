@@ -112,6 +112,49 @@ defmodule Persistence.Release do
     end
   end
 
+  @doc """
+  Sets the admin level (0 to 255) of a character, its name without regard to ASCII letter case. `world` is a
+  configured world number; `:default` is allowed only with exactly one world configured. Only the database changes.
+  """
+  @spec set_admin_level(String.t(), integer(), non_neg_integer() | :default) :: :ok
+  def set_admin_level(name, level, world \\ :default) do
+    ready(fn ->
+      if not (is_integer(level) and level in 0..255), do: raise("The level must be 0 to 255.")
+      world = world!(world)
+
+      case Persistence.set_admin_level(world, name, level) do
+        :ok ->
+          IO.puts(
+            "Admin level of #{name} in world #{world} set to #{level}. Only the database was changed: " <>
+              "a character in the world keeps its old level until its next login."
+          )
+
+        {:error, :unknown} ->
+          raise "No character named #{name} in world #{world}."
+
+        {:error, :database} ->
+          raise "The database failed; see the log line above."
+      end
+    end)
+  end
+
+  defp world!(world) do
+    # with_repo/1 loaded the same settings a moment before, so this cannot fail.
+    {:ok, settings} = Settings.load(System.get_env())
+    numbers = Enum.map(settings.world, & &1.number)
+
+    case {world, numbers} do
+      {:default, [number]} ->
+        number
+
+      {:default, _several} ->
+        raise "More than one world is configured (#{Enum.join(numbers, ", ")}): name the world with --world <n>."
+
+      {number, _} ->
+        if number in numbers, do: number, else: raise("World #{number} is not configured.")
+    end
+  end
+
   @spec block(String.t()) :: :ok
   def block(name), do: set_blocked(name, true, "blocked")
 

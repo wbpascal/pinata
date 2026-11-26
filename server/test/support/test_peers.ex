@@ -76,6 +76,59 @@ defmodule TestPeers do
     :ok
   end
 
+  @type zone :: %{pid: pid(), node: node(), port: :inet.port_number(), config: Path.t()}
+
+  @doc """
+  Boots one more Zone peer with its own client port and connects it to the WorldManager peer. It joins with no maps:
+  the first Zone peer runs every map. Move a map to it with `TestMapTable.move/3` on the WorldManager peer.
+  """
+  @spec add_zone(t()) :: zone()
+  def add_zone(peers) do
+    config = Path.rootname(peers.config) <> "-zone2.toml"
+    {pid, node} = boot_peer("zone2", "zone", config)
+    [port] = TestPorts.free(1)
+    first = File.read!(peers.config)
+    File.write!(config, String.replace(first, "[zone]\nport = #{peers.zone_port}", "[zone]\nport = #{port}"))
+    start_app(pid)
+    true = :peer.call(pid, Node, :connect, [peers.nodes.wm])
+    wait_joined(pid)
+    %{pid: pid, node: node, port: port, config: config}
+  end
+
+  @doc "Stops a Zone peer of `add_zone/1` and deletes its settings file; the other peers log nothing for it."
+  @spec stop_zone(t(), zone()) :: :ok
+  def stop_zone(peers, %{pid: pid, node: node, config: config}) do
+    others = [peers.login, peers.wm, peers.zone]
+    Enum.each(others, &:peer.call(&1, Logger, :configure, [[level: :error]]))
+    :ok = :peer.call(pid, Logger, :configure, [[level: :none]])
+    :peer.stop(pid)
+    wait_lost(peers.wm, node)
+    # the other peers see the node go a moment later
+    Process.sleep(100)
+    Enum.each(others, &:peer.call(&1, Logger, :configure, [[level: :warning]]))
+    File.rm(config)
+    :ok
+  end
+
+  defp wait_joined(pid, tries \\ 100) do
+    case :peer.call(pid, :sys, :get_state, [Zone.Maps]) do
+      %{worlds: worlds} when map_size(worlds) > 0 -> :ok
+      _ when tries > 0 -> Process.sleep(100) && wait_joined(pid, tries - 1)
+      _ -> raise "the second Zone peer did not join the WorldManager"
+    end
+  end
+
+  defp wait_lost(wm, node, tries \\ 100) do
+    {:ok, world} = :peer.call(wm, Cluster.Registry, :whereis_world_manager, [0])
+    zones = :peer.call(wm, :sys, :get_state, [world]).zones
+
+    cond do
+      not Enum.any?(Map.keys(zones), &(node(&1) == node)) -> :ok
+      tries > 0 -> Process.sleep(20) && wait_lost(wm, node, tries - 1)
+      true -> raise "the WorldManager peer did not see the second Zone peer go"
+    end
+  end
+
   # The Zone peer started before it was connected and joins by its 1 s retry.
   defp wait_for_map_table(wm, tries \\ 100) do
     case :peer.call(wm, WorldManager.World, :zone_of, [0, "Rou"]) do
@@ -103,6 +156,8 @@ defmodule TestPeers do
     :ok = :peer.call(pid, Logger, :configure, [[level: :warning]])
 
     _ = :peer.call(pid, Code, :require_file, [Path.expand("test_clock.ex", __DIR__)], @call_timeout)
+    _ = :peer.call(pid, Code, :require_file, [Path.expand("test_map_table.ex", __DIR__)], @call_timeout)
+    _ = :peer.call(pid, Code, :require_file, [Path.expand("test_random_spot.ex", __DIR__)], @call_timeout)
     {pid, node}
   end
 

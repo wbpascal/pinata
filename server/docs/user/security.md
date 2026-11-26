@@ -21,6 +21,7 @@ The server treats everything a client sends as untrusted. What it cannot protect
 - **Turn off `login.auto_create_accounts` on a public server.** It is on by default in single-node mode, and then anyone who reaches the Login port can create accounts. Create accounts yourself (see [`accounts.md`](accounts.md)).
 - **Load accounts** (`load0001` …, [`accounts.md`](accounts.md), "Commands") share one password. Create them only on a server used for load runs and block them afterwards with `Persistence.Release.block`.
 - **Block an account** you suspect of abuse with `Persistence.Release.block` (see [`accounts.md`](accounts.md)).
+- **Give an admin level only to characters of trusted accounts.** A character with an admin level above 0 is a GM: it can disconnect any player of the world (`&kickout`), teleport (`&linkto`), hide and change its dimension (see [`gm-commands.md`](gm-commands.md)). Whoever knows the password of that account has these rights. Every command line of a GM is in the server log (`Zone: GM command: …`, level `info`); set an admin level back to 0 with the same command.
 
 ## Connection limits
 
@@ -37,6 +38,7 @@ Watch for these lines (see [`operation.md`](operation.md)); many of one kind fro
 - `connection closed: unsent bytes exceeded`
 - client protocol violations (unknown opcode, wrong first packet, wrong version key)
 - many `login refused` lines for one account or from one peer
+- `GM command` lines of a character you did not make a GM, and `kicked` lines you cannot explain
 
 ## Telemetry export
 

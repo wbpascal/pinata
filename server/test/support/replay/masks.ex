@@ -138,7 +138,8 @@ defmodule Replay.Masks do
       {Proto.Packets.ActSomeoneemoticonCmd, :handle, :object, "object handle: the player that plays the emote"},
       {Proto.Packets.ActSomeoneemoticonstopCmd, :handle, :object, "object handle: the player whose emote stopped"},
       {Proto.Packets.ActSomeeonejumpCmd, :handle, :object, "object handle: the player that jumps"},
-      {Proto.Packets.ActSomeonechangemodeCmd, :handle, :object, "object handle: the player that changed its stance"}
+      {Proto.Packets.ActSomeonechangemodeCmd, :handle, :object, "object handle: the player that changed its stance"},
+      {Proto.Packets.BatAbstateresetCmd, :handle, :object, "object handle: the GM whose hide ended"}
     ]
 
   defp brief_handles do

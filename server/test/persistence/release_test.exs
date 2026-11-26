@@ -91,4 +91,92 @@ defmodule Persistence.ReleaseTest do
       end
     end
   end
+
+  describe "set_admin_level" do
+    setup do
+      {:ok, id} = Persistence.create_account("gm", "pw")
+      %{account: id, character: Factory.character(id, %{name: "Boss"})}
+    end
+
+    defp level_of(id), do: Persistence.Repo.active().get!(Persistence.Character, id).admin_level
+
+    test "sets the level, names without letter case, and says only the database changed", %{character: c} do
+      out = capture_io(fn -> :ok = Persistence.Release.set_admin_level("boss", 100) end)
+      assert out =~ "Admin level of boss in world 0 set to 100."
+      assert out =~ "Only the database was changed: a character in the world keeps its old level until its next login."
+      assert level_of(c.id) == 100
+
+      capture_io(fn -> :ok = Persistence.Release.set_admin_level("Boss", 0, 0) end)
+      assert level_of(c.id) == 0
+    end
+
+    test "refuses a level out of range and an unknown character", %{character: c} do
+      for level <- [256, -1] do
+        assert_raise RuntimeError, "The level must be 0 to 255.", fn ->
+          capture_io(fn -> Persistence.Release.set_admin_level("Boss", level) end)
+        end
+      end
+
+      assert_raise RuntimeError, "No character named Ghost in world 0.", fn ->
+        capture_io(fn -> Persistence.Release.set_admin_level("Ghost", 10) end)
+      end
+
+      assert_raise RuntimeError, "World 7 is not configured.", fn ->
+        capture_io(fn -> Persistence.Release.set_admin_level("Boss", 10, 7) end)
+      end
+
+      assert level_of(c.id) == 0
+    end
+
+    test "with two worlds the world must be named", %{account: account} do
+      old = System.fetch_env!("PINATA_CONFIG")
+      path = Path.join(System.tmp_dir!(), "pinata-two-worlds-#{System.unique_integer([:positive])}.toml")
+
+      File.write!(
+        path,
+        File.read!(old) <>
+          """
+
+          [[world]]
+          number = 0
+          name = "One"
+
+          [[world]]
+          number = 1
+          name = "Two"
+          """
+      )
+
+      System.put_env("PINATA_CONFIG", path)
+
+      on_exit(fn ->
+        System.put_env("PINATA_CONFIG", old)
+        File.rm(path)
+      end)
+
+      c = Factory.character(account, %{world_id: 1, name: "Other"})
+
+      assert_raise RuntimeError, "More than one world is configured (0, 1): name the world with --world <n>.", fn ->
+        capture_io(fn -> Persistence.Release.set_admin_level("Other", 10) end)
+      end
+
+      out = capture_io(fn -> :ok = Persistence.Release.set_admin_level("Other", 10, 1) end)
+      assert out =~ "in world 1 set to 10"
+      assert level_of(c.id) == 10
+
+      assert_raise RuntimeError, "World 7 is not configured.", fn ->
+        capture_io(fn -> Persistence.Release.set_admin_level("Other", 10, 7) end)
+      end
+    end
+  end
+
+  describe "mix pinata.character.admin_level" do
+    test "refuses malformed arguments" do
+      usage = "Usage: mix pinata.character.admin_level <character name> <level> [--world <n>]"
+
+      for args <- [[], ["Boss"], ["Boss", "1x"], ["Boss", "1", "extra"], ["Boss", "1", "--world", "a"]] do
+        assert_raise Mix.Error, usage, fn -> Mix.Tasks.Pinata.Character.AdminLevel.run(args) end
+      end
+    end
+  end
 end

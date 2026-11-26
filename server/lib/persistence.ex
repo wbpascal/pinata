@@ -108,11 +108,12 @@ defmodule Persistence do
           hair: non_neg_integer(),
           hair_color: non_neg_integer(),
           face: non_neg_integer(),
+          admin_level: 0..255,
           equipment: [equipped()]
         }
 
   @loaded_keys [:id, :slot, :name, :level, :exp, :login_map, :login_x, :login_y, :hp, :sp, :money] ++
-                 [:hp_stones, :sp_stones, :race, :class, :gender, :hair, :hair_color, :face]
+                 [:hp_stones, :sp_stones, :race, :class, :gender, :hair, :hair_color, :face, :admin_level]
 
   @doc "The characters of an account in a world, ordered by slot, each with its equipped items."
   @spec list_characters(non_neg_integer(), pos_integer()) :: {:ok, [character()]} | {:error, :database}
@@ -363,6 +364,28 @@ defmodule Persistence do
       end)
 
     with {:ok, :placed} <- result, do: :ok
+  end
+
+  @doc """
+  Sets the admin level of the named character of a world (name without regard to ASCII letter case). Only the
+  database changes: a character in the world keeps its old level until its next login.
+  """
+  @spec set_admin_level(non_neg_integer(), binary(), 0..255) :: :ok | {:error, :unknown | :database}
+  def set_admin_level(world_id, name, level) when level in 0..255 do
+    repo = Repo.active()
+    key = Character.name_key(name)
+
+    result =
+      transact(repo, "set_admin_level", fn ->
+        query = from(c in Character, where: c.world_id == ^world_id and c.name_key == ^key)
+
+        case repo.update_all(query, set: [admin_level: level]) do
+          {1, _} -> {:ok, :set}
+          {0, _} -> {:error, :unknown}
+        end
+      end)
+
+    with {:ok, :set} <- result, do: :ok
   end
 
   defp place(repo, world_id, entry) do

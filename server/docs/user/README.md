@@ -11,6 +11,7 @@ The server cannot be played on yet. You download the release archive of your pla
 - `GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))` creates the data directory from an original `9Data` folder (see [`install.md`](install.md)).
 - `Persistence.Release.migrate()` runs the pending database migrations (see [`operation.md`](operation.md)).
 - `Persistence.Release.create_account(~s(<name>))` creates an account; it asks for the password. `Persistence.Release.block(~s(<name>))` and `Persistence.Release.unblock(~s(<name>))` block and unblock an account (see [`accounts.md`](accounts.md)).
+- `Persistence.Release.set_admin_level(~s(<character name>), <level>)` sets the admin level of a character, which makes it a GM (see [`gm-commands.md`](gm-commands.md)).
 
 A string inside the expression is written `~s(...)`, not in double quotes: that form works in every shell, also on Windows. [`install.md`](install.md), section "Windows", lists what differs on Windows.
 
@@ -27,14 +28,7 @@ From a source checkout each of these has a `mix` task; they are listed in [`from
 | [`from-source.md`](from-source.md) | building the release and the image yourself, starting without a release, the `mix` tasks |
 | [`settings.md`](settings.md) | every setting |
 | [`accounts.md`](accounts.md) | creating, blocking and unblocking accounts |
+| [`gm-commands.md`](gm-commands.md) | the admin level of a character, the GM commands, the command log |
 | [`operation.md`](operation.md) | start, stop, logs, start-up failures, capacity figures, OpenTelemetry, memory, time zone, database and migrations, moving to a new version |
 | [`security.md`](security.md) | what to open, which secrets to change, account and connection settings, log lines to watch, limits of the client protocol |
 | [`multi-node.md`](multi-node.md) | PostgreSQL, the node list, which part runs where, the data directory check, a Docker Compose example |
-
-## Not written yet
-
-Each page is written by the first change that builds what it describes:
-
-| Page | Content |
-|---|---|
-| `gm-commands.md` | GM commands |

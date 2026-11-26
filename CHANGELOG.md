@@ -27,6 +27,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - The town portal request takes the character to the destination of `TownPortal.shn` (level limit `MinLevel`); the town portal window of the NPC itself waits for NPC menus (#112).
 - A gate whose target map runs on no Zone node does nothing for the player and writes an `info` line naming the gate, its map and the destination (#112).
 - A gate or town portal between two maps with the same machine number in `FieldList` on one Zone node changes the map without a reconnect, as the original does inside one zone (#112).
+- GM commands: a character with an admin level above 0 is a GM and can use `&adminlevel`, `&hide`, `&show`, `&dimension <n>`, `&linkto [<map> [<x> <y>]]` and `&kickout <name>` (with the Korean aliases of the original) in the chat line; a `&` line is never shown as chat, and every command line of a GM is written to the server log at `info` (#116).
+- `mix pinata.character.admin_level <character name> <level> [--world <n>]` (release: `Persistence.Release.set_admin_level`) sets the admin level of a character (0 to 255) in the database; a GM sees "From <address>" and its admin level at every map entry (#116).
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 - `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
@@ -48,6 +50,10 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - No exit countdown on the server: the character leaves the world at once (the original kept it for up to 13 s); a character select right after "back to character select" is never refused (#111).
 - The town portal answers success only after WorldManager accepted the target map, and "cannot be used now" when the map runs nowhere; the original said success and then did nothing (#112).
 - The town portal works only within 1000 units of a town portal NPC; the original accepted the request anywhere, a free teleport for a modified client (#112).
+- `&kickout` answers "<name> is banned" with the name; the original sent the text without it (P02-B41) (#116).
+- `&kickout` reaches a character on any map and node; the original found only characters of the GM's own zone and answered "<garbled name> is not in game" for the others (Z11-B6) (#116).
+- Every command line of a GM is logged, whatever its admin level; the original logged none of a GM with a level above 100 (Z11-B1) (#116).
+- A GM in another dimension (`&dimension`) does not get an appear and a delete of every object near it on each step (P02-B27) (#116).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 
@@ -56,6 +62,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - `public_host` must be an IPv4 address in text form on a node with the Zone part (every single-node setup): a node with a host name there does not start (#106).
 - The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
 - One new database migration (play minutes and logout time of a character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#111).
+- One new database migration (the admin level of a character, 0 for every existing character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#116).
 
 ## 0.1.0 – Login to character select (2026-11-21)
 

@@ -35,6 +35,7 @@ defmodule Persistence.Character do
     field :sp_stones, :integer, default: 0
     field :play_minutes, :integer, default: 0
     field :logout_at, :utc_datetime
+    field :admin_level, :integer, default: 0
   end
 
   @doc "The unique key of a name: ASCII letters lower-cased, byte-wise (the name is not UTF-8 in general)."

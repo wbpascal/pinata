@@ -30,8 +30,6 @@ defmodule ChatTest do
   @shout14x <<0x1E, 0x20>> <> Base.decode16!("000b7831342073686f75742041", case: :lower)
   @someone14x <<0x1F, 0x20>> <>
                 Base.decode16!("005465737431323335000000000000000000000000000b7831342073686f75742041", case: :lower)
-  # captured GM command line
-  @amp <<0x01, 0x20>> <> Base.decode16!("000b2661646d696e6c6576656c", case: :lower)
   @hello <<0x01, 0x20, 0, 5, "hello">>
 
   setup_all do
@@ -322,13 +320,6 @@ defmodule ChatTest do
       log = TestLog.capture(fn -> Process.get(:zone) |> send!(shout("h", 77, many)) |> nothing!() end)
       assert [_] = Regex.scan(~r/\[info\] Zone: shout dropped: 77 item links, peer /, log)
       nothing!(bz)
-    end
-
-    test "a line starting with & is never shown", t do
-      a = in_world(t, "first", "X45A")
-      b = in_world(t, "second", "X45B", %{login_x: 6500, login_y: 9800})
-      a.zone |> seen!() |> send!(@amp) |> nothing!()
-      nothing!(b.zone)
     end
 
     test "0x082F answers 0x0830 with ShoutLevel and ShoutDelay", t do

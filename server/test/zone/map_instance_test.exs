@@ -28,6 +28,7 @@ defmodule Zone.MapInstanceTest do
       hair: 0,
       hair_color: 0,
       face: 0,
+      admin_level: 0,
       equipment: []
     }
 
@@ -307,6 +308,85 @@ defmodule Zone.MapInstanceTest do
     assert_receive {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: ^mover}]}}
     assert {:ok, ^p} = Zone.MapInstance.player(pid, mover)
     assert :error = Zone.MapInstance.relocate(pid, 9499, {1, 1})
+  end
+
+  describe "GM actions" do
+    alias Proto.Packets.BatAbstateinformNoeffectCmd
+    alias Proto.Packets.BatAbstateresetCmd
+    alias Proto.Packets.MapLogoutCmd
+
+    # the GM's own packets arrive tagged, the watcher's untagged
+    defp gm_conn do
+      me = self()
+
+      spawn_link(fn ->
+        Stream.repeatedly(fn -> receive(do: ({:cluster, msg} -> send(me, {:gm, msg}))) end) |> Stream.run()
+      end)
+    end
+
+    setup do
+      pid = start("Rou")
+      _watcher = standing(pid, {500, 500}, self())
+      gm = standing(pid, {600, 600}, gm_conn())
+      flush_gm()
+      %{pid: pid, gm: gm}
+    end
+
+    defp flush_gm do
+      receive do
+        {:gm, _} -> flush_gm()
+      after
+        20 -> :ok
+      end
+    end
+
+    test ":hide sends 0x1805 to those in sight and 0x242A to the GM; :show sends 0x2428 to both", %{pid: pid, gm: gm} do
+      :ok = Zone.MapInstance.action(pid, gm, :hide)
+      assert_receive {:cluster, {:packets, [%MapLogoutCmd{handle: ^gm}]}}
+      abstate = %BatAbstateinformNoeffectCmd{abstate: 288, keep_time: 4_200_000_000}
+      assert_receive {:gm, {:packets, [^abstate]}}
+      assert {:ok, %Zone.Player{sub_layer: 3}} = Zone.MapInstance.player(pid, gm)
+
+      :ok = Zone.MapInstance.action(pid, gm, :show)
+      reset = %BatAbstateresetCmd{handle: gm, abstate: 288}
+      assert_receive {:gm, {:packets, [^reset]}}
+      assert_receive {:cluster, {:packets, [^reset]}}
+      assert {:ok, %Zone.Player{sub_layer: 0}} = Zone.MapInstance.player(pid, gm)
+
+      # not hidden: nothing
+      :ok = Zone.MapInstance.action(pid, gm, :show)
+      refute_receive {_, {:packets, _}}, 50
+    end
+
+    test "{:dimension, n} sends 0x1805 under the old number, then sets it, also the same number", %{pid: pid, gm: gm} do
+      :ok = Zone.MapInstance.action(pid, gm, {:dimension, 1})
+      assert_receive {:cluster, {:packets, [%MapLogoutCmd{handle: ^gm}]}}
+      assert {:ok, %Zone.Player{dimension: 1}} = Zone.MapInstance.player(pid, gm)
+
+      # the watcher no longer sees the GM; back to 0 announces nothing
+      :ok = Zone.MapInstance.action(pid, gm, {:dimension, 0})
+      refute_receive {_, {:packets, _}}, 50
+
+      :ok = Zone.MapInstance.action(pid, gm, {:dimension, 0})
+      assert_receive {:cluster, {:packets, [%MapLogoutCmd{handle: ^gm}]}}
+      refute_receive {:gm, _}, 50
+    end
+
+    test "relocate/3 resets the dimension and the sub-layer", %{pid: pid, gm: gm} do
+      :ok = Zone.MapInstance.set_layer(pid, gm, 5, 3)
+      assert {:ok, %Zone.Player{dimension: 0, sub_layer: 0}} = Zone.MapInstance.relocate(pid, gm, {700, 700})
+    end
+
+    test "free_spot/1 draws a point whose cell is free", %{pid: pid} do
+      b = :sys.get_state(pid).block_data
+
+      for _ <- 1..20 do
+        assert {:ok, {x, y}} = Zone.MapInstance.free_spot(pid)
+        refute GameData.BlockData.blocked?(b, x, y)
+      end
+
+      assert :error = Zone.MapInstance.free_spot(start("RouN"))
+    end
   end
 
   test "leave returns the player as it was on the map, player/2 reads it" do

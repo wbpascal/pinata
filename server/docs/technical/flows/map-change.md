@@ -1,6 +1,7 @@
 # Flow: map change
 
-How a character in the world goes to another map instance through a Gate NPC or the town portal (`Zone.Handler`,
+How a character in the world goes to another map instance through a Gate NPC, the town portal or the GM command
+`&linkto` (`Zone.Handler`,
 `Zone.Link`, `Zone.MapInstance`, `Cluster.WorldManager.zone_of/2`, `Cluster.Sessions.reserve/2`,
 `WorldManager.Handler`, `Persistence.save_character/4`). The old Zone connection asks WorldManager for the Zone node
 of the target map, saves the player, removes it from its map instance, parks the player struct in the WorldManager
@@ -179,6 +180,10 @@ A gate answers nothing on a refusal.
   (handles are per map instance here, per zone in the original).
 - **The menu texts are constants** (`Script/MenuString.txt` record `LinkTitle`, `Script/ETC.txt` record `Yes`); no
   loader reads `Script/` yet.
+- **`&linkto`** is a third origin (`:gm`, flow: [`gm-commands.md`](gm-commands.md)): its target is a point the GM
+  names, the `RegenX` / `RegenY` point of `MapInfo`, or a random free cell of the own map (shortcut: rejection
+  sampling of at most 100 draws, not the quadtree of `bd_FindEmptyCoord`). A target map that is not running or has
+  no `MapInfo` row answers `0x2011` "Invalid map name"; it has no answer packet of its own otherwise.
 - **No arrival placement**: the original moves an arriving player off an occupied cell (`so_MapMarking`, x + 25 at
   the town portal NPC of RouN in the capture); here the player stands at the reserved position (milestone 4).
 - **Not built**: the NPC menu `0x201C` / `0x201D` (so the real client cannot open the town portal window yet;
