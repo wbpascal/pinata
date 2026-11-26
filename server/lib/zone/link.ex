@@ -52,7 +52,8 @@ defmodule Zone.Link do
   def menu(dest, npc_handle, {x, y}) do
     case GameData.fetch(GameData.MapInfo, dest.map_client) do
       {:ok, %{name: name}} ->
-        # shortcut: the texts of Script/MenuString.txt (LinkTitle) and Script/ETC.txt (Yes) are constants, read them from the data directory when server menus get their milestone
+        # shortcut: the texts of Script/MenuString.txt (LinkTitle) and Script/ETC.txt (Yes) are constants,
+        # read them from the data directory when server menus get their milestone
         {:ok,
          %MenuServermenuReq{
            title: "Do you want to move to " <> name <> " field?",

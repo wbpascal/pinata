@@ -237,7 +237,7 @@ defmodule MapChangeTest do
     close_all([p.wm, zone])
   end
 
-  test "a failing save refuses the town portal (0x19C2) and the gate (nothing), each with an error line" do
+  test "a failing save refuses the town portal with 0x19C2 and an error line" do
     cid = character!("admin", "Test1235", @town)
     p = in_world("admin", "Test1235")
     Persistence.Repo.active().query!("DELETE FROM characters WHERE id = #{cid}")
@@ -336,8 +336,56 @@ defmodule MapChangeTest do
     assert <<0x05, 0x18, a.handle::little-16>> in bodies
     assert on_map?("RouN", a.handle)
 
+    # a town portal before the 0x1803 of the link is refused
+    a_zone = a_zone |> town_portal(0) |> recv!(<<0x1B, 0x18, 0x19C2::little-16>>)
     {_burst, a_zone} = a_zone |> send!(<<0x03, 0x18>>) |> until!(0x245F)
     assert {[<<0x26, 0x58, 0::16>>, <<0x2A, 0x18, 0>>], a_wm} = until!(a.wm, 0x182A)
     close_all([a_wm, a_zone, b.wm, b_zone])
+  end
+
+  test "a click on a non-Gate NPC or out of reach: nothing, the role line for the town portal NPC" do
+    _cid = character!("admin", "Test1235", @town)
+    p = in_world("admin", "Test1235")
+    town = npc_handle("RouN", &(&1.mob_name == "Gate_Town"))
+    gate = npc_handle("RouN", &(&1.role_arg == "GateRou1"))
+
+    # the gate GateRou1 is out of reach from the town portal NPC
+    log = TestLog.capture(fn -> p.zone |> click(town) |> nothing!() |> click(gate) |> nothing!() end)
+
+    assert log =~ "[debug] Zone: NPC click dropped: role QuestNpc is not built"
+    close_all([p.wm, p.zone])
+  end
+
+  test "\"No\" closes the gate menu: a later \"Yes\" does nothing, the player stays" do
+    cid = character!("admin", "Test1235", @cos_gate)
+    p = in_world("admin", "Test1235")
+    gate = npc_handle("RouN", &(&1.role_arg == "GateRou1"))
+    {[menu], zone} = p.zone |> click(gate) |> bodies!()
+    assert op(menu) == 0x3C01
+
+    zone = zone |> send!(<<0x02, 0x3C, 1>>) |> nothing!() |> send!(<<0x02, 0x3C, 0>>) |> nothing!()
+
+    assert on_map?("RouN", p.handle)
+    r = row(cid)
+    assert {r.login_map, r.login_x, r.login_y, r.logout_at} == {"RouN", 6477, 10_500, nil}
+    close_all([p.wm, zone])
+  end
+
+  test "\"Yes\" from too far from where the menu opened: nothing, one debug line, the player stays" do
+    _cid = character!("admin", "Test1235", @cos_gate)
+    p = in_world("admin", "Test1235")
+    gate = npc_handle("RouN", &(&1.role_arg == "GateRou1"))
+    {[menu], zone} = p.zone |> click(gate) |> bodies!()
+    assert op(menu) == 0x3C01
+
+    :sys.replace_state(map!("RouN"), fn s ->
+      %{s | players: Map.update!(s.players, p.handle, &%{&1 | x: 6477 + 1500})}
+    end)
+
+    log = TestLog.capture(fn -> zone |> send!(<<0x02, 0x3C, 0>>) |> nothing!() end)
+
+    assert log =~ "[debug] Zone: server menu answer dropped: too far from where the menu opened"
+    assert on_map?("RouN", p.handle)
+    close_all([p.wm, zone])
   end
 end

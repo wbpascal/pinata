@@ -364,6 +364,30 @@ defmodule EnterWorldTest do
               ]} = Zone.Handler.handle_info(state, {:redeemed, {:error, :wrong_node}})
     end
 
+    test "an auto-save timer in step :loading is dropped and the next 0x1803 arms it again" do
+      player =
+        struct!(Zone.Player,
+          character: %{},
+          world_no: 0,
+          map: "RouN",
+          x: 0,
+          y: 0,
+          walk_speed: 0,
+          run_speed: 0,
+          map_type: 0,
+          equipment: %{},
+          address: "",
+          last_good: {0, 0}
+        )
+
+      state = %Zone.Handler{checksums: [], step: :loading, auto_save?: true, player: player}
+
+      assert {%{auto_save?: false} = loading, []} = Zone.Handler.handle_info(state, {:timer, :auto_save})
+
+      assert {_, [{:perform, {:login_complete, _, _, _, false}}]} =
+               Zone.Handler.handle_packet(loading, %Proto.Packets.MapLogincompleteCmd{})
+    end
+
     test "pushed sight packets are dropped before the world and sent in it" do
       msg = {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: 8001}]}}
       state = %Zone.Handler{checksums: [], step: :loading}

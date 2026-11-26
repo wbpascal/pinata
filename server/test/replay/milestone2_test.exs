@@ -245,9 +245,10 @@ defmodule Replay.Milestone2Test do
   # deferral. Then five map changes: the town portal 0x181A (228, 343, 453, 583: RouN to RouVal01 and back, twice)
   # with 0x181B and 0x180A, and the gate of RouN to RouCos02 (0x200A at 847, the menu 0x3C01, "Yes" 0x3C02 at 856,
   # 0x180A). Each new Zone connection enters with the full burst; the WorldManager connection sends only 0x5826 and
-  # 0x182A. The client closed each old Zone connection after its 0x180A (close_after). late_ms: 200 because the original handled each move 5 to 60 ms after its capture time and ticked at its
-  # own phase, so a tick-driven appear can lie before the tick that sends it here; without it the replay fails at the
-  # first NPC appear (146) for every tick phase, with it it passes for all (testing.md, "Clock").
+  # 0x182A. The client closed each old Zone connection after its 0x180A (close_after). late_ms: 200 because the
+  # original handled each move 5 to 60 ms after its capture time and ticked at its own phase, so a tick-driven appear
+  # can lie before the tick that sends it here; without it the replay fails at the first NPC appear (146) for every
+  # tick phase, with it it passes for all (testing.md, "Clock").
   test "26_11_15_walk-run-portals",
     do:
       replay(

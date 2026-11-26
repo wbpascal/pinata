@@ -269,7 +269,8 @@ defmodule Zone.Handler do
       when is_pid(map),
       do: {state, [{:perform, {:auto_save, map, p}}]}
 
-  def handle_info(state, {:timer, :auto_save}), do: {state, []}
+  # not in world (a 0x1809 in progress): the next 0x1803 arms the timer again
+  def handle_info(state, {:timer, :auto_save}), do: {%{state | auto_save?: false}, []}
 
   def handle_info(state, {:auto_saved, _id, :ok}), do: {state, []}
 
