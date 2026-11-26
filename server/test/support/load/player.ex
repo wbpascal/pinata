@@ -130,8 +130,12 @@ defmodule Load.Player do
 
   defp world_select(body) do
     case Proto.decode(body) do
-      {:ok, %UserWorldselectAck{world_status: 6, ip: ip, port: port, validate: validate}} -> {:ok, {ip, port, validate}}
-      _other -> {:error, "unexpected " <> describe(body)}
+      # 6 to 10: open, by the player count (Login.WorldStatus)
+      {:ok, %UserWorldselectAck{world_status: status, ip: ip, port: port, validate: validate}} when status in 6..10 ->
+        {:ok, {ip, port, validate}}
+
+      _other ->
+        {:error, "unexpected " <> describe(body)}
     end
   end
 

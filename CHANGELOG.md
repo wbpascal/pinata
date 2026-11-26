@@ -26,6 +26,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
 - `mix pinata.account.create --count <n> --prefix <prefix>` (release: `Persistence.Release.create_accounts`) creates the accounts `<prefix>0001` to `<prefix><n>` with one password (#119).
 - `mix pinata.character.place` (release: `Persistence.Release.place_characters`) sets the stored map and position of characters from `name,map,x,y` lines on standard input (#119).
+- SQLite uses one database connection and lets a request wait up to about 10 s: under a busy CPU, logins, map entries and saves no longer fail with "database is locked" or a dropped request (#119).
 
 ### Differences from the original server
 

@@ -10,7 +10,15 @@ defmodule Persistence.Repo do
   def configure("sqlite:" <> path) do
     case File.mkdir_p(Path.dirname(path)) do
       :ok ->
-        put(Persistence.Repo.SQLite, database: path, log: false, default_transaction_mode: :immediate)
+        # One connection: SQLite has one writer, so more connections only wait on its lock and fail after
+        # busy_timeout. The queue drops a request only after about 10 s instead of 100 ms under load.
+        put(Persistence.Repo.SQLite,
+          database: path,
+          log: false,
+          default_transaction_mode: :immediate,
+          pool_size: 1,
+          queue_target: 5_000
+        )
 
       {:error, reason} ->
         {:error, "database.url: cannot create the directory of #{path} (#{:file.format_error(reason)})"}

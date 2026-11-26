@@ -16,7 +16,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 | `Persistence.Password` | private: PBKDF2 hashing |
 | `Persistence.Release` | operator commands without Mix; the `mix pinata.*` tasks only call it |
 
-`Persistence.Repo.configure/1` puts the repo config into the application environment, because `Ecto.Migrator.with_repo/3` starts a repo from there, and records the chosen repo as `:persistence_repo`. SQLite runs with `default_transaction_mode: :immediate`.
+`Persistence.Repo.configure/1` puts the repo config into the application environment, because `Ecto.Migrator.with_repo/3` starts a repo from there, and records the chosen repo as `:persistence_repo`. SQLite runs with `default_transaction_mode: :immediate`, `pool_size: 1` and `queue_target: 5_000`: SQLite has one writer, so further connections would only wait on its lock and fail after the busy timeout, and a queued request is dropped only after about 10 s instead of 100 ms (found by the load run under a busy CPU).
 
 ## Start-up
 
