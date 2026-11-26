@@ -29,8 +29,10 @@ An object is in sight of another when all three hold:
 
   The table is in the code; the file is not read at start-up.
 
-Dimension and sub-layer are set by `Zone.MapInstance.set_layer/4` (it sends nothing; the GM commands that call it
-and their packets are issue 116). The registered layer and "hide except me" are not represented. A player in mode 0
+Dimension and sub-layer are set by the GM commands `&hide`, `&show` and `&dimension` (`Zone.MapInstance.action/3`,
+with their packets; flow: [`flows/gm-commands.md`](flows/gm-commands.md)) and by `Zone.MapInstance.set_layer/4`
+(sends nothing). A map change resets both to 0 (`relocate/3` for a `0x1809`, a fresh entry otherwise) without a
+packet. The registered layer and "hide except me" are not represented. A player in mode 0
 (between `0x1801` and `0x1803`) is in the grid and counts for the crowd figure, but receives nothing and is shown to
 nobody. An NPC without `MobInfo` row is not shown.
 

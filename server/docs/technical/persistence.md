@@ -6,7 +6,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `load_character/3`, `create_character/1`, `delete_character/3`, `rename_character/4`, `place_characters/2`, `skip_tutorial/3`, `save_character/4`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `load_character/3`, `create_character/1`, `delete_character/3`, `rename_character/4`, `place_characters/2`, `set_admin_level/3`, `skip_tutorial/3`, `save_character/4`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
@@ -71,8 +71,10 @@ The name key models SQL Server's default comparison, case-insensitive and blind 
 | `hp_stones`, `sp_stones` | integer, default 0 | at least 0 |
 | `play_minutes` | bigint, default 0 | at least 0; whole minutes in the world, added at each leave |
 | `logout_at` | utc_datetime, nullable | the last leave; none for a character that never left the world |
+| `admin_level` | integer, default 0 | 0 to 255; above 0 the character is a GM ([`flows/gm-commands.md`](flows/gm-commands.md)) |
 
-Unique indexes: `(world_id, account_id, slot)` and `(world_id, name_key)`. `play_minutes` and `logout_at` come from the second migration of the table (`20261122000000_add_character_play_time`), which adds both columns and the check of `play_minutes` the same way.
+Unique indexes: `(world_id, account_id, slot)` and `(world_id, name_key)`. `play_minutes` and `logout_at` come from the second migration of the table (`20261122000000_add_character_play_time`), which adds both columns and the check of `play_minutes` the same way. `admin_level` comes from the third
+(`20261126000000_add_character_admin_level`), with its check the same way.
 
 Checks work on both adapters through one list per table in the migration: SQLite takes a check only as the `check:` option of a column, PostgreSQL ignores that option and gets a `create constraint` per check when the adapter is PostgreSQL (SQLite cannot add constraints later).
 
@@ -103,9 +105,11 @@ Unique index `(character_id, storage, slot)`. Storage 9 is the inventory; only c
 
 `place_characters/2` (the operator command of the load run, [`load-run.md`](load-run.md)) is one transaction: one guarded `update_all` per entry on `characters` by `(world_id, name_key)`, in `name_key` order, setting `login_map`, `login_x` and `login_y`. An entry with no row leaves the transaction with `{:error, {:no_character, name}}` and nothing is changed; a database failure is `{:error, :database}` with a logged line.
 
+`set_admin_level/3` (the operator command `Persistence.Release.set_admin_level/3`) is one transaction with one guarded `update_all` on `characters` by `(world_id, name_key)` setting `admin_level`; no row is `{:error, :unknown}`, a failure `{:error, :database}` with a logged line. A character in the world keeps the level it was loaded with until its next login.
+
 ## Map entry
 
-`load_character/3` (the Zone at map entry) is one transaction with two reads: the character by `(world_id, account_id, id)` and its items with storage 8 ordered by slot. It returns the stored values the map-entry burst sends (level, experience, position, HP, SP, money, stones, look) with the equipment; no row is `{:error, :not_found}`, a failure `{:error, :database}`.
+`load_character/3` (the Zone at map entry) is one transaction with two reads: the character by `(world_id, account_id, id)` and its items with storage 8 ordered by slot. It returns the stored values the map-entry burst sends (level, experience, position, HP, SP, money, stones, look, admin level) with the equipment; no row is `{:error, :not_found}`, a failure `{:error, :database}`.
 
 ## Save
 

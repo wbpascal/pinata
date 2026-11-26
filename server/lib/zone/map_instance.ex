@@ -46,6 +46,12 @@ defmodule Zone.MapInstance do
   the players in sight and the player itself, a jump (`0x2025`) or a stance change (`0x2009`) to the players in sight
   only, and keeps the emote state of `Zone.Player` that later appears show. `login_complete/2`, an accepted move, a
   jump and a stance change clear the emote state; a stop, a refusal and a pull-back do not.
+
+  GM commands (flow: `docs/technical/flows/gm-commands.md`): `action/3` also runs `:hide` (`0x1805` to the players
+  that saw the GM, `0x242A` to the GM, sub-layer 3), `:show` (sub-layer 0, `0x2428` to the GM and the players that
+  see it now; nothing when the GM is not hidden) and `{:dimension, n}` (`0x1805` to the players in sight under the old
+  number, then the new number). Coming back into view announces nothing. `relocate/3` and every entry reset both.
+  `free_spot/1` draws a free point of the map for `&linkto` without argument.
   """
 
   use GenServer
@@ -60,6 +66,8 @@ defmodule Zone.MapInstance do
   alias Proto.Packets.ActSomeonemoverunCmd
   alias Proto.Packets.ActSomeonemovewalkCmd
   alias Proto.Packets.ActSomeonestopCmd
+  alias Proto.Packets.BatAbstateinformNoeffectCmd
+  alias Proto.Packets.BatAbstateresetCmd
   alias Proto.Packets.MapLogoutCmd
   alias Proto.Packets.MiscChatBlockSpamerBlocktimeCmd
   alias Zone.Mover
@@ -81,7 +89,18 @@ defmodule Zone.MapInstance do
   # ShineObject::so_defstopmotion: what ClearEmoticon writes (Z02 §2 says {0, 0}; the binary and capture 45 win)
   @no_emote {0xFF, 0xFFFF}
 
-  @type action :: {:emote, 0..255} | {:emote_stop, 0..255, 0..0xFFFF} | :jump | {:stance, 1 | 2}
+  @type action ::
+          {:emote, 0..255}
+          | {:emote_stop, 0..255, 0..0xFFFF}
+          | :jump
+          | {:stance, 1 | 2}
+          | :hide
+          | :show
+          | {:dimension, integer()}
+
+  # STA_GMHIDEMODE and the keep time of &hide (capture 14, 392.45 s)
+  @gm_hide 288
+  @gm_hide_ms 4_200_000_000
 
   @spec start_link({Cluster.Registry.world_id(), binary(), Path.t()}) :: GenServer.on_start()
   def start_link({world_id, map_name, _data_dir} = arg),
@@ -155,8 +174,12 @@ defmodule Zone.MapInstance do
   An action of the player of the handle, already checked by the caller. `{:emote, id}` sends `0x2021` to the player
   and the players in sight and sets the emote state to `{id, 0}`; `{:emote_stop, id, frame}` sends `0x2023` the same
   way and sets `{id, frame}`; `:jump` sends `0x2025` and `{:stance, s}` sends `0x2009` to the players in sight only,
-  both clear the emote state (`{0xFF, 0xFFFF}`), the stance change also sets the stance. The mover is stepped to the
-  millisecond first and keeps running. A player in mode 0 is ignored.
+  both clear the emote state (`{0xFF, 0xFFFF}`), the stance change also sets the stance. The GM commands: `:hide`
+  sends `0x1805` to the players in sight, sets sub-layer 3 and sends `0x242A {288, 4200000000}` to the GM; `:show`
+  of a hidden GM sets sub-layer 0 and sends `0x2428 {handle, 288}` to the GM and the players that see it now, of a
+  GM that is not hidden nothing; `{:dimension, n}` sends `0x1805` to the players in sight under the old number and
+  sets the new one (also when it is the same). The mover is stepped to the millisecond first and keeps running. A
+  player in mode 0 is ignored.
   """
   @spec action(pid(), 8000..9499, action()) :: :ok | {:error, :not_entered}
   def action(pid, handle, {:emote, id} = action) when id in 0..255, do: GenServer.call(pid, {:action, handle, action})
@@ -167,6 +190,18 @@ defmodule Zone.MapInstance do
   def action(pid, handle, :jump), do: GenServer.call(pid, {:action, handle, :jump})
 
   def action(pid, handle, {:stance, s} = action) when s in [1, 2], do: GenServer.call(pid, {:action, handle, action})
+
+  def action(pid, handle, action) when action in [:hide, :show], do: GenServer.call(pid, {:action, handle, action})
+
+  def action(pid, handle, {:dimension, n} = action) when is_integer(n),
+    do: GenServer.call(pid, {:action, handle, action})
+
+  @doc """
+  A random point of the map whose cell is free (`&linkto` without argument); `:error` without block data (no player
+  entered yet) or when 100 draws found none.
+  """
+  @spec free_spot(pid()) :: {:ok, Zone.Grid.point()} | :error
+  def free_spot(pid), do: GenServer.call(pid, :free_spot)
 
   @doc "Sets the dimension and the sub-layer of the player of the handle; sends nothing."
   @spec set_layer(pid(), 8000..9499, integer(), 0..5) :: :ok | {:error, :not_entered}
@@ -199,8 +234,8 @@ defmodule Zone.MapInstance do
 
   @doc """
   Moves the player of the handle to a point of the same map instance (`0x1809`): `0x1805` to the players in sight
-  (mode 1 only), then the new position, mode 0, no mover, no move, the chat state of a fresh entry; the handle stays.
-  Returns the stored player; `:error` for an unknown handle.
+  (mode 1 only), then the new position, mode 0, no mover, no move, the chat state of a fresh entry, dimension 0 and
+  sub-layer 0 (a hidden GM is visible again; no `0x2428` is sent); the handle stays. Returns the stored player; `:error` for an unknown handle.
   """
   @spec relocate(pid(), 8000..9499, Zone.Grid.point()) :: {:ok, Zone.Player.t()} | :error
   def relocate(pid, handle, {x, y} = point) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
@@ -346,6 +381,8 @@ defmodule Zone.MapInstance do
             mover: :none,
             move: :none,
             mode: 0,
+            dimension: 0,
+            sub_layer: 0,
             chat: Zone.Player.__struct__().chat
         }
 
@@ -365,6 +402,8 @@ defmodule Zone.MapInstance do
 
   def handle_call({:action, handle, action}, _from, state),
     do: movement(state, handle, fn state, player, _now -> act(state, player, action) end)
+
+  def handle_call(:free_spot, _from, state), do: {:reply, free_spot(state.block_data, 100), state}
 
   def handle_call({:set_layer, handle, dimension, sub_layer}, _from, state) do
     case state.players do
@@ -563,6 +602,23 @@ defmodule Zone.MapInstance do
     {state, to_sight(state, player, [%ActSomeonechangemodeCmd{handle: player.handle, mode: s}])}
   end
 
+  # so_ply_AdminCommand &hide / &show / &dimension (Z11 §3.1); the receivers of 0x1805 are those of the old layer
+  defp act(state, player, :hide) do
+    gone = to_sight(state, player, [%MapLogoutCmd{handle: player.handle}])
+    state = put_player(state, %{player | sub_layer: 3})
+    {state, gone ++ [{player, [%BatAbstateinformNoeffectCmd{abstate: @gm_hide, keep_time: @gm_hide_ms}]}]}
+  end
+
+  defp act(state, %Zone.Player{sub_layer: 3} = player, :show),
+    do: with_self(state, %{player | sub_layer: 0}, %BatAbstateresetCmd{handle: player.handle, abstate: @gm_hide})
+
+  defp act(state, _player, :show), do: {state, []}
+
+  defp act(state, player, {:dimension, n}) do
+    gone = to_sight(state, player, [%MapLogoutCmd{handle: player.handle}])
+    {put_player(state, %{player | dimension: n}), gone}
+  end
+
   defp with_self(state, player, packet) do
     state = put_player(state, player)
     {state, [{player, [packet]} | to_sight(state, player, [packet])]}
@@ -723,6 +779,17 @@ defmodule Zone.MapInstance do
       handle = @first_handle + rem(state.next_handle - @first_handle + i, count)
       if not Map.has_key?(state.players, handle), do: {:ok, handle}
     end)
+  end
+
+  # shortcut: rejection sampling, not the quadtree of bd_FindEmptyCoord FUN_00438960 (Z09 §9.4); build the tree when
+  # mob spawns need the same spots
+  defp free_spot(nil, _draws), do: :error
+  defp free_spot(_b, 0), do: :error
+
+  defp free_spot(b, draws) do
+    x = Random.uniform(div(b.bytes_per_row * 8 * 50, 8)) - 1
+    y = Random.uniform(div(b.rows * 50, 8)) - 1
+    if BlockData.blocked?(b, x, y), do: free_spot(b, draws - 1), else: {:ok, {x, y}}
   end
 
   defp load_block_data(%{block_data: nil} = state) do

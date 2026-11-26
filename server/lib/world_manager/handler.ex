@@ -50,6 +50,13 @@ defmodule WorldManager.Handler do
   the list with `0x0C1F`. Other types are ignored. A closed socket ends the process and with it the session, once
   (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here); the Zone connection then saves and closes
   (flow: `docs/technical/flows/leave-world.md`).
+
+  A kick (`&kickout`, flow: `docs/technical/flows/gm-commands.md`) comes as `{:cluster, {:kick, code}}` from a GM's
+  Zone connection that found the session by character name (`Cluster.Sessions.find_character/2`), so it reaches the
+  session on any node, also while its player is between two maps. A session with a character in the world sends
+  `0x0C17 {0x068B}`, drops an open reservation, leaves the character group (a second kick finds nobody) and tells its
+  Zone connection, which saves and closes (`Cluster.Sessions.kicked/1`). The session stays open: the client closes
+  it with `0x0C18 {0}`. A later `0x1801` of the player finds no ticket (`0x1804 {0x141}`).
   """
 
   @behaviour Net.Handler
@@ -407,6 +414,19 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:cluster, {:whisper_refused, receiver}}),
     do: {state, [{:send, %ActWhisperfailAck{error: 0x0F69, receiver: receiver}}]}
 
+  def handle_info(%__MODULE__{character: name} = state, {:cluster, {:kick, code}}) when is_binary(name) do
+    zone = if is_pid(state.zone), do: [{:perform, {:kick_zone, state.zone}}], else: []
+
+    {%{state | reservation: :none, character: :none},
+     [
+       {:send, %UserConnectcutCmd{error: code}},
+       {:log, :info, "kicked: character #{inspect(name)}"},
+       {:perform, {:leave_world, state.world_no, name}}
+     ] ++ zone}
+  end
+
+  def handle_info(state, {:cluster, {:kick, _code}}), do: {state, []}
+
   def handle_info(state, {:cluster, :session_replaced}),
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, {:close, :info, "session replaced"}]}
 
@@ -559,6 +579,11 @@ defmodule WorldManager.Handler do
 
   def perform({:leave_world, world_no, name}) do
     :ok = Cluster.Sessions.leave_world(world_no, name)
+    :left_world
+  end
+
+  def perform({:kick_zone, pid}) do
+    :ok = Cluster.Sessions.kicked(pid)
     :left_world
   end
 

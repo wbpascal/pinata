@@ -128,6 +128,8 @@ defmodule Proto.Packets do
     0x204A => Proto.Packets.ActReinforceStopCmd,
     0x240E => Proto.Packets.BatHpchangeCmd,
     0x240F => Proto.Packets.BatSpchangeCmd,
+    0x2428 => Proto.Packets.BatAbstateresetCmd,
+    0x242A => Proto.Packets.BatAbstateinformNoeffectCmd,
     0x245F => Proto.Packets.BatLpchangeCmd,
     0x3020 => Proto.Packets.ItemChargedinvenopenReq,
     0x3021 => Proto.Packets.ItemChargedinvenopenAck,

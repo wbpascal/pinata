@@ -41,7 +41,8 @@ next packet.
 `0x2001` (normal chat):
 
 1. The connection is in the world (after `0x1803`); before that the packet is ignored.
-2. A line starting with `&` is dropped and never shown: it is a GM command (issue 116).
+2. A line starting with `&` is a GM command and never shown as chat; none of the checks below applies to it (see
+   [`gm-commands.md`](gm-commands.md)).
 3. At most 76 item links; more are dropped with the line `Zone: chat dropped: <n> item links`.
 4. The `Chat` flag of the map's first `FieldList` row (no row: refused).
 5. The spam filter.
@@ -103,7 +104,7 @@ and is never stored. The map instance holds the rules of its map (`Zone.Chat.rul
 - P02-B29 fixed: the bits 2 to 7 of the `0x201F` flag are 0; the original left them as its shared buffer held them
   (masked in replays).
 - Z01-B5 kept: the 2016 client has no handler for `0x0830`, so it ignores the answer.
-- Z11-B2 (the argument parser of the GM command frame) is not reached: a `&` line is dropped whole until issue 116.
+- Z11-B2 fixed: the GM command frame cuts every argument at 32 bytes (see [`gm-commands.md`](gm-commands.md)).
 
 ## Absent until their milestones
 
