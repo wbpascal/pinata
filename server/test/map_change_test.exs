@@ -485,8 +485,8 @@ defmodule MapChangeTest do
     {gate, index} = cos03_gate!("RouN")
     cos03 = map!("RouCos03")
     me = :sys.get_state(map!("RouN")).players[p.handle]
-    :sys.replace_state(cos03, &%{&1 | players: Map.put(&1.players, p.handle, %{me | mode: 0, conn: :none})})
-    on_exit(fn -> :sys.replace_state(cos03, &%{&1 | players: Map.delete(&1.players, p.handle)}) end)
+    {:ok, _} = Zone.MapInstance.enter(cos03, %{me | conn: :none}, p.handle)
+    on_exit(fn -> Zone.MapInstance.leave(cos03, p.handle) end)
     {[menu], zone} = p.zone |> click(gate) |> bodies!()
     assert op(menu) == 0x3C01
 

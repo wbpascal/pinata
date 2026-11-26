@@ -57,8 +57,9 @@ defmodule Zone.Handler do
   the map instance sends `0x1809` and returns to step `:loading`; the next `0x1803` runs the burst again (one auto-save
   timer per connection). A change to another map instance of this node with the same `FieldList` machine number (the
   original's "same zone") also sends `0x1809` on the same connection, the handle kept; the player moves to the target
-  instance (`Zone.MapInstance.enter/3`), and a handle in use there falls back to `0x180A`. The new connection redeems the reservation as an entry of kind `:map_change`: no database
-  load, the parked player arrives on the reserved map and position (`Zone.Player.arrive/4`).
+  instance (`Zone.MapInstance.enter/3`), and a handle in use there falls back to `0x180A`. The new connection redeems
+  the reservation as an entry of kind `:map_change`: no database load, the parked player arrives on the reserved map and
+  position (`Zone.Player.arrive/4`).
   """
 
   @behaviour Net.Handler
