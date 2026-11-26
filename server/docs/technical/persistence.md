@@ -6,7 +6,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `load_character/3`, `create_character/1`, `delete_character/3`, `rename_character/4`, `skip_tutorial/3`, `save_character/4`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `load_character/3`, `create_character/1`, `delete_character/3`, `rename_character/4`, `place_characters/2`, `skip_tutorial/3`, `save_character/4`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
@@ -16,7 +16,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 | `Persistence.Password` | private: PBKDF2 hashing |
 | `Persistence.Release` | operator commands without Mix; the `mix pinata.*` tasks only call it |
 
-`Persistence.Repo.configure/1` puts the repo config into the application environment, because `Ecto.Migrator.with_repo/3` starts a repo from there, and records the chosen repo as `:persistence_repo`. SQLite runs with `default_transaction_mode: :immediate`.
+`Persistence.Repo.configure/1` puts the repo config into the application environment, because `Ecto.Migrator.with_repo/3` starts a repo from there, and records the chosen repo as `:persistence_repo`. SQLite runs with `default_transaction_mode: :immediate`, `pool_size: 1` and `queue_target: 5_000`: SQLite has one writer, so further connections would only wait on its lock and fail after the busy timeout, and a queued request is dropped only after about 10 s instead of 100 ms (found by the load run under a busy CPU).
 
 ## Start-up
 
@@ -100,6 +100,8 @@ Unique index `(character_id, storage, slot)`. Storage 9 is the inventory; only c
 ## Rename
 
 `rename_character/4` is one transaction: it reads the character by `(world_id, account_id, slot)` and updates `name` and `name_key` by id. No row is `{:error, :not_found}`; a violation of the unique index on `(world_id, name_key)` is `{:error, :name_taken}` (the name is unique per world, ASCII letter case ignored; P02-B42 fixed); anything else is `{:error, :database}` with a logged line. Flow: [`flows/character-rename.md`](flows/character-rename.md).
+
+`place_characters/2` (the operator command of the load run, [`load-run.md`](load-run.md)) is one transaction: one guarded `update_all` per entry on `characters` by `(world_id, name_key)`, in `name_key` order, setting `login_map`, `login_x` and `login_y`. An entry with no row leaves the transaction with `{:error, {:no_character, name}}` and nothing is changed; a database failure is `{:error, :database}` with a logged line.
 
 ## Map entry
 

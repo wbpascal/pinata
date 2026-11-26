@@ -18,6 +18,12 @@ defmodule Zone.Player do
 
   `chat` is the state of the chat spam filter and the shout delay (`Zone.Chat`): empty at every entry into a map
   instance, never stored.
+
+  Actions (`docs/technical/flows/actions.md`): `stance` is 1 (normal) or 2 (combat), set by `0x2008`, and is the
+  `mode` byte other players see in `0x1C06` once the player is in the world. `emoticon` is the emote state
+  `{emoticon_id, emoticon_frame}` of `0x1C06`: `{0xFF, 0}` for a new player (the original's constructor), cleared to
+  `{0xFF, 0xFFFF}` after `0x1803`, an accepted move, a jump and a stance change; `{id, 0}` after an emote `0x2020`,
+  `{id, frame}` after an emote stop `0x2022`.
   """
 
   @type equipment :: %{
@@ -45,6 +51,8 @@ defmodule Zone.Player do
                 handle: :none,
                 conn: :none,
                 mode: 0,
+                stance: 1,
+                emoticon: {0xFF, 0},
                 admin_level: 0,
                 dir: 90,
                 dimension: 0,
@@ -68,6 +76,8 @@ defmodule Zone.Player do
           handle: :none | 8000..9499,
           conn: :none | pid(),
           mode: 0 | 1,
+          stance: 1 | 2,
+          emoticon: {0..255, 0..0xFFFF},
           admin_level: non_neg_integer(),
           dir: 0..255,
           dimension: integer(),

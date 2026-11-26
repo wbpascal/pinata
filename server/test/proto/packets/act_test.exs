@@ -2,6 +2,8 @@ defmodule Proto.Packets.ActTest do
   use ExUnit.Case, async: true
 
   alias Proto.Packets.{ActSomeonewhisperCmd, ActWhisperfailAck, ActWhisperReq, ActWhispersuccessAck}
+  alias Proto.Packets.{ActChangemodeReq, ActEmoticonCmd, ActEmoticonstopCmd, ActJumpCmd, ActSomeeonejumpCmd}
+  alias Proto.Packets.{ActSomeonechangemodeCmd, ActSomeoneemoticonCmd, ActSomeoneemoticonstopCmd}
   alias Proto.Packets.{ActChatReq, ActShoutCmd, ActSomeonechatCmd, ActSomeoneshoutCmd}
 
   # scenario 14 (26_11_15_14_second-client-in-sight, lines 707 to 709) and scenario 45 (lines 1005, 1006)
@@ -73,5 +75,27 @@ defmodule Proto.Packets.ActTest do
     assert {:error, :bad_size} = ActChatReq.decode(<<1, 2, "hi">> <> :binary.copy(<<0xAB>>, 0x66))
     links = :binary.copy(<<0xAB>>, 0x67)
     assert {:ok, %ActChatReq{item_link_count: 1, links: ^links}} = ActChatReq.decode(<<1, 2, "hi", links::binary>>)
+  end
+
+  test "emote, jump and stance packets" do
+    # scenario 45 (lines 520, 521, 536) and scenario 14 (lines 875, 876)
+    assert {:ok, %ActEmoticonCmd{emoticon_id: 7}} = ActEmoticonCmd.decode(<<0x07>>)
+    assert ActSomeoneemoticonCmd.encode(%ActSomeoneemoticonCmd{handle: 8005, emoticon_id: 7}) == <<0x45, 0x1F, 0x07>>
+    assert {:ok, %ActJumpCmd{}} = ActJumpCmd.decode(<<>>)
+    assert ActSomeeonejumpCmd.encode(%ActSomeeonejumpCmd{handle: 8005}) == <<0x45, 0x1F>>
+    assert {:ok, %ActChangemodeReq{mode: 2}} = ActChangemodeReq.decode(<<0x02>>)
+    assert ActSomeonechangemodeCmd.encode(%ActSomeonechangemodeCmd{handle: 8001, mode: 2}) == <<0x41, 0x1F, 0x02>>
+    # never captured: the layouts of Z02 §4
+    assert {:ok, %ActEmoticonstopCmd{emoticon_id: 23, emoticon_frame: 300}} =
+             ActEmoticonstopCmd.decode(<<23, 0x2C, 0x01>>)
+
+    assert ActSomeoneemoticonstopCmd.encode(%ActSomeoneemoticonstopCmd{
+             handle: 8005,
+             emoticon_id: 23,
+             emoticon_frame: 300
+           }) ==
+             <<0x45, 0x1F, 23, 0x2C, 0x01>>
+
+    assert {:error, :bad_size} = ActEmoticonCmd.decode(<<7, 0>>)
   end
 end

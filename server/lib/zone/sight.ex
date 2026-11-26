@@ -63,10 +63,14 @@ defmodule Zone.Sight do
   def crowd_radius(n, radius) when n < @crowd_min, do: radius
   def crowd_radius(n, _radius), do: min(1600, trunc(:math.sqrt(75_000_000 / min(n, 528))))
 
-  @doc "The appear packet `0x1C06` of a player (no move, no abstates, no title, no guild)."
+  @doc """
+  The appear packet `0x1C06` of a player (no move, no abstates, no title, no guild). Its `mode` is 0 before `0x1803`,
+  else the stance; it carries the emote state (`Zone.Player`, `docs/technical/flows/actions.md`).
+  """
   @spec brief(Zone.Player.t()) :: BriefinfoLogincharacterCmd.t()
   def brief(%Zone.Player{character: c} = p) do
     worn = Map.new(p.equipment, &{&1.slot, &1})
+    {emoticon_id, emoticon_frame} = p.emoticon
 
     %BriefinfoLogincharacterCmd{
       handle: p.handle,
@@ -74,7 +78,7 @@ defmodule Zone.Sight do
       x: p.x,
       y: p.y,
       dir: p.dir,
-      mode: p.mode,
+      mode: if(p.mode == 0, do: 0, else: p.stance),
       chrclass: c.class,
       gender: c.gender,
       shape_class: c.class,
@@ -91,8 +95,8 @@ defmodule Zone.Sight do
       upgrade_shoes: upgrade(worn, 21),
       shapedata_rest: <<0, 0>>,
       polymorph: 0xFFFF,
-      emoticon_id: 0xFF,
-      emoticon_frame: 0xFFFF,
+      emoticon_id: emoticon_id,
+      emoticon_frame: emoticon_frame,
       title_type: 0,
       title_element: 0,
       title_mob_id: 0,

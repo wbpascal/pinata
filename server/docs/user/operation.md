@@ -98,6 +98,9 @@ Lines an administrator acts on:
 | `Zone: map login accepted: character <id>, map <map>, peer <peer>` | info | the client entered the Zone node |
 | `Zone: chat dropped: <n> item links, peer <peer>` | info | a line of normal chat with more than 76 item links was dropped (the unmodified client does not send it) |
 | `Zone: shout dropped: <n> item links, peer <peer>` | info | a shout with more than 76 item links was dropped |
+| `Zone: emote ignored: unknown id <id>, peer <peer>` / `Zone: emote ignored: charged emote <id>, peer <peer>` | info | an emote with no `ActionViewInfo` row, or a charged emote sent as a plain one, was ignored (the unmodified client does not send it) |
+| `Zone: emote stop ignored: unknown id <id>, peer <peer>` | info | an emote stop with no `ActionViewInfo` row was ignored |
+| `Zone: stance ignored: mode <mode>, peer <peer>` | info | a stance change other than 1 (normal) or 2 (combat) was ignored |
 | `Zone: shout off: ShoutLevel or ShoutDelay missing in ChrCommon` | info | at start: the data directory lacks a shout value, so nobody can shout (see "Chat" below) |
 | `Zone: chat spam filter off: no usable row in SpamerPenaltyRule or SpamerPenalty` | info | at start: the spam filter tables are empty or unusable, so chat is not limited (see "Chat" below) |
 | `Zone: connection closed: map login refused: <reason>, peer <peer>` | info | `no session for the handle`, `no map-login ticket`, `reserved for another Zone node` or `not the reserved character`: the client came to the Zone without a fresh character login |

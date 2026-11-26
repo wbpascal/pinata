@@ -18,6 +18,8 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - Normal chat reaches the players in sight, shout every player of the map. A map can forbid either (`Chat` / `Shout` of `FieldList`); shout needs a level above `ShoutLevel` (5) and waits `ShoutDelay` (2 s) between two shouts. A refused line gets no answer, as in the original (#113).
 - Chat spam filter: 3 lines of normal chat or shout within 3 s block the player's chat for 10 s, longer for each repeat (`SpamerPenaltyRule.shn`, `SpamerPenalty.shn`); the client shows the block time (#113).
 - Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
+- Sitting, emotes and jumping are shown to the players in sight; a player who comes into sight sees a sitting or dancing player in that state until it moves. The combat stance is shown too (#115).
+- A node with the Zone part also reads `ActionViewInfo.shn` at start-up and does not start when it is damaged (#115).
 - Leaving the world (back to the character list, quit, lost connection) saves map, position, HP, SP, play minutes and the logout time, and the character can be selected again at once (#111).
 - Every character in the world is saved every 10 minutes; a crashed map disconnects its players and loses what happened since their last save; stopping the server saves every player first (#111).
 - A second login of an account waits until the first session's character is saved; when that takes more than 5 s the login is refused and an `error` line is written (#111).
@@ -28,6 +30,9 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 - `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
+- `mix pinata.account.create --count <n> --prefix <prefix>` (release: `Persistence.Release.create_accounts`) creates the accounts `<prefix>0001` to `<prefix><n>` with one password (#119).
+- `mix pinata.character.place` (release: `Persistence.Release.place_characters`) sets the stored map and position of characters from `name,map,x,y` lines on standard input (#119).
+- SQLite uses one database connection and lets a request wait up to about 10 s: under a busy CPU, logins, map entries and saves no longer fail with "database is locked" or a dropped request (#119).
 
 ### Differences from the original server
 

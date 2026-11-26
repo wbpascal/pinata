@@ -619,5 +619,75 @@ defmodule Zone.MapInstanceTest do
       assert got(pid, :hidden) == []
       assert %{mover: :none, move: :none} = at(pid, hidden)
     end
+
+    test "an emote goes to the player and the players in sight and stays until an accepted move", %{pid: pid} do
+      alias Proto.Packets.ActSomeoneemoticonCmd
+      me = two!(pid)
+      assert :ok = Zone.MapInstance.action(pid, me, {:emote, 7})
+      assert got(pid, :me) == [%ActSomeoneemoticonCmd{handle: me, emoticon_id: 7}]
+      assert got(pid, :obs) == [%ActSomeoneemoticonCmd{handle: me, emoticon_id: 7}]
+      assert %{emoticon: {7, 0}} = at(pid, me)
+      # a stop and a refused move keep it
+      :ok = Zone.MapInstance.stop(pid, me, {1400, 1003})
+      :ok = Zone.MapInstance.move(pid, me, :run, {1420, 1003}, {1420, 1003})
+      assert %{emoticon: {7, 0}} = at(pid, me)
+      :ok = Zone.MapInstance.move(pid, me, :run, {1400, 1003}, {1450, 1003})
+      assert %{emoticon: {0xFF, 0xFFFF}} = at(pid, me)
+    end
+
+    test "an emote stop goes to both and keeps the frame", %{pid: pid} do
+      alias Proto.Packets.ActSomeoneemoticonstopCmd
+      me = two!(pid)
+      assert :ok = Zone.MapInstance.action(pid, me, {:emote_stop, 23, 300})
+      packet = %ActSomeoneemoticonstopCmd{handle: me, emoticon_id: 23, emoticon_frame: 300}
+      assert got(pid, :me) == [packet]
+      assert got(pid, :obs) == [packet]
+      assert %{emoticon: {23, 300}} = at(pid, me)
+    end
+
+    test "a jump and a stance change go to the players in sight only and clear the emote", %{pid: pid} do
+      alias Proto.Packets.ActSomeeonejumpCmd
+      alias Proto.Packets.ActSomeonechangemodeCmd
+      me = two!(pid)
+      :ok = Zone.MapInstance.action(pid, me, {:emote, 7})
+      _ = got(pid, :me) ++ got(pid, :obs)
+      assert :ok = Zone.MapInstance.action(pid, me, :jump)
+      assert got(pid, :obs) == [%ActSomeeonejumpCmd{handle: me}]
+      assert got(pid, :me) == []
+      assert %{emoticon: {0xFF, 0xFFFF}} = at(pid, me)
+      :ok = Zone.MapInstance.action(pid, me, {:emote, 7})
+      _ = got(pid, :me) ++ got(pid, :obs)
+      assert :ok = Zone.MapInstance.action(pid, me, {:stance, 2})
+      assert got(pid, :obs) == [%ActSomeonechangemodeCmd{handle: me, mode: 2}]
+      assert got(pid, :me) == []
+      assert %{stance: 2, emoticon: {0xFF, 0xFFFF}} = at(pid, me)
+    end
+
+    test "the entrant's appear carries {0xFF, 0}, then login_complete clears the emote state", %{pid: pid} do
+      first = in_world!(pid, :me, {1400, 1003})
+      assert %{emoticon: {0xFF, 0xFFFF}} = at(pid, first)
+      _ = got(pid, :me)
+      {:ok, second} = Zone.MapInstance.enter(pid, %{player(conn(:obs)) | x: 1400, y: 1203, last_good: {1400, 1203}})
+      {:ok, burst} = Zone.MapInstance.login_complete(pid, second)
+      assert [%BriefinfoLogincharacterCmd{handle: ^second, emoticon_id: 0xFF, emoticon_frame: 0}] = got(pid, :me)
+      chars = for %Proto.Packets.BriefinfoCharacterCmd{chars: chars} <- burst, c <- chars, do: c
+      seen = for %BriefinfoLogincharacterCmd{handle: ^first} = b <- chars, do: b
+      assert [%{emoticon_id: 0xFF, emoticon_frame: 0xFFFF}] = seen
+
+      assert %{emoticon: {0xFF, 0xFFFF}} = at(pid, second)
+    end
+
+    test "actions of an unknown handle and a mode-0 player", %{pid: pid} do
+      assert {:error, :not_entered} = Zone.MapInstance.action(pid, 9000, :jump)
+      {:ok, hidden} = Zone.MapInstance.enter(pid, %{player(conn(:hidden)) | x: 1400, y: 1003, last_good: {1400, 1003}})
+      _obs = in_world!(pid, :obs, {1400, 1203})
+      _ = got(pid, :obs)
+
+      for action <- [{:emote, 7}, {:emote_stop, 7, 1}, :jump, {:stance, 2}],
+          do: assert(:ok = Zone.MapInstance.action(pid, hidden, action))
+
+      assert got(pid, :hidden) == [] and got(pid, :obs) == []
+      assert %{stance: 1, emoticon: {0xFF, 0}} = at(pid, hidden)
+    end
   end
 end

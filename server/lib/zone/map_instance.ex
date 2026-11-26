@@ -41,6 +41,11 @@ defmodule Zone.MapInstance do
   the map instance for `0x1809`: `0x1805` to the players in sight, the new position, mode 0, mover and chat state
   reset, the handle kept. `enter/3` takes a player from another map instance of this node under the handle it has
   (a `0x1809` between two instances), or refuses with `:handle_taken`.
+
+  Actions (`docs/technical/flows/actions.md`): `action/3` relays an emote (`0x2021`) or an emote stop (`0x2023`) to
+  the players in sight and the player itself, a jump (`0x2025`) or a stance change (`0x2009`) to the players in sight
+  only, and keeps the emote state of `Zone.Player` that later appears show. `login_complete/2`, an accepted move, a
+  jump and a stance change clear the emote state; a stop, a refusal and a pull-back do not.
   """
 
   use GenServer
@@ -48,6 +53,10 @@ defmodule Zone.MapInstance do
   alias GameData.BlockData
   alias Proto.Packets.ActMovefailAck
   alias Proto.Packets.ActReinforceStopCmd
+  alias Proto.Packets.ActSomeeonejumpCmd
+  alias Proto.Packets.ActSomeonechangemodeCmd
+  alias Proto.Packets.ActSomeoneemoticonCmd
+  alias Proto.Packets.ActSomeoneemoticonstopCmd
   alias Proto.Packets.ActSomeonemoverunCmd
   alias Proto.Packets.ActSomeonemovewalkCmd
   alias Proto.Packets.ActSomeonestopCmd
@@ -69,6 +78,10 @@ defmodule Zone.MapInstance do
   @stuck2 899
   # an NPC acts on a click within 1000 units: dist² ≤ 1 000 000 (Z02 §6.2)
   @npc_reach2 1_000_000
+  # ShineObject::so_defstopmotion: what ClearEmoticon writes (Z02 §2 says {0, 0}; the binary and capture 45 win)
+  @no_emote {0xFF, 0xFFFF}
+
+  @type action :: {:emote, 0..255} | {:emote_stop, 0..255, 0..0xFFFF} | :jump | {:stance, 1 | 2}
 
   @spec start_link({Cluster.Registry.world_id(), binary(), Path.t()}) :: GenServer.on_start()
   def start_link({world_id, map_name, _data_dir} = arg),
@@ -137,6 +150,23 @@ defmodule Zone.MapInstance do
   @spec stop(pid(), 8000..9499, Zone.Grid.point()) :: :ok | {:error, :not_entered}
   def stop(pid, handle, {x, y} = loc) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
     do: GenServer.call(pid, {:stop, handle, loc})
+
+  @doc """
+  An action of the player of the handle, already checked by the caller. `{:emote, id}` sends `0x2021` to the player
+  and the players in sight and sets the emote state to `{id, 0}`; `{:emote_stop, id, frame}` sends `0x2023` the same
+  way and sets `{id, frame}`; `:jump` sends `0x2025` and `{:stance, s}` sends `0x2009` to the players in sight only,
+  both clear the emote state (`{0xFF, 0xFFFF}`), the stance change also sets the stance. The mover is stepped to the
+  millisecond first and keeps running. A player in mode 0 is ignored.
+  """
+  @spec action(pid(), 8000..9499, action()) :: :ok | {:error, :not_entered}
+  def action(pid, handle, {:emote, id} = action) when id in 0..255, do: GenServer.call(pid, {:action, handle, action})
+
+  def action(pid, handle, {:emote_stop, id, frame} = action) when id in 0..255 and frame in 0..0xFFFF,
+    do: GenServer.call(pid, {:action, handle, action})
+
+  def action(pid, handle, :jump), do: GenServer.call(pid, {:action, handle, :jump})
+
+  def action(pid, handle, {:stance, s} = action) when s in [1, 2], do: GenServer.call(pid, {:action, handle, action})
 
   @doc "Sets the dimension and the sub-layer of the player of the handle; sends nothing."
   @spec set_layer(pid(), 8000..9499, integer(), 0..5) :: :ok | {:error, :not_entered}
@@ -244,6 +274,8 @@ defmodule Zone.MapInstance do
         state = put_in(state.players[handle], player)
         {packets, deliveries} = Zone.Sight.entry(view(state), player)
         deliver(deliveries)
+        # the original's 0x1803 handler clears the emote state after the exchange (capture 45 index 235 against 888)
+        state = put_in(state.players[handle], %{player | emoticon: @no_emote})
         {:reply, {:ok, Zone.MapEntry.login_complete(player, packets)}, state}
 
       %{} ->
@@ -330,6 +362,9 @@ defmodule Zone.MapInstance do
 
   def handle_call({:stop, handle, loc}, _from, state),
     do: movement(state, handle, fn state, player, _now -> check_stop(state, player, loc) end)
+
+  def handle_call({:action, handle, action}, _from, state),
+    do: movement(state, handle, fn state, player, _now -> act(state, player, action) end)
 
   def handle_call({:set_layer, handle, dimension, sub_layer}, _from, state) do
     case state.players do
@@ -500,9 +535,37 @@ defmodule Zone.MapInstance do
 
     # moveattr: the original sends leftover buffer bytes (Z02-B2)
     move = struct!(module, handle: player.handle, from_x: x, from_y: y, to_x: tx, to_y: ty, speed: speed, moveattr: 0)
-    player = %{player | move: move}
+    player = %{player | move: move, emoticon: @no_emote}
     state = put_player(state, player)
     {state, to_sight(state, player, [move])}
+  end
+
+  # sp_DoEmotion FUN_00458860, sp_NC_ACT_EMOTICONSTOP_CMD FUN_00458a70 (include self), sp_NC_ACT_JUMP_CMD
+  # FUN_0045a250, sp_NC_ACT_CHANGEMODE_REQ FUN_00457560 (players in sight only); Z02 §2.4, §2.5, §4
+  defp act(state, player, {:emote, id}) do
+    with_self(state, %{player | emoticon: {id, 0}}, %ActSomeoneemoticonCmd{handle: player.handle, emoticon_id: id})
+  end
+
+  defp act(state, player, {:emote_stop, id, frame}) do
+    packet = %ActSomeoneemoticonstopCmd{handle: player.handle, emoticon_id: id, emoticon_frame: frame}
+    with_self(state, %{player | emoticon: {id, frame}}, packet)
+  end
+
+  defp act(state, player, :jump) do
+    player = %{player | emoticon: @no_emote}
+    state = put_player(state, player)
+    {state, to_sight(state, player, [%ActSomeeonejumpCmd{handle: player.handle}])}
+  end
+
+  defp act(state, player, {:stance, s}) do
+    player = %{player | stance: s, emoticon: @no_emote}
+    state = put_player(state, player)
+    {state, to_sight(state, player, [%ActSomeonechangemodeCmd{handle: player.handle, mode: s}])}
+  end
+
+  defp with_self(state, player, packet) do
+    state = put_player(state, player)
+    {state, [{player, [packet]} | to_sight(state, player, [packet])]}
   end
 
   # sp_NC_ACT_STOP_REQ (Z02 §2.3)

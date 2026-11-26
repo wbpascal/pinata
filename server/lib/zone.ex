@@ -33,7 +33,8 @@ defmodule Zone do
       GameData.MapInfo,
       GameData.TownPortal,
       GameData.SpamerPenalty,
-      GameData.SpamerPenaltyRule
+      GameData.SpamerPenaltyRule,
+      GameData.ActionViewInfo
     ]
   end
 end
