@@ -37,8 +37,16 @@ _Avoid_: log (alone), audit log, action log
 ### Sources of truth
 
 **Original server**:
-The 2016 server binaries and the behaviour reconstructed from them in `docs/`.
+The 2016 server binaries.
 _Avoid_: old server, legacy server
+
+**Reconstruction**:
+The behaviour of the original server written down from its binaries: protocol, pseudocode and the bug register. The rebuild is checked against it; a capture outranks it.
+_Avoid_: spec (alone), RE docs, analysis
+
+**Original data**:
+The data folder the original server shipped with: its client data tables, server data tables and scripts. It is the input of the import task.
+_Avoid_: 9Data (alone), source data, data directory (that is the import task's output)
 
 **Client data table**:
 An SHN table the unmodified client also holds, kept byte-identical as the source of truth.
