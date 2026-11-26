@@ -360,4 +360,30 @@ defmodule Persistence.CharactersTest do
       assert {:error, :database} = Persistence.save_character(0, c.id, @saved, :auto)
     end
   end
+
+  test "place_characters sets map and position, all or nothing, names without letter case", %{id: id} do
+    a = Factory.character(id, %{slot: 0, name: "Alpha"})
+    b = Factory.character(id, %{slot: 1, name: "Beta", login_x: 5, login_y: 6})
+    row = fn c -> Persistence.Repo.active().get!(Persistence.Character, c.id) end
+
+    assert :ok =
+             Persistence.place_characters(0, [
+               %{name: "BETA", map: "Rou", x: 10, y: 20},
+               %{name: "alpha", map: "Eld", x: 30, y: 40}
+             ])
+
+    assert {row.(a).login_map, row.(a).login_x, row.(a).login_y} == {"Eld", 30, 40}
+    assert {row.(b).login_map, row.(b).login_x, row.(b).login_y} == {"Rou", 10, 20}
+
+    assert {:error, {:no_character, "Nobody"}} =
+             Persistence.place_characters(0, [
+               %{name: "Alpha", map: "RouN", x: 1, y: 2},
+               %{name: "Nobody", map: "RouN", x: 1, y: 2}
+             ])
+
+    assert {row.(a).login_map, row.(a).login_x} == {"Eld", 30}
+
+    assert {:error, {:no_character, "Alpha"}} =
+             Persistence.place_characters(1, [%{name: "Alpha", map: "Rou", x: 1, y: 1}])
+  end
 end

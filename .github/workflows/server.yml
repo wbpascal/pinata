@@ -341,3 +341,61 @@ jobs:
       - name: Stop the Collector
         if: always()
         run: docker rm -f otelcol || true
+
+  # The load run task against the release in single-node mode, 50 players for 10 s (docs/technical/load-run.md,
+  # "CI smoke run"). It fails on a player that does not reach the world, a disconnect, a crash or an error line of the
+  # node, never on latency.
+  load-smoke:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: server
+    env:
+      MIX_ENV: test
+      R: _build/prod/rel/pinata
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Data set (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - run: mix deps.get
+
+      - run: MIX_ENV=prod mix release
+
+      - run: $R/bin/pinata eval "GameData.Release.import_data(~S($GITHUB_WORKSPACE/Files/Server/2016/9Data), ~s(data))"
+
+      - name: Start
+        run: |
+          set -euo pipefail
+          $R/bin/pinata start > "$RUNNER_TEMP/node.out" 2>&1 &
+          for i in $(seq 60); do
+            if (echo > /dev/tcp/127.0.0.1/9010) 2> /dev/null; then break; fi
+            if [ "$i" = 60 ]; then echo "Login does not listen on 9010"; exit 1; fi
+            sleep 2
+          done
+
+      # Single-node mode creates the accounts load0001 to load0050 on their first login.
+      - run: mix pinata.load --host 127.0.0.1 --port 9010 --scenario crowd --players 50 --hold 10 --stop-after-hold
+
+      - run: $R/bin/pinata rpc "Pinata.Figures.print()"
+
+      - name: Stop, no error line
+        run: |
+          $R/bin/pinata stop
+          ! grep -F '[error]' "$RUNNER_TEMP/node.out"
+
+      - name: Node output
+        if: failure()
+        run: cat "$RUNNER_TEMP/node.out" || true

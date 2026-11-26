@@ -14,17 +14,7 @@ defmodule Persistence.Release do
   @spec create_account(String.t()) :: :ok
   def create_account(name) do
     ready(fn ->
-      # shortcut: the password is echoed while typed, hide it when a terminal library is acceptable
-      typed =
-        case IO.gets("Password: ") do
-          line when is_binary(line) -> line |> String.trim_trailing("\n") |> String.trim_trailing("\r")
-          _eof_or_error -> ""
-        end
-
-      if typed == "", do: raise("No password given.")
-
-      # The 2016 client sends the lower-case hex MD5 of the typed password; that is what is stored hashed.
-      password = Base.encode16(:crypto.hash(:md5, typed), case: :lower)
+      password = password!()
 
       case Persistence.create_account(name, password) do
         {:ok, id} ->
@@ -37,9 +27,89 @@ defmodule Persistence.Release do
           raise "The database failed; see the log line above."
 
         {:error, :invalid_name} ->
-          raise "#{name} is not a valid account name: 1 to 255 printable ASCII characters, no spaces."
+          raise invalid_name(name)
       end
     end)
+  end
+
+  defp create_one(name, password) do
+    case Persistence.create_account(name, password) do
+      {:ok, _id} -> :created
+      {:error, :name_taken} -> :existing
+      {:error, :database} -> raise "The database failed; see the log line above."
+      {:error, :invalid_name} -> raise invalid_name(name)
+    end
+  end
+
+  defp invalid_name(name), do: "#{name} is not a valid account name: 1 to 255 printable ASCII characters, no spaces."
+
+  defp password! do
+    # shortcut: the password is echoed while typed, hide it when a terminal library is acceptable
+    typed =
+      case IO.gets("Password: ") do
+        line when is_binary(line) -> line |> String.trim_trailing("\n") |> String.trim_trailing("\r")
+        _eof_or_error -> ""
+      end
+
+    if typed == "", do: raise("No password given.")
+
+    # The 2016 client sends the lower-case hex MD5 of the typed password; that is what is stored hashed.
+    Base.encode16(:crypto.hash(:md5, typed), case: :lower)
+  end
+
+  @doc "Creates the accounts `<prefix>0001` to `<prefix><count>` with one password, asked once; existing names are counted, not changed."
+  @spec create_accounts(String.t(), pos_integer()) :: :ok
+  def create_accounts(prefix, count) do
+    ready(fn ->
+      if not (is_integer(count) and count in 1..9999), do: raise("The count must be 1 to 9999.")
+      password = password!()
+      names = for i <- 1..count, do: prefix <> String.pad_leading(Integer.to_string(i), 4, "0")
+
+      # Sequential on purpose: each account hashes its password with its own salt.
+      {created, existing} = names |> Enum.map(&create_one(&1, password)) |> Enum.split_with(&(&1 == :created))
+      {created, existing} = {length(created), length(existing)}
+
+      IO.puts("Created #{created} accounts, #{existing} existed already: #{hd(names)} to #{List.last(names)}.")
+    end)
+  end
+
+  @doc """
+  Sets the stored map and position of characters from `name,map,x,y` lines on standard input (the load run). All or
+  nothing; a character in the world overwrites the values when it is saved.
+  """
+  @spec place_characters(non_neg_integer()) :: :ok
+  def place_characters(world \\ 0) do
+    ready(fn ->
+      lines =
+        case IO.read(:stdio, :eof) do
+          text when is_binary(text) ->
+            text |> String.split("\n") |> Enum.map(&String.trim_trailing(&1, "\r")) |> Enum.with_index(1)
+
+          _eof_or_error ->
+            []
+        end
+
+      lines = Enum.reject(lines, fn {line, _n} -> line == "" end)
+      if lines == [], do: raise("No placement lines given.")
+      entries = Enum.map(lines, &placement!/1)
+
+      case Persistence.place_characters(world, entries) do
+        :ok -> IO.puts("Placed #{length(entries)} characters.")
+        {:error, {:no_character, name}} -> raise "No character named #{name} in world #{world}; nothing was placed."
+        {:error, :database} -> raise "The database failed; see the log line above."
+      end
+    end)
+  end
+
+  defp placement!({line, n}) do
+    with [name, map, x, y] <- String.split(line, ","),
+         true <- byte_size(name) in 1..20 and map =~ ~r/\A[A-Za-z0-9_-]{1,12}\z/,
+         {x, ""} when x in 0..0x7FFFFFFF <- Integer.parse(x),
+         {y, ""} when y in 0..0x7FFFFFFF <- Integer.parse(y) do
+      %{name: name, map: map, x: x, y: y}
+    else
+      _ -> raise "Line #{n} is not <character name>,<map>,<x>,<y>: #{inspect(line)}"
+    end
   end
 
   @spec block(String.t()) :: :ok

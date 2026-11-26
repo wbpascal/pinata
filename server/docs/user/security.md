@@ -19,6 +19,7 @@ The server treats everything a client sends as untrusted. What it cannot protect
 ## Accounts
 
 - **Turn off `login.auto_create_accounts` on a public server.** It is on by default in single-node mode, and then anyone who reaches the Login port can create accounts. Create accounts yourself (see [`accounts.md`](accounts.md)).
+- **Load accounts** (`load0001` …, [`accounts.md`](accounts.md), "Commands") share one password. Create them only on a server used for load runs and block them afterwards with `Persistence.Release.block`.
 - **Block an account** you suspect of abuse with `Persistence.Release.block` (see [`accounts.md`](accounts.md)).
 
 ## Connection limits

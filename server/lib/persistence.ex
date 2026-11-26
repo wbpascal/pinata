@@ -341,6 +341,37 @@ defmodule Persistence do
     with {:ok, :renamed} <- result, do: :ok
   end
 
+  @type placement :: %{name: binary(), map: String.t(), x: non_neg_integer(), y: non_neg_integer()}
+
+  @doc """
+  Sets the stored map and position of the named characters of a world (names without regard to ASCII letter case).
+  All or nothing: an unknown name leaves every character as it was. For characters that are not in the world: a
+  character in the world overwrites the values when it is saved.
+  """
+  @spec place_characters(non_neg_integer(), [placement()]) :: :ok | {:error, {:no_character, binary()} | :database}
+  def place_characters(world_id, entries) do
+    repo = Repo.active()
+    entries = Enum.sort_by(entries, &Character.name_key(&1.name))
+
+    result =
+      transact(repo, "place_characters", fn ->
+        case Enum.find(entries, &(not place(repo, world_id, &1))) do
+          nil -> {:ok, :placed}
+          # Leaves the transaction at the first unknown name; the rollback undoes the others.
+          entry -> {:error, {:no_character, entry.name}}
+        end
+      end)
+
+    with {:ok, :placed} <- result, do: :ok
+  end
+
+  defp place(repo, world_id, entry) do
+    key = Character.name_key(entry.name)
+    query = from(c in Character, where: c.world_id == ^world_id and c.name_key == ^key)
+    {count, _} = repo.update_all(query, set: [login_map: entry.map, login_x: entry.x, login_y: entry.y])
+    count == 1
+  end
+
   defp update_name(repo, character, name) do
     changeset =
       character

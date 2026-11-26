@@ -41,5 +41,8 @@ In `server/`, each in place of a release command of the other pages:
 | `mix pinata.import_data <9Data folder> <new data directory>` | `bin/pinata eval "GameData.Release.import_data(~s(<9Data folder>), ~s(<new data directory>))"` | creates the data directory (see [`install.md`](install.md)); on Windows it takes a path with backslashes as it is |
 | `mix pinata.migrate` | `bin/pinata eval "Persistence.Release.migrate()"` | runs the pending database migrations (see [`operation.md`](operation.md)) |
 | `mix pinata.account.create <name>` | `bin/pinata eval "Persistence.Release.create_account(~s(<name>))"` | creates an account; it asks for the password (see [`accounts.md`](accounts.md)) |
+| `mix pinata.account.create --count <n> --prefix <prefix>` | `bin/pinata eval "Persistence.Release.create_accounts(~s(<prefix>), <n>)"` | creates the accounts `<prefix>0001` to `<prefix><n>` with one password, asked once (see [`accounts.md`](accounts.md)) |
+| `mix pinata.character.place < <file>` | `bin/pinata eval "Persistence.Release.place_characters()" < <file>` | sets the stored map and position of characters from `name,map,x,y` lines (see [`accounts.md`](accounts.md), "Placing characters") |
+| `MIX_ENV=test mix pinata.load --scenario world\|crowd --players <n> …` | none | developer task: the load run against a running server (see [`../technical/load-run.md`](../technical/load-run.md)) |
 | `mix pinata.account.block <name>`, `mix pinata.account.unblock <name>` | `bin/pinata eval "Persistence.Release.block(~s(<name>))"`, `unblock` alike | block and unblock an account |
 | `mix pinata.packets_doc` | none | writes `docs/technical/packets.md` from the packet definitions. Run it after changing a packet definition; `mix check` fails on a stale file |
