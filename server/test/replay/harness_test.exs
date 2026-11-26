@@ -72,6 +72,9 @@ defmodule Replay.HarnessTest do
     def handle_packet(state, %MiscSeedAck{seed: 2}), do: {state, [{:send, @reply}, {:send, @reply}]}
     def handle_packet(state, %MiscSeedAck{seed: 3}), do: {state, []}
     def handle_packet(state, %MiscSeedAck{seed: 4}), do: {state, [{:send, %MiscHeartbeatReq{}}, {:send, @reply}]}
+
+    def handle_packet(state, %MiscSeedAck{seed: 5}),
+      do: {state, [{:send, %Box{head: 0, inner: %Item{id: 0, qty: 0}, items: []}}, {:send, @reply}]}
   end
 
   defmodule EchoHandle do
@@ -479,8 +482,22 @@ defmodule Replay.HarnessTest do
       assert run(Stub, lines, deferrals: [{:unsent, 2, [3, 4], 3, "r"}]) == :ok
     end
 
+    test "extra: a server packet of that module the transcript does not have is dropped" do
+      lines = @trigger <> "0500\n" <> @reply <> "0100efbeadde0700"
+      assert {:error, %Failure{kind: :unexpected}} = run(Stub, lines)
+      assert run(Stub, lines, deferrals: [{:extra, Box, 3, "r"}]) == :ok
+    end
+
     test "validation" do
       packets = transcript(@good).packets
+      assert Replay.Deferrals.validate!([{:extra, Box, 3, "r"}], packets) == :ok
+      assert_raise ArgumentError, ~r/milestone/, fn -> Replay.Deferrals.validate!([{:extra, Box, 0, "r"}], packets) end
+      assert_raise ArgumentError, ~r/reason/, fn -> Replay.Deferrals.validate!([{:extra, Box, 3, ""}], packets) end
+
+      assert_raise ArgumentError, ~r/malformed/, fn ->
+        Replay.Deferrals.validate!([{:extra, "Box", 3, "r"}], packets)
+      end
+
       assert Replay.Deferrals.validate!([{:absent, Box, 4, "r"}, {:unsent, 2, [3], 3, "r"}], packets) == :ok
       assert_raise ArgumentError, ~r/reason/, fn -> Replay.Deferrals.validate!([{:absent, Box, 4, ""}], packets) end
       assert_raise ArgumentError, ~r/milestone/, fn -> Replay.Deferrals.validate!([{:absent, Box, 0, "r"}], packets) end

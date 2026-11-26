@@ -47,12 +47,24 @@ defmodule Zone.Handler do
   `0x0830 {ShoutLevel, ShoutDelay}`, which the 2016 client ignores (Z01-B5). Absent until their milestones: the GM
   chat ban and the GM colour bit (7), font and balloon colours (9), the pet keyword (9), Lua chat triggers (10), the
   chat-title counter `0x6006` (6), the megaphone `0x204B` (6), party chat (6).
+
+  Actions (flow: `docs/technical/flows/actions.md`): in the world, `0x2020` emote, `0x2022` emote stop, `0x2024`
+  jump and `0x2008` stance go to the map instance (`Zone.MapInstance.action/3`), which relays `0x2021` / `0x2023` to
+  the player and the players in sight, `0x2025` / `0x2009` to the players in sight. An emote id without an
+  `ActionViewInfo` row, a charged emote (`eActionType` 2) through `0x2020`, and a stance other than 1 or 2 are
+  ignored with an `info` line; the connection stays open. Before `0x1803` the four packets are ignored. Absent until
+  their milestones: the gamble-game refusal of `0x2020`, `CancelOnAction`, charged emotes `0x2067` (9), the pet
+  dance (9), the tent shape of `0x2008`, the Lua jump triggers (10), the quest hook (5).
   """
 
   @behaviour Net.Handler
 
+  alias Proto.Packets.ActChangemodeReq
   alias Proto.Packets.ActChatReq
+  alias Proto.Packets.ActEmoticonCmd
+  alias Proto.Packets.ActEmoticonstopCmd
   alias Proto.Packets.ActEndoftradeCmd
+  alias Proto.Packets.ActJumpCmd
   alias Proto.Packets.ActMoverunCmd
   alias Proto.Packets.ActMovewalkCmd
   alias Proto.Packets.ActShoutCmd
@@ -152,6 +164,35 @@ defmodule Zone.Handler do
 
   def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActShoutCmd{} = req),
     do: {state, [{:perform, {:chat, state.map, p.handle, :shout, line(req)}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActEmoticonCmd{emoticon_id: id}) do
+    case GameData.fetch(GameData.ActionViewInfo, id) do
+      # a charged emote plays through an item (milestone 9)
+      {:ok, %{action_type: 2}} -> {state, [{:log, :info, "emote ignored: charged emote #{id}"}]}
+      {:ok, _row} -> {state, [{:perform, {:action, state.map, p.handle, {:emote, id}}}]}
+      :error -> {state, [{:log, :info, "emote ignored: unknown id #{id}"}]}
+    end
+  end
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActEmoticonstopCmd{} = e) do
+    case GameData.fetch(GameData.ActionViewInfo, e.emoticon_id) do
+      {:ok, _row} ->
+        {state, [{:perform, {:action, state.map, p.handle, {:emote_stop, e.emoticon_id, e.emoticon_frame}}}]}
+
+      :error ->
+        {state, [{:log, :info, "emote stop ignored: unknown id #{e.emoticon_id}"}]}
+    end
+  end
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActJumpCmd{}),
+    do: {state, [{:perform, {:action, state.map, p.handle, :jump}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world, player: %Zone.Player{} = p} = state, %ActChangemodeReq{mode: mode})
+      when mode in [1, 2],
+      do: {state, [{:perform, {:action, state.map, p.handle, {:stance, mode}}}]}
+
+  def handle_packet(%__MODULE__{step: :in_world} = state, %ActChangemodeReq{mode: mode}),
+    do: {state, [{:log, :info, "stance ignored: mode #{mode}"}]}
 
   def handle_packet(%__MODULE__{step: step} = state, %MiscServerparameterReq{}) when step in [:loading, :in_world],
     do: {state, [{:perform, :server_parameters}]}
@@ -310,6 +351,7 @@ defmodule Zone.Handler do
   def perform({:move, map, own, kind, from, to}), do: moved(Zone.MapInstance.move(map, own, kind, from, to))
 
   def perform({:stop, map, own, loc}), do: moved(Zone.MapInstance.stop(map, own, loc))
+  def perform({:action, map, own, action}), do: moved(Zone.MapInstance.action(map, own, action))
 
   def perform({:chat, map, handle, kind, line}), do: {:chatted, Zone.MapInstance.chat(map, handle, kind, line)}
   def perform(:server_parameters), do: {:server_parameters, Zone.Chat.common().shout}

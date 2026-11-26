@@ -92,7 +92,7 @@ defmodule GameDataTest do
 
   test "the tables of the Zone part load without warnings" do
     assert {:ok, tables, []} = GameData.Loader.parse(@dir, Zone.game_data(), true)
-    assert map_size(tables) == 10
+    assert map_size(tables) == 11
     assert {:ok, %{sight: 1600}} = GameData.fetch(GameData.MapInfo, "RouN")
 
     counts = %{
@@ -103,7 +103,8 @@ defmodule GameDataTest do
       GameData.MobInfo => 2842,
       GameData.TownPortal => 8,
       GameData.SpamerPenalty => 10,
-      GameData.SpamerPenaltyRule => 1
+      GameData.SpamerPenaltyRule => 1,
+      GameData.ActionViewInfo => 105
     }
 
     for {schema, count} <- counts, do: assert(map_size(tables[schema].rows) == count)
@@ -144,5 +145,9 @@ defmodule GameDataTest do
     assert {:ok, %{min_level: 1, group: 0, map_name: "RouN", x: 5874, y: 6530}} = GameData.fetch(GameData.TownPortal, 0)
     assert {:ok, %{chat_block_time: 10, probate_time: 15}} = GameData.fetch(GameData.SpamerPenalty, 1)
     assert {:ok, %{second_rule: 3000, repeat_rule: 3}} = GameData.fetch(GameData.SpamerPenaltyRule, 1)
+    assert {:ok, %{action_type: 1}} = GameData.fetch(GameData.ActionViewInfo, 7)
+    assert {:ok, %{action_type: 0}} = GameData.fetch(GameData.ActionViewInfo, 0)
+    assert {:ok, %{action_type: 2}} = GameData.fetch(GameData.ActionViewInfo, 31)
+    assert :error = GameData.fetch(GameData.ActionViewInfo, 21)
   end
 end

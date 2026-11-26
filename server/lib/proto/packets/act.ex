@@ -212,3 +212,67 @@ defmodule Proto.Packets.ActSomeoneshoutCmd do
   field :content, {:counted, :u8}
   field :links, {:records, :item_link_count, 0x67}
 end
+
+defmodule Proto.Packets.ActChangemodeReq do
+  @moduledoc "0x2008 NC_ACT_CHANGEMODE_REQ, client to server: the player changes its stance (1 normal, 2 combat)."
+  use Proto.Packet, opcode: 0x2008
+  # official: mode
+  field :mode, :u8
+end
+
+defmodule Proto.Packets.ActSomeonechangemodeCmd do
+  @moduledoc "0x2009 NC_ACT_SOMEONECHANGEMODE_CMD, server to client: the player of the handle changed its stance."
+  use Proto.Packet, opcode: 0x2009
+  # official: handle
+  field :handle, :u16
+  # official: mode
+  field :mode, :u8
+end
+
+defmodule Proto.Packets.ActEmoticonCmd do
+  @moduledoc "0x2020 NC_ACT_EMOTICON_CMD, client to server: the player plays an emote (7 is the sit)."
+  use Proto.Packet, opcode: 0x2020
+  # official: emoticonid
+  field :emoticon_id, :u8
+end
+
+defmodule Proto.Packets.ActSomeoneemoticonCmd do
+  @moduledoc "0x2021 NC_ACT_SOMEONEEMOTICON_CMD, server to client: the player of the handle plays an emote."
+  use Proto.Packet, opcode: 0x2021
+  # official: handle
+  field :handle, :u16
+  # official: emoticonid
+  field :emoticon_id, :u8
+end
+
+defmodule Proto.Packets.ActEmoticonstopCmd do
+  @moduledoc "0x2022 NC_ACT_EMOTICONSTOP_CMD, client to server: the player's emote stops at this frame."
+  use Proto.Packet, opcode: 0x2022
+  # official: emoticon.emoticonid
+  field :emoticon_id, :u8
+  # official: emoticon.emoticonframe
+  field :emoticon_frame, :u16
+end
+
+defmodule Proto.Packets.ActSomeoneemoticonstopCmd do
+  @moduledoc "0x2023 NC_ACT_SOMEONEEMOTICONSTOP_CMD, server to client: the emote of the player of the handle stopped at this frame."
+  use Proto.Packet, opcode: 0x2023
+  # official: handle
+  field :handle, :u16
+  # official: emoticon.emoticonid
+  field :emoticon_id, :u8
+  # official: emoticon.emoticonframe
+  field :emoticon_frame, :u16
+end
+
+defmodule Proto.Packets.ActJumpCmd do
+  @moduledoc "0x2024 NC_ACT_JUMP_CMD, empty, client to server: the player jumps."
+  use Proto.Packet, opcode: 0x2024
+end
+
+defmodule Proto.Packets.ActSomeeonejumpCmd do
+  @moduledoc "0x2025 NC_ACT_SOMEEONEJUMP_CMD (sic, official name), server to client: the player of the handle jumps."
+  use Proto.Packet, opcode: 0x2025
+  # official: handle
+  field :handle, :u16
+end
