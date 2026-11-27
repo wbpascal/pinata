@@ -5,7 +5,24 @@ defmodule Zone.MapInstanceTest do
   @moduletag :tmp_dir
 
   defp dir, do: System.fetch_env!("PINATA_TEST_DATA_DIR")
-  defp start(name, data_dir \\ dir()), do: start_supervised!({Zone.MapInstance, {200, name, data_dir}}, id: name)
+  defp start(name), do: start(name, free_dir(name))
+  defp start(name, data_dir), do: start_supervised!({Zone.MapInstance, {200, name, data_dir}}, id: name)
+
+  # A copy of the map's block data with every cell free, so that players can enter at any point; one per run and map.
+  defp free_dir(name) do
+    free = Path.join(System.tmp_dir!(), "pinata-free-blocks-#{System.pid()}")
+    path = Path.join([free, "BlockInfo", name <> ".shbd"])
+
+    if not File.exists?(path) do
+      {:ok, <<bpr::little-32, rows::little-32>> = head} =
+        File.open(Path.join([dir(), "BlockInfo", name <> ".shbd"]), [:read, :binary], &IO.binread(&1, 8))
+
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, head <> :binary.copy(<<0>>, bpr * rows))
+    end
+
+    free
+  end
 
   defp player(conn \\ :none) do
     character = %{
@@ -63,10 +80,12 @@ defmodule Zone.MapInstanceTest do
   test "block data is read at the first entry only" do
     pid = start("Rou")
     assert :sys.get_state(pid).block_data == nil
-    first = TestLog.capture(fn -> assert {:ok, 8000} = Zone.MapInstance.enter(pid, player()) end)
+    first = TestLog.capture(fn -> assert {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player()) end)
     assert first =~ "[info] Zone: map Rou: block data loaded, "
     assert %GameData.BlockData{} = :sys.get_state(pid).block_data
-    assert TestLog.capture(fn -> assert {:ok, 8001} = Zone.MapInstance.enter(pid, player()) end) == ""
+
+    refute TestLog.capture(fn -> assert {:ok, %{handle: 8001}} = Zone.MapInstance.enter(pid, player()) end) =~
+             "Zone: map Rou:"
   end
 
   test "a block data file that cannot be read refuses the entry", %{tmp_dir: tmp_dir} do
@@ -83,7 +102,7 @@ defmodule Zone.MapInstanceTest do
     TestClock.set(1_000_000)
     pid = start("Rou")
     idle = start("RouCos01")
-    {:ok, 8000} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player())
     TestClock.set(2_000_000)
     assert :sys.get_state(pid).ticks == 10
     {:ok, %Zone.Player{handle: 8000}} = Zone.MapInstance.leave(pid, 8000)
@@ -94,30 +113,30 @@ defmodule Zone.MapInstanceTest do
 
   test "handles count up and a freed handle is not reused before the wrap" do
     pid = start("Rou")
-    assert {:ok, 8000} = Zone.MapInstance.enter(pid, player())
-    assert {:ok, 8001} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 8001}} = Zone.MapInstance.enter(pid, player())
     {:ok, %Zone.Player{handle: 8000}} = Zone.MapInstance.leave(pid, 8000)
-    assert {:ok, 8002} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 8002}} = Zone.MapInstance.enter(pid, player())
     assert %{handle: 8002, mode: 0} = :sys.get_state(pid).players[8002]
 
     # at the end of the range the count wraps and skips the handles in use
     :sys.replace_state(pid, &%{&1 | next_handle: 9499})
-    assert {:ok, 9499} = Zone.MapInstance.enter(pid, player())
-    assert {:ok, 8000} = Zone.MapInstance.enter(pid, player())
-    assert {:ok, 8003} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 9499}} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 8003}} = Zone.MapInstance.enter(pid, player())
   end
 
   test "enter/3 takes the given handle, refuses it in use, and enter/2 skips it" do
     pid = start("Rou")
-    assert {:ok, 8000} = Zone.MapInstance.enter(pid, player(), 8000)
+    assert {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player(), 8000)
     assert %{handle: 8000, mode: 0} = :sys.get_state(pid).players[8000]
     assert {:error, :handle_taken} = Zone.MapInstance.enter(pid, player(), 8000)
-    assert {:ok, 8001} = Zone.MapInstance.enter(pid, player())
+    assert {:ok, %{handle: 8001}} = Zone.MapInstance.enter(pid, player())
   end
 
   test "1500 players fill the map" do
     pid = start("Rou")
-    {:ok, _} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: _}} = Zone.MapInstance.enter(pid, player())
     one = :sys.get_state(pid).players[8000]
     :sys.replace_state(pid, &%{&1 | players: Map.new(8000..9499, fn h -> {h, %{one | handle: h}} end)})
     assert {:error, :full} = Zone.MapInstance.enter(pid, player())
@@ -125,7 +144,7 @@ defmodule Zone.MapInstanceTest do
 
   test "login_complete sets mode 1 once and returns the burst" do
     pid = start("Rou")
-    {:ok, handle} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: handle}} = Zone.MapInstance.enter(pid, player())
 
     assert {:ok, [%Proto.Packets.CharClientCardcollectCmd{} | _] = packets} =
              Zone.MapInstance.login_complete(pid, handle)
@@ -141,8 +160,8 @@ defmodule Zone.MapInstanceTest do
   test "the end of a monitored connection removes its player" do
     pid = start("Rou")
     conn = spawn(fn -> receive do: (:stop -> :ok) end)
-    {:ok, handle} = Zone.MapInstance.enter(pid, player(conn))
-    {:ok, other} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: handle}} = Zone.MapInstance.enter(pid, player(conn))
+    {:ok, %{handle: other}} = Zone.MapInstance.enter(pid, player())
     send(conn, :stop)
     wait_until(fn -> not Map.has_key?(:sys.get_state(pid).players, handle) end)
     assert Map.keys(:sys.get_state(pid).players) == [other]
@@ -192,15 +211,15 @@ defmodule Zone.MapInstanceTest do
 
   test "a player in sight that leaves is announced with 0x1805; a mode-0 player is not" do
     pid = start("Rou")
-    {:ok, me} = Zone.MapInstance.enter(pid, player(self()))
+    {:ok, %{handle: me}} = Zone.MapInstance.enter(pid, player(self()))
     {:ok, _} = Zone.MapInstance.login_complete(pid, me)
-    {:ok, other} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: other}} = Zone.MapInstance.enter(pid, player())
     {:ok, _} = Zone.MapInstance.login_complete(pid, other)
     assert_receive {:cluster, {:packets, [%Proto.Packets.BriefinfoLogincharacterCmd{handle: ^other}]}}
     {:ok, _} = Zone.MapInstance.leave(pid, other)
     assert_receive {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: ^other}]}}
 
-    {:ok, hidden} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: hidden}} = Zone.MapInstance.enter(pid, player())
     {:ok, _} = Zone.MapInstance.leave(pid, hidden)
     refute_receive {:cluster, _}, 50
   end
@@ -225,14 +244,14 @@ defmodule Zone.MapInstanceTest do
     on_exit(fn -> Application.delete_env(:pinata, :clock_source) end)
     TestClock.set(1_000_000)
     pid = start("Rou")
-    {:ok, 8000} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player())
     TestClock.set(1_100_000)
     assert_receive {:telemetry, [:pinata, :tick, :stop], %{duration: _}, %{world: 200, map: "Rou"}}, 1000
   end
 
   test "a crashed instance comes back empty and is logged once" do
     {:ok, old} = Zone.MapInstance.whereis(0, "RouCos01")
-    {:ok, _handle} = Zone.MapInstance.enter(old, player())
+    {:ok, %{handle: _handle}} = Zone.MapInstance.enter(old, player())
 
     log =
       TestLog.capture(fn ->
@@ -256,7 +275,7 @@ defmodule Zone.MapInstanceTest do
 
   # a player in mode 1 at a point; the packets of its entry are flushed
   defp standing(pid, {x, y}, conn \\ :none) do
-    {:ok, handle} = Zone.MapInstance.enter(pid, %{player(conn) | x: x, y: y, last_good: {x, y}})
+    {:ok, %{handle: handle}} = Zone.MapInstance.enter(pid, %{player(conn) | x: x, y: y, last_good: {x, y}})
     {:ok, _} = Zone.MapInstance.login_complete(pid, handle)
     flush()
     handle
@@ -282,7 +301,7 @@ defmodule Zone.MapInstanceTest do
     assert :error = Zone.MapInstance.npc(pid, far, npc.handle)
     assert :error = Zone.MapInstance.npc(pid, near, 1)
     assert :error = Zone.MapInstance.npc(pid, 9499, npc.handle)
-    {:ok, loading} = Zone.MapInstance.enter(pid, %{player() | x: npc.x, y: npc.y, last_good: {npc.x, npc.y}})
+    {:ok, %{handle: loading}} = Zone.MapInstance.enter(pid, %{player() | x: npc.x, y: npc.y, last_good: {npc.x, npc.y}})
     assert :error = Zone.MapInstance.npc(pid, loading, npc.handle)
   end
 
@@ -307,7 +326,7 @@ defmodule Zone.MapInstanceTest do
     assert {p.x, p.y, p.last_good, p.mode, p.mover, p.move, p.chat.ring} == {700, 800, {700, 800}, 0, :none, :none, []}
     assert_receive {:cluster, {:packets, [%Proto.Packets.MapLogoutCmd{handle: ^mover}]}}
     assert {:ok, ^p} = Zone.MapInstance.player(pid, mover)
-    assert :error = Zone.MapInstance.relocate(pid, 9499, {1, 1})
+    assert {:error, :not_on_map} = Zone.MapInstance.relocate(pid, 9499, {1, 1})
   end
 
   describe "GM actions" do
@@ -405,7 +424,7 @@ defmodule Zone.MapInstanceTest do
 
   test "leave returns the player as it was on the map, player/2 reads it" do
     pid = start("Rou")
-    {:ok, handle} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: handle}} = Zone.MapInstance.enter(pid, player())
     :sys.replace_state(pid, &put_in(&1.players[handle].x, 77))
     assert {:ok, %Zone.Player{handle: ^handle, x: 77}} = Zone.MapInstance.player(pid, handle)
     assert {:ok, %Zone.Player{handle: ^handle, x: 77}} = Zone.MapInstance.leave(pid, handle)
@@ -415,14 +434,14 @@ defmodule Zone.MapInstanceTest do
 
   test "stopped in order it sends each connection its player; killed it sends nothing" do
     pid = start("Rou")
-    {:ok, handle} = Zone.MapInstance.enter(pid, player(self()))
-    {:ok, _other} = Zone.MapInstance.enter(pid, player())
+    {:ok, %{handle: handle}} = Zone.MapInstance.enter(pid, player(self()))
+    {:ok, %{handle: _other}} = Zone.MapInstance.enter(pid, player())
     :ok = GenServer.stop(pid, :shutdown)
     assert_receive {:cluster, {:map_stopped, %Zone.Player{handle: ^handle}}}, 1000
     refute_receive {:cluster, _}, 50
 
     pid = start("RouCos02")
-    {:ok, _handle} = Zone.MapInstance.enter(pid, player(self()))
+    {:ok, %{handle: _handle}} = Zone.MapInstance.enter(pid, player(self()))
 
     TestLog.capture(fn ->
       Process.exit(pid, :kill)
@@ -522,7 +541,7 @@ defmodule Zone.MapInstanceTest do
 
     defp in_world!(pid, tag, {x, y}) do
       p = %{player(conn(tag)) | x: x, y: y, last_good: {x, y}}
-      {:ok, handle} = Zone.MapInstance.enter(pid, p)
+      {:ok, %{handle: handle}} = Zone.MapInstance.enter(pid, p)
       {:ok, _} = Zone.MapInstance.login_complete(pid, handle)
       handle
     end
@@ -619,7 +638,9 @@ defmodule Zone.MapInstanceTest do
     end
 
     test "a current position without a free cell is refused", %{pid: pid} do
-      me = two!(pid, {2100, 1003})
+      me = two!(pid, {1900, 1003})
+      # the entry places a player off the wall, so put it there afterwards
+      :sys.replace_state(pid, &update_in(&1.players[me], fn p -> %{p | x: 2100, last_good: {2100, 1003}} end))
       :ok = Zone.MapInstance.move(pid, me, :run, {2100, 1003}, {2300, 1003})
       assert got(pid, :me) == [%ActMovefailAck{x: 2100, y: 1003}]
     end
@@ -707,7 +728,10 @@ defmodule Zone.MapInstanceTest do
     test "an unknown handle and a mode-0 player", %{pid: pid} do
       assert {:error, :not_entered} = Zone.MapInstance.move(pid, 9000, :run, {1, 1}, {2, 2})
       assert {:error, :not_entered} = Zone.MapInstance.stop(pid, 9000, {1, 1})
-      {:ok, hidden} = Zone.MapInstance.enter(pid, %{player(conn(:hidden)) | x: 1400, y: 1003, last_good: {1400, 1003}})
+
+      {:ok, %{handle: hidden}} =
+        Zone.MapInstance.enter(pid, %{player(conn(:hidden)) | x: 1400, y: 1003, last_good: {1400, 1003}})
+
       assert :ok = Zone.MapInstance.move(pid, hidden, :run, {1400, 1003}, {1400, 1003})
       assert :ok = Zone.MapInstance.stop(pid, hidden, {1400, 1003})
       assert got(pid, :hidden) == []
@@ -761,7 +785,10 @@ defmodule Zone.MapInstanceTest do
       first = in_world!(pid, :me, {1400, 1003})
       assert %{emoticon: {0xFF, 0xFFFF}} = at(pid, first)
       _ = got(pid, :me)
-      {:ok, second} = Zone.MapInstance.enter(pid, %{player(conn(:obs)) | x: 1400, y: 1203, last_good: {1400, 1203}})
+
+      {:ok, %{handle: second}} =
+        Zone.MapInstance.enter(pid, %{player(conn(:obs)) | x: 1400, y: 1203, last_good: {1400, 1203}})
+
       {:ok, burst} = Zone.MapInstance.login_complete(pid, second)
       assert [%BriefinfoLogincharacterCmd{handle: ^second, emoticon_id: 0xFF, emoticon_frame: 0}] = got(pid, :me)
       chars = for %Proto.Packets.BriefinfoCharacterCmd{chars: chars} <- burst, c <- chars, do: c
@@ -773,7 +800,10 @@ defmodule Zone.MapInstanceTest do
 
     test "actions of an unknown handle and a mode-0 player", %{pid: pid} do
       assert {:error, :not_entered} = Zone.MapInstance.action(pid, 9000, :jump)
-      {:ok, hidden} = Zone.MapInstance.enter(pid, %{player(conn(:hidden)) | x: 1400, y: 1003, last_good: {1400, 1003}})
+
+      {:ok, %{handle: hidden}} =
+        Zone.MapInstance.enter(pid, %{player(conn(:hidden)) | x: 1400, y: 1003, last_good: {1400, 1003}})
+
       _obs = in_world!(pid, :obs, {1400, 1203})
       _ = got(pid, :obs)
 
@@ -782,6 +812,57 @@ defmodule Zone.MapInstanceTest do
 
       assert got(pid, :hidden) == [] and got(pid, :obs) == []
       assert %{stance: 1, emoticon: {0xFF, 0}} = at(pid, hidden)
+    end
+
+    # 512 x 512 cells of the setup's size, blocked where the function says
+    defp blocks(blocked?) do
+      bits =
+        for cy <- 0..511, byte <- 0..63, into: <<>> do
+          <<Enum.sum(for i <- 0..7, blocked?.(byte * 8 + i, cy), do: Bitwise.bsl(1, i))>>
+        end
+
+      %GameData.BlockData{bytes_per_row: 64, rows: 512, bits: bits}
+    end
+
+    defp set_blocks(pid, b, regen), do: :sys.replace_state(pid, &%{&1 | block_data: b, regen: regen})
+
+    test "enter/2 on a blocked cell places the player on a free neighbour", %{pid: pid} do
+      p = %{player() | x: 2001, y: 1003, last_good: {2001, 1003}}
+      assert {:ok, %Zone.Player{x: x, y: y, last_good: {x, y}} = entered} = Zone.MapInstance.enter(pid, p)
+      refute GameData.BlockData.blocked?(:sys.get_state(pid).block_data, x, y)
+      assert {x, y} != {2001, 1003} and abs(x - 2001) <= 25 and abs(y - 1003) <= 21
+      assert {:ok, ^entered} = Zone.MapInstance.player(pid, entered.handle)
+    end
+
+    test "enter/2 on a fully blocked map is refused with :no_free_cell", %{pid: pid} do
+      set_blocks(pid, blocks(fn _, _ -> true end), {100, 100})
+      assert {:error, :no_free_cell} = Zone.MapInstance.enter(pid, player())
+      assert :sys.get_state(pid).players == %{}
+    end
+
+    test "relocate/3: a blocked point is placed; no free cell anywhere refuses and sends nothing", %{pid: pid} do
+      me = in_world!(pid, :me, {1400, 1003})
+      _obs = in_world!(pid, :obs, {1400, 1203})
+      _ = got(pid, :obs)
+      assert {:ok, %Zone.Player{x: x, y: y}} = Zone.MapInstance.relocate(pid, me, {2001, 1003})
+      refute GameData.BlockData.blocked?(:sys.get_state(pid).block_data, x, y)
+      _ = got(pid, :obs)
+
+      before = at(pid, me)
+      set_blocks(pid, blocks(fn _, _ -> true end), {100, 100})
+      assert {:error, :no_free_cell} = Zone.MapInstance.relocate(pid, me, {1400, 1003})
+      assert at(pid, me) == before
+      assert got(pid, :obs) == []
+    end
+
+    test "with no free cell in reach the player is placed at the regen point, with an info line", %{pid: pid} do
+      set_blocks(pid, blocks(&(not (&1 == 16 and &2 == 16))), {100, 100})
+      p = %{player() | x: 1600, y: 1600, last_good: {1600, 1600}}
+
+      log =
+        TestLog.capture(fn -> assert {:ok, %Zone.Player{x: 100, y: 100}} = Zone.MapInstance.enter(pid, p) end)
+
+      assert log =~ "[info] Zone: map Rou: no free cell around (1600, 1600), placed at the regen point"
     end
   end
 end

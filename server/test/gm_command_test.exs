@@ -267,6 +267,30 @@ defmodule GmCommandTest do
   describe "single node" do
     @describetag topology: :single
 
+    test "&linkto <map> <x> <y> far outside the walkable area lands on the regen point and saves it", t do
+      a = in_world(t, "admin", "Test1235", %{admin_level: 100})
+
+      a.zone
+      |> send!(line("&linkto RouN 100 200"))
+      |> recv!(<<0x09, 0x18, 150::little-16, 6445::little-32, 8630::little-32>>)
+      |> complete()
+      |> TestClient.close()
+
+      TestClient.close(a.wm)
+
+      wait_until(fn ->
+        r = Persistence.Repo.active().get!(Persistence.Character, a.id)
+        {r.login_x, r.login_y} == {6445, 8630}
+      end)
+    end
+
+    test "&linkto <map> <x> <y> on a blocked cell lands on a free cell next to it", t do
+      a = in_world(t, "admin", "Test1235", %{admin_level: 100})
+      zone = send!(a.zone, line("&linkto RouN 4801 4700"))
+      assert {:ok, <<0x09, 0x18, 150::little-16, x::little-32, y::little-32>>, _zone} = TestClient.recv_raw(zone)
+      assert {x, y} in [{4813, 4679}, {4789, 4679}]
+    end
+
     test "admin level 0: no answer, not shown as chat, no log line", t do
       a = in_world(t, "first", "X45A")
       b = in_world(t, "second", "X45B", %{login_x: 6500, login_y: 9800})

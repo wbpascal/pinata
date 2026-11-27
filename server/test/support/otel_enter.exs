@@ -4,7 +4,7 @@
 {:ok, map} = Zone.MapInstance.whereis(0, "Rou")
 conn = spawn(fn -> Process.sleep(:infinity) end)
 
-{:ok, handle} =
+{:ok, %Zone.Player{handle: handle}} =
   Zone.MapInstance.enter(map, %Zone.Player{
     character: :otel_smoke,
     world_no: 0,

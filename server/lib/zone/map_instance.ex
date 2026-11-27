@@ -5,7 +5,7 @@ defmodule Zone.MapInstance do
   The state holds the sight radius (`MapInfo.Sight`; 0 for a map without a row), the NPCs placed from `ShineNPC`
   (`Zone.Npc`, in file order, with their handles) and the shown ones by handle, the grid of every object position
   (`Zone.Grid`, cell size = the sight radius, 1600 when it is 0), the block data (`nil` until the first entry), the
-  players by object handle (`Zone.Player`), the chat rules of the map (`Zone.Chat.rules/1`), the tick count and the
+  regen point of `MapInfo` (`:none` without a row), the players by object handle (`Zone.Player`), the chat rules of the map (`Zone.Chat.rules/1`), the tick count and the
   tick schedule. A player
   gets the next free handle from 8000 to 9499, counting on from the last one given and wrapping to 8000, so a freed
   handle is not reused before the wrap; 1500 players fill the map. A player enters in mode 0 (receives nothing,
@@ -40,7 +40,9 @@ defmodule Zone.MapInstance do
   stands within 1000 units of a shown NPC of a mob name (the town portal check); `relocate/3` moves a player inside
   the map instance for `0x1809`: `0x1805` to the players in sight, the new position, mode 0, mover and chat state
   reset, the handle kept. `enter/3` takes a player from another map instance of this node under the handle it has
-  (a `0x1809` between two instances), or refuses with `:handle_taken`.
+  (a `0x1809` between two instances), or refuses with `:handle_taken`. Every arrival (`enter/2`, `enter/3`,
+  `relocate/3`) is placed by `Zone.Placement` on the nearest free cell of the wanted point, else of the regen point
+  (an `info` line), else refused with `:no_free_cell`; the placed point is stored, put in the grid and returned.
 
   Actions (`docs/technical/flows/actions.md`): `action/3` relays an emote (`0x2021`) or an emote stop (`0x2023`) to
   the players in sight and the player itself, a jump (`0x2025`) or a stance change (`0x2009`) to the players in sight
@@ -118,9 +120,12 @@ defmodule Zone.MapInstance do
 
   @doc """
   A player enters in mode 0 and gets its object handle. The first entry reads the block data; when that fails the
-  entry is refused. A full map (1500 players) refuses too.
+  entry is refused. A full map (1500 players) refuses too. The player is placed on the nearest free cell of its point
+  (`Zone.Placement`), or of the map's regen point when there is none in reach; `{:error, :no_free_cell}` when both
+  fail. Returns the stored player (handle, placed `x`, `y` and `last_good`).
   """
-  @spec enter(pid(), Zone.Player.t()) :: {:ok, 8000..9499} | {:error, :no_block_data | :full}
+  @spec enter(pid(), Zone.Player.t()) ::
+          {:ok, Zone.Player.t()} | {:error, :no_block_data | :full | :no_free_cell}
   def enter(pid, %Zone.Player{} = player), do: GenServer.call(pid, {:enter, player})
 
   @doc """
@@ -128,7 +133,7 @@ defmodule Zone.MapInstance do
   `{:error, :handle_taken}` when the handle is in use here.
   """
   @spec enter(pid(), Zone.Player.t(), 8000..9499) ::
-          {:ok, 8000..9499} | {:error, :no_block_data | :full | :handle_taken}
+          {:ok, Zone.Player.t()} | {:error, :no_block_data | :full | :handle_taken | :no_free_cell}
   def enter(pid, %Zone.Player{} = player, handle) when handle in @first_handle..@last_handle,
     do: GenServer.call(pid, {:enter, player, handle})
 
@@ -239,9 +244,12 @@ defmodule Zone.MapInstance do
   @doc """
   Moves the player of the handle to a point of the same map instance (`0x1809`): `0x1805` to the players in sight
   (mode 1 only), then the new position, mode 0, no mover, no move, the chat state of a fresh entry, dimension 0 and
-  sub-layer 0 (a hidden GM is visible again; no `0x2428` is sent); the handle stays. Returns the stored player; `:error` for an unknown handle.
+  sub-layer 0 (a hidden GM is visible again; no `0x2428` is sent); the handle stays. The new position is placed as in
+  `enter/2`. Returns the stored player; `{:error, :not_on_map}` for an unknown handle, `{:error, :no_free_cell}`
+  when no point can be placed (nothing sent, nothing changed).
   """
-  @spec relocate(pid(), 8000..9499, Zone.Grid.point()) :: {:ok, Zone.Player.t()} | :error
+  @spec relocate(pid(), 8000..9499, Zone.Grid.point()) ::
+          {:ok, Zone.Player.t()} | {:error, :not_on_map | :no_free_cell}
   def relocate(pid, handle, {x, y} = point) when is_integer(x) and x >= 0 and is_integer(y) and y >= 0,
     do: GenServer.call(pid, {:relocate, handle, point})
 
@@ -250,14 +258,14 @@ defmodule Zone.MapInstance do
     # terminate/2 runs on a supervisor shutdown only when exits are trapped.
     Process.flag(:trap_exit, true)
 
-    radius =
+    {radius, regen} =
       case GameData.fetch(GameData.MapInfo, name) do
-        {:ok, %{sight: sight}} ->
-          sight
+        {:ok, %{sight: sight, regen_x: rx, regen_y: ry}} ->
+          {sight, {rx, ry}}
 
         :error ->
           Logger.info("Zone: map #{name}: no MapInfo row, sight radius 0")
-          0
+          {0, :none}
       end
 
     npcs =
@@ -286,6 +294,7 @@ defmodule Zone.MapInstance do
        npc_index: Map.new(shown, &{&1.handle, &1}),
        grid: grid,
        block_data: nil,
+       regen: regen,
        chat: Zone.Chat.rules(name),
        players: %{},
        next_handle: @first_handle,
@@ -372,29 +381,29 @@ defmodule Zone.MapInstance do
     end
   end
 
-  def handle_call({:relocate, handle, {x, y}}, _from, state) do
-    case state.players do
-      %{^handle => %Zone.Player{} = player} ->
-        if player.mode == 1, do: broadcast(state, player, [%MapLogoutCmd{handle: handle}])
+  def handle_call({:relocate, handle, point}, _from, state) do
+    with %{^handle => %Zone.Player{} = player} <- state.players,
+         {:ok, {x, y}} <- mark(state, point) do
+      if player.mode == 1, do: broadcast(state, player, [%MapLogoutCmd{handle: handle}])
 
-        moved = %{
-          player
-          | x: x,
-            y: y,
-            last_good: {x, y},
-            mover: :none,
-            move: :none,
-            mode: 0,
-            dimension: 0,
-            sub_layer: 0,
-            chat: Zone.Player.__struct__().chat
-        }
+      moved = %{
+        player
+        | x: x,
+          y: y,
+          last_good: {x, y},
+          mover: :none,
+          move: :none,
+          mode: 0,
+          dimension: 0,
+          sub_layer: 0,
+          chat: Zone.Player.__struct__().chat
+      }
 
-        grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
-        {:reply, {:ok, moved}, %{state | players: Map.put(state.players, handle, moved), grid: grid}}
-
-      %{} ->
-        {:reply, :error, state}
+      grid = state.grid |> Zone.Grid.delete(handle, {player.x, player.y}) |> put_grid(moved)
+      {:reply, {:ok, moved}, %{state | players: Map.put(state.players, handle, moved), grid: grid}}
+    else
+      {:error, :no_free_cell} = refused -> {:reply, refused, state}
+      %{} -> {:reply, {:error, :not_on_map}, state}
     end
   end
 
@@ -500,9 +509,10 @@ defmodule Zone.MapInstance do
   # choose = the handle and the next_handle after it, or a refusal
   defp enter_with(state, player, choose) do
     with {:ok, state} <- load_block_data(state),
+         {:ok, {x, y}} <- mark(state, {player.x, player.y}),
          {:ok, handle, next_handle} <- choose.(state) do
       _ = if is_pid(player.conn), do: Process.monitor(player.conn)
-      player = %{player | handle: handle, mode: 0}
+      player = %{player | handle: handle, mode: 0, x: x, y: y, last_good: {x, y}}
 
       state = %{
         state
@@ -511,7 +521,7 @@ defmodule Zone.MapInstance do
           next_handle: next_handle
       }
 
-      {:reply, {:ok, handle}, start_ticking(state)}
+      {:reply, {:ok, player}, start_ticking(state)}
     else
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -793,6 +803,19 @@ defmodule Zone.MapInstance do
     x = Random.uniform(div(b.bytes_per_row * 8 * 50, 8)) - 1
     y = Random.uniform(div(b.rows * 50, 8)) - 1
     if BlockData.blocked?(b, x, y), do: free_spot(b, draws - 1), else: {:ok, {x, y}}
+  end
+
+  # so_MapMarking, then so_MapMarkingAtDefaultCoord FUN_00466b50 (Z01 §5.3)
+  defp mark(state, {x, y} = point) do
+    with :error <- Zone.Placement.place(state.block_data, point),
+         {rx, ry} <- state.regen,
+         {:ok, placed} <- Zone.Placement.place(state.block_data, {rx, ry}) do
+      Logger.info("Zone: map #{state.name}: no free cell around (#{x}, #{y}), placed at the regen point")
+      {:ok, placed}
+    else
+      {:ok, placed} -> {:ok, placed}
+      _failed -> {:error, :no_free_cell}
+    end
   end
 
   defp load_block_data(%{block_data: nil} = state) do

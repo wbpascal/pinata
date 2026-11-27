@@ -555,9 +555,7 @@ defmodule Net.ConnectionTest do
       end)
 
     assert length(String.split(log, "[debug] Net: connection closed by the client, peer 127.0.0.1:")) == 2
-    refute log =~ "[info]"
-    refute log =~ "[warning]"
-    refute log =~ "[error]"
+    refute log =~ ~r/\[(info|warning|error)\] Net:/
   end
 
   test "cluster message goes to handle_info" do

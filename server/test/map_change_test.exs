@@ -23,7 +23,7 @@ defmodule MapChangeTest do
   # near the town portal NPC Gate_Town of RouN (5874, 6530), the gate GateRou6 to EventF (4801, 4643) and the gate
   # GateRou1 to RouCos02 (6477, 10579)
   @town {5874, 6600}
-  @event_gate {4801, 4700}
+  @event_gate {4801, 4690}
   @cos_gate {6477, 10_500}
 
   setup do
@@ -186,7 +186,7 @@ defmodule MapChangeTest do
     assert op(menu) == 0x3C01
 
     # the player's server position, the limit range 1000, "Yes" and "No"
-    assert {m.npc_handle, m.x, m.y, m.limit_range, m.priority} == {gate, 4801, 4700, 1000, 0}
+    assert {m.npc_handle, m.x, m.y, m.limit_range, m.priority} == {gate, 4801, 4690, 1000, 0}
     assert m.title =~ ~r/^Do you want to move to .* field\?$/
     assert m.menus == [%ServerMenu{reply: 0, string: "Yes"}, %ServerMenu{reply: 1, string: "No"}]
 
@@ -195,7 +195,7 @@ defmodule MapChangeTest do
     assert log =~ "[info] Zone: gate MapLinkGate on map RouN: destination EventF is not running, peer"
     assert on_map?("RouN", p.handle)
     r = row(cid)
-    assert {r.login_map, r.login_x, r.login_y, r.logout_at} == {"RouN", 4801, 4700, nil}
+    assert {r.login_map, r.login_x, r.login_y, r.logout_at} == {"RouN", 4801, 4690, nil}
     close_all([p.wm, zone])
   end
 
@@ -498,7 +498,7 @@ defmodule MapChangeTest do
     {gate, index} = cos03_gate!("RouN")
     cos03 = map!("RouCos03")
     me = :sys.get_state(map!("RouN")).players[p.handle]
-    {:ok, _} = Zone.MapInstance.enter(cos03, %{me | conn: :none}, p.handle)
+    {:ok, %{handle: _}} = Zone.MapInstance.enter(cos03, %{me | conn: :none}, p.handle)
     on_exit(fn -> Zone.MapInstance.leave(cos03, p.handle) end)
     {[menu], zone} = p.zone |> click(gate) |> bodies!()
     assert op(menu) == 0x3C01

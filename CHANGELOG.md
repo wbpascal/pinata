@@ -36,6 +36,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - `mix pinata.character.place` (release: `Persistence.Release.place_characters`) sets the stored map and position of characters from `name,map,x,y` lines on standard input (#119).
 - SQLite uses one database connection and lets a request wait up to about 10 s: under a busy CPU, logins, map entries and saves no longer fail with "database is locked" or a dropped request (#119).
 - Entering the world with the real client no longer hangs at "Connecting to the server": after a character is selected the server sends the shortcut bar, key map and game options, empty until their milestones, so the client uses its built-in keys and options (#132).
+- A character never arrives on a blocked cell: at a map login, a gate, a town portal and `&linkto` it is put on the nearest free cell, or on the map's start point when there is none in reach; a character saved on a blocked cell is repaired at its next login (#153).
 
 ### Differences from the original server
 

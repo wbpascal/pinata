@@ -66,6 +66,7 @@ Lines an administrator acts on:
 | `WorldManager: Zone node <node> of world <n> lost, <a> maps reassigned, <b> not running` | warning | a Zone node is gone; `<b>` maps run nowhere until a Zone node offering them joins |
 | `Zone: WorldManager of world <n> lost, joining again when it returns` | warning | the Zone node joins again once a second |
 | `Zone: map <name>: block data loaded, <n> bytes` | info | the first player entered the map |
+| `Zone: map <name>: no free cell around (<x>, <y>), placed at the regen point` | info | a character arrived on a point without a free cell in reach (for example saved on a blocked cell, or `&linkto` far outside the walkable area) and was put on the map's start point instead |
 | `Zone: map <name>: no MapInfo row, sight radius 0` | info | a map instance started for a map that `MapInfo.shn` does not list (`RouCos04` in the 2016 data): players on it see nobody and no NPC. Nothing to do unless you edited the data |
 | `Zone: map <name>: NPC <mob name> not shown: no MobInfo row` | info | a `ShineNPC` row names a mob that `MobInfo.shn` does not have (`KDSoccer_MctNPC` on `Eld` in the 2016 data): the NPC is not shown. Nothing to do unless you edited the data |
 | `Zone: map <name>: <file>: <reason>` | error | the block data of a map could not be read at the first entry; the entry is refused. Restore the file |
@@ -104,7 +105,7 @@ Lines an administrator acts on:
 | `Zone: shout off: ShoutLevel or ShoutDelay missing in ChrCommon` | info | at start: the data directory lacks a shout value, so nobody can shout (see "Chat" below) |
 | `Zone: chat spam filter off: no usable row in SpamerPenaltyRule or SpamerPenalty` | info | at start: the spam filter tables are empty or unusable, so chat is not limited (see "Chat" below) |
 | `Zone: connection closed: map login refused: <reason>, peer <peer>` | info | `no session for the handle`, `no map-login ticket`, `reserved for another Zone node` or `not the reserved character`: the client came to the Zone without a fresh character login |
-| `Zone: connection closed: map entry failed: <reason>, peer <peer>` | warning | the character could not be placed on its map after the map login (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`); the client is told `0x142`. For a database failure or unreadable block data look for the `Persistence` or `Zone: map` line before it |
+| `Zone: connection closed: map entry failed: <reason>, peer <peer>` | warning | the character could not be placed on its map after the map login (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`, `no free cell`: no free cell around the saved position nor the map's start point); the client is told `0x142`. For a database failure or unreadable block data look for the `Persistence` or `Zone: map` line before it |
 | `Zone: connection closed: map login complete failed: not on the map, peer <peer>` | warning | the client reported the map loaded for a player the map does not hold; report it |
 | `Zone: connection closed: session ended, peer <peer>` | info | the WorldManager connection of the player ended, so the Zone connection was closed (the character is saved) |
 | `Zone: left the world: character <id>, map <map>, peer <peer>` | info | a character left the world and was saved |
@@ -116,6 +117,7 @@ Lines an administrator acts on:
 | `Zone: gate <npc> on map <map>: no LinkTable row for <argument>, peer <peer>` | info | a Gate NPC has no usable `LinkTable` row; the click does nothing. Nothing to do unless you edited the data |
 | `Zone: gate <npc> on map <map>: no MapInfo row for <client map>, peer <peer>` | info | a gate leads to a map that `MapInfo.shn` does not list; the click does nothing. Nothing to do unless you edited the data |
 | `Zone: map change refused: no MapInfo row for <client map>, peer <peer>` | info | a town portal row leads to a map that `MapInfo.shn` does not list; refused. Nothing to do unless you edited the data |
+| `Zone: map change refused: no free cell on <map> around (<x>, <y>), peer <peer>` | warning | neither the target point of a map change nor the map's start point has a free cell in reach; the character stays where it is. Check the block data and the `MapInfo` start point of the map |
 | `Zone: map change refused: save failed: character <id>, <reason>, peer <peer>` | error | the save before a map change failed (`character not found`, `database failure`); the character stays on its map. For a database failure look for the `Persistence` line before it |
 | `Zone: map change failed: not on the map, peer <peer>` | warning | the character was no longer on its map instance when the map change ran; report it |
 | `Zone: connection closed: map change failed: no session, peer <peer>` | warning | the WorldManager connection ended, or the player went back to character select, during a map change; the character was saved at its old position |
@@ -211,14 +213,14 @@ Measured on 2026-11-22: the single-node release (all three parts, SQLite, 2016 `
 | resident set size of the OS process | 195360 kB (191 MB) | `ps -o rss= -p $(bin/pinata pid)` |
 | memory the Erlang VM reports | 128152735 bytes (122 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. The same node with the block data of all 88 field maps loaded (`Zone.MapInstance.enter/2` once on every map), after about one minute more:
+The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. The same node with the block data of all 88 field maps loaded (a stub player entered with `Zone.MapInstance.enter/2` and removed with `leave/2` on every map), after about one minute more:
 
 | Measure | Value | Command |
 |---|---|---|
 | resident set size of the OS process | 292848 kB (286 MB) | `ps -o rss= -p $(bin/pinata pid)` |
 | memory the Erlang VM reports | 219610335 bytes (209 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); :ok = Zone.MapInstance.enter(p, :memory_check) end'`. The budget is 512 MB.
+The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); pl = %Zone.Player{character: %{}, world_no: 0, map: m, x: 0, y: 0, walk_speed: 0, run_speed: 0, map_type: 0, equipment: %{}, address: nil, last_good: {0, 0}}; with {:ok, %Zone.Player{handle: h}} <- Zone.MapInstance.enter(p, pl), do: Zone.MapInstance.leave(p, h) end'`. The stub is placed on the nearest free cell of (0, 0), else of the map's regen point; the block data is read even when both fail (`{:error, :no_free_cell}`). The budget is 512 MB.
 
 On Windows the two commands are `(Get-Process -Id (bin\pinata pid)).WorkingSet64` (PowerShell, bytes) and `bin\pinata rpc "IO.inspect(:erlang.memory(:total))"`.
 

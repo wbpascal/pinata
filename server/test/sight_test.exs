@@ -181,7 +181,7 @@ defmodule SightTest do
 
   # enters a stub player in mode 1
   defp stub!(map, name, pos, conn \\ :none) do
-    {:ok, handle} = Zone.MapInstance.enter(map, stub(name, pos, conn))
+    {:ok, %{handle: handle}} = Zone.MapInstance.enter(map, stub(name, pos, conn))
     {:ok, _packets} = Zone.MapInstance.login_complete(map, handle)
     handle
   end

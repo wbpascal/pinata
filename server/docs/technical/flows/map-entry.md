@@ -13,7 +13,7 @@ sequenceDiagram
     Note over Z: 0x1801 accepted, the ticket redeemed (enter-world.md)
     Z->>P: load_character(world, user_no, character)
     Z->>I: whereis(world, map), then enter(player)
-    alt database failure, character not found, no map instance, game data row missing, block data unreadable, map full
+    alt database failure, character not found, no map instance, game data row missing, block data unreadable, map full, no free cell
         Z->>C: 0x1804 {0x142, 0xFF}, close
     else
         I-->>Z: handle 8000..9499, the player in mode 0
@@ -109,13 +109,13 @@ The player enters in mode 0: it receives nothing and is shown to nobody. `0x1803
 
 | Code | Packet | When | Client text |
 |---|---|---|---|
-| `0x142` | `0x1804` | the player cannot be placed: database failure, character not found, no map instance, a game data row missing, block data unreadable, map full | not checked |
+| `0x142` | `0x1804` | the player cannot be placed: database failure, character not found, no map instance, a game data row missing, block data unreadable, map full, no free cell around the saved point nor the map's regen point | not checked |
 
 ## Log lines
 
 | Level | Part | Line |
 |---|---|---|
-| `warning` | Zone | `connection closed: map entry failed: <reason>` (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`) |
+| `warning` | Zone | `connection closed: map entry failed: <reason>` (`database failure`, `character not found`, `no map instance`, `a game data row is missing`, `block data unreadable`, `map instance full`, `no free cell`) |
 | `warning` | Zone | `connection closed: map login complete failed: not on the map` |
 | `debug` | Zone, WorldManager | `dropped a known but unbuilt packet 0x<opcode>` (see [`protocol.md`](../protocol.md)) |
 
@@ -137,7 +137,11 @@ All are masked in replays (`Replay.Masks.global/0`).
 - The parameter refresh (`0x1035`, `0x240E`, `0x240F`, `0x245F`) ends the `0x1803` answer; the original sends it one tick later. The order on the wire is the same; milestone 4 decides about the tick.
 - `0x0810` and `0x182C` are never sent: only plain field maps run in milestone 2.
 - `0x7005` and `0x700D` carry no stored option block (`bSuccess` 0); the client then uses its defaults.
-- `0x1802` carries the stored position unchanged; moving a player off an occupied cell is not built.
+- `0x1802` carries the placed point: the map instance puts the player on the nearest free cell of a spiral of 31
+  rings at spacing 25 around the saved position (`Zone.Placement`, `FieldMap::fm_Marking`), else around the map's
+  `RegenX` / `RegenY` point (an `info` line `Zone: map <map>: no free cell around (<x>, <y>), placed at the regen
+  point`), as the original's `so_MapMarking` / `so_MapMarkingAtDefaultCoord`; a character saved on a blocked cell is
+  so repaired. Object spacing (25 units from every other object, `so_collesioncheck`) is not built (milestone 4).
 - The Kingdom Quest list `0x581D` is not sent (milestone 10). The option pushes `0x7032` to `0x7034` are sent empty after `0x1003` ([`enter-world.md`](enter-world.md)).
 - The periodic `0x0849` (every full minute) is not sent; only the first-join copy.
 - The level check of `0x1803` (level 0 or above 150 disconnects) is not built.
