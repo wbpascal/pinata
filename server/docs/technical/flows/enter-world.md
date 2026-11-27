@@ -38,6 +38,7 @@ sequenceDiagram
         else
             Note over M: reservation (map-login ticket) for this character and Zone node
             M->>C: 0x1003 {zone_ip, zone_port}
+            M->>C: 0x7032, 0x7033, 0x7034 (empty)
         end
     end
     C->>Z: connect to the Zone node
@@ -108,7 +109,7 @@ The three WorldManager lines are written before their `0x1002` is sent. Telemetr
 
 ## Differences from the original
 
-No `0x104B` / `0x101C` round trip to the Character server and no `0x0C1A`. No `0x111D` (tutorial map). The WorldManager option pushes `0x7032` to `0x7034` after `0x1003` are not sent yet. What an accepted `0x1801` sends: [`map-entry.md`](map-entry.md).
+No `0x104B` / `0x101C` round trip to the Character server and no `0x0C1A`. No `0x111D` (tutorial map). The WorldManager option pushes `0x7032`, `0x7033` and `0x7034` after `0x1003` are sent empty (count 0): milestone 4 fills the shortcut bar (`0x7032`), milestone 6 the key map and the game options (`0x7033`, `0x7034`). The client needs all three to leave "Connecting to the server"; with an empty list it keeps its built-in key map and options. The original sends them about 50 ms after `0x1003`, the rebuild at once. What an accepted `0x1801` sends: [`map-entry.md`](map-entry.md).
 
 ## Not checked
 

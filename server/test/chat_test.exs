@@ -185,6 +185,7 @@ defmodule ChatTest do
     {wm, wm_handle} = world_login(t, account)
     {body, wm} = char_login(wm)
     assert <<0x03, 0x10, _::binary>> = body
+    wm = TestClient.option_pushes!(wm)
     {handle, zone} = t.zone |> connect() |> send!(map_login(wm_handle, character)) |> until_handle()
     zone = zone |> send!(<<0x03, 0x18>>) |> send!(<<0x04, 0x08>>) |> until_heartbeat()
     %{wm: wm, zone: zone, handle: handle}

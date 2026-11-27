@@ -167,6 +167,7 @@ defmodule WhisperTest do
     {wm, handle} = world_login(t, account)
     {body, wm} = char_login(wm)
     assert <<0x03, 0x10, _::binary>> = body
+    wm = TestClient.option_pushes!(wm)
     zone = t.zone |> connect() |> send!(map_login(handle, character)) |> send!(<<0x04, 0x08>>) |> until_heartbeat()
     {wm, zone}
   end
@@ -264,7 +265,7 @@ defmodule WhisperTest do
       end)
 
       sender |> send!(whisper("Test1235", "hi")) |> recv!(fail(0x0F69, "Test1235")) |> nothing!()
-      nothing!(Process.get(:wm))
+      :wm |> Process.get() |> TestClient.option_pushes!() |> nothing!()
     end
 
     test "a whisper to yourself answers 0x200D, then 0x200F", t do

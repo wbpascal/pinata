@@ -15,9 +15,10 @@ defmodule WorldManager.Handler do
   with `0x20C3`, no rename right (flow: `docs/technical/flows/character-rename.md`).
 
   `0x1001` enters the world with the character of a slot: it keeps a reservation (the map-login ticket) for the Zone
-  node that runs the character's stored map and answers `0x1003` with that node's address, or `0x1002`. A character
-  with tutorial state 0 is first asked `0x1110`; a skip (`0x1111`) saves state 2 and goes on. The Zone redeems the
-  ticket with `handle_call/2` on `0x1801`; from then on the session monitors the Zone connection (flow:
+  node that runs the character's stored map and answers `0x1003` with that node's address, or `0x1002`. Right after
+  `0x1003` it pushes `0x7032`, `0x7033` and `0x7034` empty (`WorldManager.Placeholders`); the client waits for them
+  before it enters the world. A character with tutorial state 0 is first asked `0x1110`; a skip (`0x1111`) saves
+  state 2 and goes on. The Zone redeems the ticket with `handle_call/2` on `0x1801`; from then on the session monitors the Zone connection (flow:
   `docs/technical/flows/enter-world.md`).
 
   After a map login the client asks for its options and prison state: `0x7004`, `0x700C` and `0x7C06` get the empty
@@ -318,12 +319,20 @@ defmodule WorldManager.Handler do
     do:
       {state, [{:log, :warning, "character login failed, database failure"}, {:send, %CharLoginfailAck{error: 0x145}}]}
 
+  # The client enters the world only after these three pushes (its gate FUN_00477470); the original sends them after
+  # every 0x1003 and not at a map change.
   def handle_info(state, {:zone_found, c, {:ok, zone}}),
     do:
       {%{
          state
          | reservation: %{kind: :first_entry, character_id: c.id, name: c.name, map: c.login_map, node: zone.node}
-       }, [{:send, %CharLoginAck{zone_ip: zone.host, zone_port: zone.port}}]}
+       },
+       [
+         {:send, %CharLoginAck{zone_ip: zone.host, zone_port: zone.port}},
+         {:send, WorldManager.Placeholders.shortcut_data()},
+         {:send, WorldManager.Placeholders.key_map()},
+         {:send, WorldManager.Placeholders.game_option()}
+       ]}
 
   def handle_info(state, {:zone_found, c, :error}),
     do:

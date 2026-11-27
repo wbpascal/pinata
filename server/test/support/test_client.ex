@@ -103,6 +103,15 @@ defmodule TestClient do
     client
   end
 
+  @doc "Asserts that the next three packets are the empty option pushes 0x7032, 0x7033 and 0x7034; returns the client."
+  @spec option_pushes!(t()) :: t()
+  def option_pushes!(client) do
+    Enum.reduce([0x32, 0x33, 0x34], client, fn low, client ->
+      assert {:ok, <<^low, 0x70, 0, 0>>, client} = recv_raw(client)
+      client
+    end)
+  end
+
   @doc "Closes the connection."
   @spec close(t()) :: :ok
   def close(%__MODULE__{socket: socket}), do: :gen_tcp.close(socket)

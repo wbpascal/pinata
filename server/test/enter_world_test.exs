@@ -128,7 +128,7 @@ defmodule EnterWorldTest do
     {client, handle} = world_login()
     {body, client} = char_login(client, 0)
     assert body == ack_1003()
-    {client, handle}
+    {TestClient.option_pushes!(client), handle}
   end
 
   defp wait_until(fun, tries \\ 50) do
@@ -141,6 +141,16 @@ defmodule EnterWorldTest do
 
   test "0x1001 for a character on a running map answers 0x1003 with the Zone node's address", %{id: id} do
     entered(id)
+  end
+
+  test "0x1001 is answered with 0x1003, then the empty option pushes 0x7032, 0x7033, 0x7034", %{id: id} do
+    Factory.character(id, %{slot: 0, name: "Test1235"})
+    {client, _handle} = world_login()
+    {body, client} = char_login(client, 0)
+    assert body == ack_1003()
+    assert {:ok, <<0x32, 0x70, 0, 0>>, client} = TestClient.recv_raw(client)
+    assert {:ok, <<0x33, 0x70, 0, 0>>, client} = TestClient.recv_raw(client)
+    assert {:ok, <<0x34, 0x70, 0, 0>>, _client} = TestClient.recv_raw(client)
   end
 
   test "slot 6 and an empty slot", %{id: id} do
@@ -174,7 +184,7 @@ defmodule EnterWorldTest do
     {body, client} = char_login(client, slot)
     assert body == <<0x10, 0x11, 0x00>>
     client = send!(client, <<0x11, 0x11>> <> capture(@tutorial, 0x1111, :client))
-    client = recv!(client, ack_1003())
+    client = client |> recv!(ack_1003()) |> TestClient.option_pushes!()
     assert {[avatar], _client} = list(client)
     assert {avatar.tutorial_state, avatar.loginmap} == {2, "RouN"}
   end

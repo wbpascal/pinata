@@ -111,6 +111,7 @@ defmodule ActionsTest do
     assert {:ok, %UserLoginworldAck{worldmanager: wm_handle}, wm} = TestClient.recv(wm)
     wm = send!(wm, <<0x01, 0x10, 0>>)
     assert {:ok, <<0x03, 0x10, _::binary>>, wm} = TestClient.recv_raw(wm)
+    wm = TestClient.option_pushes!(wm)
     Process.put({:wm, account}, wm)
 
     zone =
