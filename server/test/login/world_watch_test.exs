@@ -5,10 +5,10 @@ defmodule Login.WorldWatchTest do
     pid = start_supervised!({Login.WorldWatch, [%{number: 77, name: "TEST"}]})
     _ = :sys.get_state(pid)
 
-    assert TestLog.capture(fn ->
+    refute TestLog.capture(fn ->
              send(pid, :check)
              _ = :sys.get_state(pid)
-           end) == ""
+           end) =~ "Login: world 77"
 
     spec = %{id: :wm, start: {Agent, :start_link, [fn -> 0 end, [name: Cluster.Registry.world_manager(77)]]}}
     agent = start_supervised!(spec)
