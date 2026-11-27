@@ -292,7 +292,7 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 - `compose-smoke` (Linux) against the Docker Compose example. `compose.yaml` names the published image `ghcr.io/wbpascal/pinata:<version>`, so the job first builds the current commit under exactly that name (taken from `compose.yaml`), and Compose pulls nothing. Locally, with a data directory in `data` (the tag is the one in `compose.yaml`):
 
   ```
-  docker build -t ghcr.io/wbpascal/pinata:0.1.0 .
+  docker build -t ghcr.io/wbpascal/pinata:0.2.0 .
   docker compose up -d
   printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
   MIX_ENV=test mix run --no-start test/support/smoke.exs 9010

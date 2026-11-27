@@ -1,71 +1,72 @@
 # Changelog
 
-## 0.2.0 – Enter the world (unreleased)
+## 0.2.0 – Enter the world (2026-11-27)
 
 A character enters the world: the client loads the map, walks and runs, takes gates and town portals to other maps, sees other players and the standing NPCs, and chats (normal, shout, whisper). Logging out, a lost connection and a second login of the account save the character, and a character can be renamed on the character list. Maps have no mobs yet, and items and skills do not work.
 
 ### New
 
-- A node with the Zone part reads the map and NPC tables of the data directory at start-up (`FieldList`, `ShineNPC`, `LinkTable`, `Common` of `ChrCommon`, `MobInfo.shn`, `TownPortal.shn`, `SpamerPenalty.shn`, `SpamerPenaltyRule.shn`) and does not start when one is missing or damaged. Files of the data directory are found whatever the letter case of their names (#105).
-- A node with the Zone part runs one map instance per field map (88 with the original data), places the NPCs of `ShineNPC` and logs how many rows it skipped. It does not start when the `.shbd` file of a field map is missing or damaged; the error names the map (#106).
-- In multi-node mode each Zone node reports its own `public_host` and `zone.port` to WorldManager (#106).
 - Selecting a character on the character list hands the client to the Zone node that runs the character's stored map; when that map runs nowhere, the client is told "The Map is under maintenance" and an `info` line names the map. A character that has not started the tutorial is asked first; skipping it enters the world (#107).
-- The Client data check: a client whose copy of one of 49 client tables differs from the server's is refused at the map login with "The client has been illegally manipulated…", and a `warning` line names the table and both hashes. A node with the Zone part does not start when one of the 49 files is missing; the error names the file (#107).
 - A character that enters the world passes the loading screen and stands on its stored map at its stored position, wearing its equipment. Inventory, skills, quests, titles and the shortcut bar are empty until their milestones (#108).
-- A client packet that belongs to the protocol but is not built yet is ignored with a `debug` line; before, it closed the connection. A packet outside the protocol still closes it (#108).
-- Players on a map see each other and the standing NPCs: when they enter the map, when they come into or leave each other's sight, and when one leaves the map. A player in a crowd (29 or more objects within 500 units) gets the players of a smaller radius at entry, as in the original. A map without `MapInfo` row and an NPC without `MobInfo` row are logged with an `info` line at start-up (#109).
+- Entering the world with the real client no longer hangs at "Connecting to the server": after a character is selected the server sends the shortcut bar, key map and game options, empty until their milestones, so the client uses its built-in keys and options (#132).
+- A character never arrives on a blocked cell: at a map login, a gate, a town portal and `&linkto` it is put on the nearest free cell, or on the map's start point when there is none in reach; a character saved on a blocked cell is repaired at its next login (#153).
 - Walking, running and stopping: the server checks each move against the map's blocked cells and its own position (200 units), moves the character at walk speed 33 / run speed 127 and shows the movement to the players in sight; a refused move puts the character back (#110).
-- Normal chat reaches the players in sight, shout every player of the map. A map can forbid either (`Chat` / `Shout` of `FieldList`); shout needs a level above `ShoutLevel` (5) and waits `ShoutDelay` (2 s) between two shouts. A refused line gets no answer, as in the original (#113).
-- Chat spam filter: 3 lines of normal chat or shout within 3 s block the player's chat for 10 s, longer for each repeat (`SpamerPenaltyRule.shn`, `SpamerPenalty.shn`); the client shows the block time (#113).
-- Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
-- Sitting, emotes and jumping are shown to the players in sight; a player who comes into sight sees a sitting or dancing player in that state until it moves. The combat stance is shown too (#115).
-- A node with the Zone part also reads `ActionViewInfo.shn` at start-up and does not start when it is damaged (#115).
-- Leaving the world (back to the character list, quit, lost connection) saves map, position, HP, SP, play minutes and the logout time, and the character can be selected again at once (#111).
-- Every character in the world is saved every 10 minutes; a crashed map disconnects its players and loses what happened since their last save; stopping the server saves every player first (#111).
-- A second login of an account waits until the first session's character is saved; when that takes more than 5 s the login is refused and an `error` line is written (#111).
+- Players on a map see each other and the standing NPCs: when they enter the map, when they come into or leave each other's sight, and when one leaves the map. A player in a crowd (29 or more objects within 500 units) gets the players of a smaller radius at entry, as in the original. A map without `MapInfo` row and an NPC without `MobInfo` row are logged with an `info` line at start-up (#109).
 - Gates: a click on a Gate NPC within reach asks "Do you want to move to … field?"; "Yes" takes the character to the destination of `LinkTable`, saved first, on the Zone node that runs the target map (#112).
 - The town portal request takes the character to the destination of `TownPortal.shn` (level limit `MinLevel`); the town portal window of the NPC itself waits for NPC menus (#112).
 - A gate whose target map runs on no Zone node does nothing for the player and writes an `info` line naming the gate, its map and the destination (#112).
 - A gate or town portal between two maps with the same machine number in `FieldList` on one Zone node changes the map without a reconnect, as the original does inside one zone (#112).
+- Normal chat reaches the players in sight, shout every player of the map. A map can forbid either (`Chat` / `Shout` of `FieldList`); shout needs a level above `ShoutLevel` (5) and waits `ShoutDelay` (2 s) between two shouts. A refused line gets no answer, as in the original (#113).
+- Chat spam filter: 3 lines of normal chat or shout within 3 s block the player's chat for 10 s, longer for each repeat (`SpamerPenaltyRule.shn`, `SpamerPenalty.shn`); the client shows the block time (#113).
+- Whisper: a line to one character of the world by name, whatever the letter case and wherever the character is; an unknown name or a character at character select answers "Cannot find the recipient." (#114).
+- Sitting, emotes and jumping are shown to the players in sight; a player who comes into sight sees a sitting or dancing player in that state until it moves. The combat stance is shown too (#115).
+- Leaving the world (back to the character list, quit, lost connection) saves map, position, HP, SP, play minutes and the logout time, and the character can be selected again at once (#111).
+- Every character in the world is saved every 10 minutes; a crashed map disconnects its players and loses what happened since their last save; stopping the server saves every player first (#111).
+- A second login of an account waits until the first session's character is saved; when that takes more than 5 s the login is refused and an `error` line is written (#111).
+- Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
 - GM commands: a character with an admin level above 0 is a GM and can use `&adminlevel`, `&hide`, `&show`, `&dimension <n>`, `&linkto [<map> [<x> <y>]]` and `&kickout <name>` (with the Korean aliases of the original) in the chat line; a `&` line is never shown as chat, and every command line of a GM is written to the server log at `info` (#116).
 - `mix pinata.character.admin_level <character name> <level> [--world <n>]` (release: `Persistence.Release.set_admin_level`) sets the admin level of a character (0 to 255) in the database; a GM sees "From <address>" and its admin level at every map entry (#116).
-- Renaming a character on the character list when the client asks for a new name: the name rules of creation with at most 16 bytes; a name in use is refused. The rename right is always refused until items exist (#117).
+- A node with the Zone part reads the map and NPC tables of the data directory at start-up (`FieldList`, `ShineNPC`, `LinkTable`, `Common` of `ChrCommon`, `MobInfo.shn`, `TownPortal.shn`, `SpamerPenalty.shn`, `SpamerPenaltyRule.shn`) and does not start when one is missing or damaged. Files of the data directory are found whatever the letter case of their names (#105).
+- A node with the Zone part runs one map instance per field map (88 with the original data), places the NPCs of `ShineNPC` and logs how many rows it skipped. It does not start when the `.shbd` file of a field map is missing or damaged; the error names the map (#106).
+- In multi-node mode each Zone node reports its own `public_host` and `zone.port` to WorldManager (#106).
+- The Client data check: a client whose copy of one of 49 client tables differs from the server's is refused at the map login with "The client has been illegally manipulated…", and a `warning` line names the table and both hashes. A node with the Zone part does not start when one of the 49 files is missing; the error names the file (#107).
+- A node with the Zone part also reads `ActionViewInfo.shn` at start-up and does not start when it is damaged (#115).
 - `bin/pinata rpc "Pinata.Figures.print()"` prints the two capacity figures (packet handling time, tick duration) as bucket counts with the 50th and 99th percentile, merged over all nodes and per node; `Pinata.Figures.reset()` clears them (#118).
 - Traces and metrics can be exported over OpenTelemetry (OTLP): the settings `telemetry.otlp_enabled` (default `false`), `telemetry.otlp_endpoint` and `telemetry.trace_ratio` (default `0.01`). The release includes the OpenTelemetry libraries; with the default nothing is exported and no connection is opened (#118).
+- SQLite uses one database connection and lets a request wait up to about 10 s: under a busy CPU, logins, map entries and saves no longer fail with "database is locked" or a dropped request (#119).
 - `mix pinata.account.create --count <n> --prefix <prefix>` (release: `Persistence.Release.create_accounts`) creates the accounts `<prefix>0001` to `<prefix><n>` with one password (#119).
 - `mix pinata.character.place` (release: `Persistence.Release.place_characters`) sets the stored map and position of characters from `name,map,x,y` lines on standard input (#119).
-- SQLite uses one database connection and lets a request wait up to about 10 s: under a busy CPU, logins, map entries and saves no longer fail with "database is locked" or a dropped request (#119).
-- Entering the world with the real client no longer hangs at "Connecting to the server": after a character is selected the server sends the shortcut bar, key map and game options, empty until their milestones, so the client uses its built-in keys and options (#132).
-- A character never arrives on a blocked cell: at a map login, a gate, a town portal and `&linkto` it is put on the nearest free cell, or on the map's start point when there is none in reach; a character saved on a blocked cell is repaired at its next login (#153).
+- A client packet that belongs to the protocol but is not built yet is ignored with a `debug` line; before, it closed the connection. A packet outside the protocol still closes it (#108).
 
 ### Differences from the original server
 
-- Skipping the tutorial enters the world on the character's stored map; the original refused the login after the skip (P02-B33) (#107).
-- A refused map login carries the real refusal code; the original sent another one (Z01-B1) (#107).
-- Objects in different dimensions no longer get an appear and a delete packet on every step (P02-B27) (#109).
-- A client request for the appear packet of an object (`0x1C01`) is answered only when the object is in sight (#109).
-- The unused `moveattr` bytes of the move packets `0x2018` / `0x201A` are 0; the original sent leftover memory (Z02-B2) (#110).
-- The legacy move packets `0x2003` / `0x2005` are ignored; the original moved the character without any check (Z02-B1) (#110).
-- The unused bits of the shout flag are 0; the original sent bits of its own memory (P02-B29) (#113).
 - A whisper whose size does not match its item links is ignored; the original copied past its buffer and any player could stop WorldManager with it (W04-B2) (#114).
-- The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).
+- The legacy move packets `0x2003` / `0x2005` are ignored; the original moved the character without any check (Z02-B1) (#110).
+- The town portal works only within 1000 units of a town portal NPC; the original accepted the request anywhere, a free teleport for a modified client (#112).
+- A client request for the appear packet of an object (`0x1C01`) is answered only when the object is in sight (#109).
+- Every command line of a GM is logged, whatever its admin level; the original logged none of a GM with a level above 100 (Z11-B1) (#116).
+- A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
+- Skipping the tutorial enters the world on the character's stored map; the original refused the login after the skip (P02-B33) (#107).
 - No exit countdown on the server: the character leaves the world at once (the original kept it for up to 13 s); a character select right after "back to character select" is never refused (#111).
 - The town portal answers success only after WorldManager accepted the target map, and "cannot be used now" when the map runs nowhere; the original said success and then did nothing (#112).
-- The town portal works only within 1000 units of a town portal NPC; the original accepted the request anywhere, a free teleport for a modified client (#112).
-- `&kickout` answers "<name> is banned" with the name; the original sent the text without it (P02-B41) (#116).
 - `&kickout` reaches a character on any map and node; the original found only characters of the GM's own zone and answered "<garbled name> is not in game" for the others (Z11-B6) (#116).
-- Every command line of a GM is logged, whatever its admin level; the original logged none of a GM with a level above 100 (Z11-B1) (#116).
+- A refused map login carries the real refusal code; the original sent another one (Z01-B1) (#107).
+- Objects in different dimensions no longer get an appear and a delete packet on every step (P02-B27) (#109).
 - A GM in another dimension (`&dimension`) does not get an appear and a delete of every object near it on each step (P02-B27) (#116).
 - `&dimension <n>` updates what the GM and the players around it see at once: the GM's client drops the players and NPCs of the dimension it left and shows those of the new one, and the players of the new dimension see the GM appear. The original left this to its appear-and-delete storm on every step (P02-B27) (#154).
-- A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
+- `&kickout` answers "<name> is banned" with the name; the original sent the text without it (P02-B41) (#116).
+- The unused `moveattr` bytes of the move packets `0x2018` / `0x201A` are 0; the original sent leftover memory (Z02-B2) (#110).
+- The unused bits of the shout flag are 0; the original sent bits of its own memory (P02-B29) (#113).
+- The echo of an empty whisper carries 0 item links; the original sent a byte of its own memory (W04-B4) (#114).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 
 ### Moving from the previous version
 
 - `public_host` must be an IPv4 address in text form on a node with the Zone part (every single-node setup): a node with a host name there does not start (#106).
-- The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
 - One new database migration (play minutes and logout time of a character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#111).
 - One new database migration (the admin level of a character, 0 for every existing character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#116).
+- Three new settings, all optional: `telemetry.otlp_enabled`, `telemetry.otlp_endpoint` and `telemetry.trace_ratio`; with the defaults nothing is exported, so an existing `pinata.toml` needs no change (#118).
+- The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
 - A source checkout has the server at the repository root, where every `mix` command now runs (there is no `server/` folder any more), and no longer needs `core.longpaths` on Windows; the original data tables are at `original-data/9Data` (#147).
 
 ## 0.1.0 – Login to character select (2026-11-21)
