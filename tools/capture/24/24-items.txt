@@ -1,7 +1,0 @@
-# Scenario 24, client A, after the "without reset items" part of steps 2 and 3:
-#   .\gmtype.ps1 -File .\24\24-items.txt -Client 1
-# Item IDs as the zone reads them (Z27 §3.7: sii_FreeStatRedistPoint / sii_SkillEmpowRedistPoint)
-&makeitem FreeStatusReloadOne -l2     # 30022 "Stat Reset Scroll": one per stat point taken back (0x1062)
-&makeitem SkillReloadbundleOne -l2    # 30016 "Skill Reset Scroll": one per empower point taken back (0x4811 minus)
-&makeitem SkillReloadbundleAll        # 30017 "Full Skill Reset Capsule" (0x9006)
-&makeitem FreeStatusReloadAll         # 30023 "Full Stat Reset Capsule" (0x9005)

@@ -1,6 +1,6 @@
 # Byte-compatibility is proven by capture replay
 
-Every capture is converted once into a transcript: a committed text file under `server/test/replay/transcripts/`, one line per decrypted packet with capture timestamp, connection, direction, opcode and payload. The `.pcapng` stays the source; the conversion extends `tools/protocol-re/pcap_decode.py`, and the Elixir side never parses pcap. A replay test builds the capture's starting state, sends the transcript's client packets through the test client, and requires every server packet to equal the transcript's byte for byte outside the masks.
+Every capture is converted once into a transcript: a committed text file under `test/replay/transcripts/`, one line per decrypted packet with capture timestamp, connection, direction, opcode and payload. The `.pcapng` stays the source; the conversion extends `tools/protocol-re/pcap_decode.py`, and the Elixir side never parses pcap. A replay test builds the capture's starting state, sends the transcript's client packets through the test client, and requires every server packet to equal the transcript's byte for byte outside the masks.
 
 We compare bytes, not decoded structs, because comparing structs would run both sides through the codec under test and hide its errors.
 

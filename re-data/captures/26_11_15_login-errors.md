@@ -1,5 +1,0 @@
-- login account "admin" with wrong password
-- login first client with correct password and select world
-- login second client with correct password and select world
-- first client gets kicked
-- second client has no issue

@@ -1,4 +1,0 @@
-- login "admin" user
-- select only available world "Enid"
-- See characters (one character, Test1235, lvl 120 archer, currently in Roumen)
-- logout

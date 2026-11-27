@@ -1,1 +1,0 @@
-SC CREATE "_GamigoZR" binpath= "D:\GitHub\NA2016\Server\GamigoZR\GamigoZR.exe"

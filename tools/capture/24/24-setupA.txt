@@ -1,8 +1,0 @@
-# Scenario 24, client A (X24A, Gladiator 100, GM), typed right after login, on the PC the clients run on:
-#   .\gmtype.ps1 -File .\24\24-setupA.txt -Client 1
-# Money and the skills 7300 / 452 come from 24-prep.sql. No reset items here on purpose: steps 2 and 3 first try
-# without them (refusals), then 24-items.txt adds them.
-&fullpoint
-&makeitem TitanicAxe            # two-hand, level 90: Heat of Fury and Dash need a two-hand weapon
-&makeitem VulcanSword           # one-hand, level 90 } for StaBuckler (step 6): the shield condition
-&makeitem HeaterShield          # shield, level 90    }

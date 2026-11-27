@@ -1,17 +1,9 @@
 # Every text file is LF in the repository and in every checkout, Windows included (core.autocrlf does not apply).
 * text=auto eol=lf
-# Packet captures: their bytes matter.
-*.pcap -text
-*.pcapng -text
-*.gbf filter=lfs diff=lfs merge=lfs -text
-*.exe filter=lfs diff=lfs merge=lfs -text
-*.bin filter=lfs diff=lfs merge=lfs -text
+# The original data stays byte-identical: many of its text files are committed with CRLF. Never converted.
+original-data/** -text
+# The large binary tables of the original data are in LFS.
+*.shn filter=lfs diff=lfs merge=lfs -text
 *.shbd filter=lfs diff=lfs merge=lfs -text
 *.bmp filter=lfs diff=lfs merge=lfs -text
-*.shn filter=lfs diff=lfs merge=lfs -text
-*.pdb filter=lfs diff=lfs merge=lfs -text
-# The original data stays byte-identical: many of its text files are committed with CRLF. Never converted.
-Files/** -text
-# generated from the tree; on merge keep ours, then regenerate (coverage.py --overview). Needs: git config merge.ours.driver true
-docs/plan/progress.md merge=ours
-pdb filter=lfs diff=lfs merge=lfs -text
+*.BMP filter=lfs diff=lfs merge=lfs -text

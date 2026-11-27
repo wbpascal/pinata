@@ -1,0 +1,12 @@
+.git
+.github
+_build
+deps
+plts
+tmp
+data
+test
+docs
+credo
+original-data
+erl_crash.dump

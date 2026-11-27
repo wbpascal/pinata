@@ -1,9 +1,0 @@
-- login as character "Test1235" in Roumen
-- run around
-- walk around
-- run to town portal in Roumen
-- go to Forest of Mist via town portal
-- switch between Forest of Mist and Roumen a few times
-- use town portal in Forest of Mist to go to Roumen
-- run to "normal" portal in Roumen
-- take normal portal to Forest of Tides

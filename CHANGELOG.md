@@ -66,6 +66,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - The data directory: one made by the import of 0.1.0 already holds the tables and geometry files that 0.2.0 reads and needs no new import. Import again only a directory that was trimmed or edited by hand and now fails the start-up check (#105).
 - One new database migration (play minutes and logout time of a character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#111).
 - One new database migration (the admin level of a character, 0 for every existing character): PostgreSQL nodes need `bin/pinata eval "Persistence.Release.migrate()"` before the start, SQLite migrates itself (#116).
+- A source checkout has the server at the repository root, where every `mix` command now runs (there is no `server/` folder any more), and no longer needs `core.longpaths` on Windows; the original data tables are at `original-data/9Data` (#147).
 
 ## 0.1.0 – Login to character select (2026-11-21)
 
