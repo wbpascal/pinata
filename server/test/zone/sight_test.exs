@@ -6,6 +6,7 @@ defmodule Zone.SightTest do
   alias Proto.Packets.BriefinfoLogincharacterCmd
   alias Proto.Packets.BriefinfoMobCmd
   alias Proto.Packets.BriefinfoRegenmobCmd
+  alias Proto.Packets.MapLogoutCmd
   alias Zone.Sight
 
   @table [
@@ -280,6 +281,87 @@ defmodule Zone.SightTest do
       assert Sight.inform(view([a, %{b | x: 5999}]), a, 8001) == [Sight.brief(%{b | x: 5999})]
       assert Sight.inform(v, a, 8000) == []
       assert Sight.inform(v, a, 9000) == []
+    end
+  end
+
+  describe "dimension/3" do
+    test "0 to 5: 0x1805 to the player, the GM gets the 0x1C0E of the player and of each NPC" do
+      gm = player(8000, 5000, 5000)
+      b = player(8001, 5500, 5000)
+      n1 = npc(17_084, 5100, 5000)
+      n2 = npc(17_085, 9000, 9000)
+
+      assert deliveries(Sight.dimension(view([gm, b, n1, n2]), gm, 5)) == [
+               {8001, [%MapLogoutCmd{handle: 8000}]},
+               {8000, [%Delete{handle: 8001}, %Delete{handle: 17_084}, %Delete{handle: 17_085}]}
+             ]
+    end
+
+    test "5 to 0: the GM gets the appears of the player and of each NPC, the player the GM's appear" do
+      gm = player(8000, 5000, 5000, %{dimension: 5})
+      b = player(8001, 5500, 5000)
+      n1 = npc(17_084, 5100, 5000)
+      n2 = npc(17_085, 9000, 9000)
+
+      assert deliveries(Sight.dimension(view([gm, b, n1, n2]), gm, 0)) == [
+               {8000, Sight.appear(b) ++ Sight.appear(n1) ++ Sight.appear(n2)},
+               {8001, Sight.appear(%{gm | dimension: 0})}
+             ]
+    end
+
+    test "a player already in the new dimension: appears both ways, after the GM's deletes" do
+      gm = player(8000, 5000, 5000)
+      b = player(8001, 5500, 5000)
+      c = player(8002, 5000, 5500, %{dimension: 5})
+
+      assert deliveries(Sight.dimension(view([gm, b, c]), gm, 5)) == [
+               {8001, [%MapLogoutCmd{handle: 8000}]},
+               {8000, [%Delete{handle: 8001} | Sight.appear(c)]},
+               {8002, Sight.appear(%{gm | dimension: 5})}
+             ]
+    end
+
+    test "the same number: 0x1805 and then the GM's appear to the player, nothing to the GM" do
+      gm = player(8000, 5000, 5000)
+      b = player(8001, 5500, 5000)
+
+      assert deliveries(Sight.dimension(view([gm, b, npc(17_084, 5100, 5000)]), gm, 0)) == [
+               {8001, [%MapLogoutCmd{handle: 8000}]},
+               {8001, Sight.appear(gm)}
+             ]
+    end
+
+    test "0 to -1: the GM only gains, every player in sight gets its appear" do
+      gm = player(8000, 5000, 5000)
+      b0 = player(8001, 5500, 5000)
+      b1 = player(8002, 5000, 5500, %{dimension: 1})
+      gm2 = %{gm | dimension: -1}
+
+      d = deliveries(Sight.dimension(view([gm, b0, b1, npc(17_084, 5100, 5000)]), gm, -1))
+
+      assert [{8001, [%MapLogoutCmd{handle: 8000}]}, {8000, own} | shown] = d
+      assert own == Sight.appear(b1)
+      assert Enum.sort(shown) == [{8001, Sight.appear(gm2)}, {8002, Sight.appear(gm2)}]
+    end
+
+    test "a hidden GM: nobody else gets anything, the GM still gets its deletes" do
+      gm = player(8000, 5000, 5000, %{sub_layer: 3})
+      b = player(8001, 5500, 5000)
+      c = player(8002, 5000, 5500, %{dimension: 5})
+
+      assert deliveries(Sight.dimension(view([gm, b, c]), gm, 5)) == [
+               {8000, [%Delete{handle: 8001} | Sight.appear(c)]}
+             ]
+    end
+
+    test "mode 0 gives nothing; a player outside the radius is left out, an NPC outside it is not" do
+      gm = player(8000, 5000, 5000)
+      far = player(8001, 7000, 5000)
+      n = npc(17_084, 9000, 9000)
+      v = view([gm, far, n])
+
+      assert Sight.dimension(v, %{gm | mode: 0}, 5) == []
+      assert deliveries(Sight.dimension(v, gm, 5)) == [{8000, [%Delete{handle: 17_084}]}]
     end
   end
 end

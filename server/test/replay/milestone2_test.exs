@@ -570,6 +570,7 @@ defmodule Replay.Milestone2Test do
   ]
 
   @p02_b27 "P02-B27, 431 s to 492 s (between &dimension 1 and &dimension 0): the original sends an appear and a delete of every object near the GM for each of its steps across dimensions; fixed by decision (issue 90). No milestone removes it"
+  @dimension_exchange "the exchange of a dimension change (issue 154): the GM gets the delete or the appear of every object whose sight changes, the players that see it now its appear; the original sends none at the command and storms on every step instead (P02-B27). No milestone removes it"
 
   # The storm of P02-B27 in the window between &dimension 1 (1149) and &dimension 0 (10702): appears (0x1C06 of the
   # other player; to the GM A also 0x1C08 of an NPC), the move resent right behind an appear of the same handle and
@@ -662,18 +663,28 @@ defmodule Replay.Milestone2Test do
   defp handle(_p), do: :none
 
   # zone#1 is A (Test1235, admin level 100), zone#2 is B (X14B, created in the capture by 0x1401, admin level 0).
+  @dimension_deferrals [
+    {:extra, P.BriefinfoBriefinfodeleteCmd, 2, @dimension_exchange},
+    {:extra, P.BriefinfoLogincharacterCmd, 2, @dimension_exchange},
+    {:extra, P.BriefinfoRegenmobCmd, 2, @dimension_exchange}
+  ]
+
   # Played to the end: B's login, character creation and tutorial skip, both entries, the moves and the sight between
   # them, the shouts, the whispers, the stance, the emotes and jumps, and A's GM commands: &hide (0x242A to A, 0x1805
   # to B), &show (0x2428 to both), &dimensio 1 ("Invalid command"), &dimension 1, -1, -1, 70000 and 0 (0x1805 to B
   # where B saw A before), &linkto (0x1809 to a free cell of RouN: TestRandomSpot gives the captured x 4975, y 5825)
   # and the map entry after it. B's &adminlevel (level 0) is played and answers nothing. Deferred: the combat of step
-  # 5 (milestone 4), the P02-B27 storm between &dimension 1 and &dimension 0 (computed_deferrals/1), abstates,
-  # monsters, items, the regular 0x1035. late_ms: 200 as in walk-run-portals.
+  # 5 (milestone 4), the P02-B27 storm between &dimension 1 and &dimension 0 (computed_deferrals/1), the packets of
+  # our dimension exchange the capture does not have (@dimension_deferrals, issue 154), abstates, monsters, items,
+  # the regular 0x1035. late_ms: 200 as in walk-run-portals.
   test "26_11_15_14_second-client-in-sight" do
     name = "26_11_15_14_second-client-in-sight"
     transcript = "transcripts/#{name}.txt" |> Path.expand(__DIR__) |> Replay.Transcript.read!()
     on_exit(fn -> Replay.Topology.all(Application, :delete_env, [:pinata, :random_source]) end)
-    deferrals = without_abstates(@deferrals ++ @in_world) ++ @second_client_deferrals ++ computed_deferrals(transcript)
+
+    deferrals =
+      without_abstates(@deferrals ++ @in_world) ++
+        @second_client_deferrals ++ computed_deferrals(transcript) ++ @dimension_deferrals
 
     # the GM command lines are sent and their answers compared (none of them deferred)
     touched = Enum.flat_map(deferrals, &deferred_indices/1)

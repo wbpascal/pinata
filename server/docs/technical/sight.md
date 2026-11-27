@@ -30,7 +30,7 @@ An object is in sight of another when all three hold:
   The table is in the code; the file is not read at start-up.
 
 Dimension and sub-layer are set by the GM commands `&hide`, `&show` and `&dimension` (`Zone.MapInstance.action/3`,
-with their packets; flow: [`flows/gm-commands.md`](flows/gm-commands.md)) and by `Zone.MapInstance.set_layer/4`
+with their packets; `&dimension` runs the exchange of "Dimension change" below; flow: [`flows/gm-commands.md`](flows/gm-commands.md)) and by `Zone.MapInstance.set_layer/4`
 (sends nothing). A map change resets both to 0 (`relocate/3` for a `0x1809`, a fresh entry otherwise) without a
 packet. The registered layer and "hide except me" are not represented. A player in mode 0
 (between `0x1801` and `0x1803`) is in the grid and counts for the crowd figure, but receives nothing and is shown to
@@ -121,6 +121,23 @@ to the players in mode 1 that see it within the full radius. This goes through t
 `Zone.MapInstance.broadcast/3`, the one "to players in sight" function, which the chat, emote and move relays of later
 issues use too.
 
+## Dimension change
+
+`Zone.Sight.dimension/3` returns the deliveries of `&dimension <n>` of a player in mode 1, computed once from its
+sight under the old number and under `n`, in this order:
+
+1. `0x1805 {handle}` to every player that saw it under the old number (also when `n` is the same);
+2. one delivery to the player itself: the `0x1C0E` of every object it saw and no longer sees, then the appear packets
+   of every object it sees only now (players in grid order, then NPCs by handle); left out when both are empty;
+3. its own appear (with the new number) to every player that sees it under `n`.
+
+Players count in mode 1 within the full radius; NPCs count without a distance limit, as in the entry exchange, which
+shows every NPC of the map. No "seen" list is needed: both sights follow from the rule. An object whose sight does
+not change gets nothing more, so the same number again sends `0x1805` and then the appear to the players that see
+the player, and nothing to the player. A hidden GM (sub-layer 3) is shown to nobody, so only it gets packets.
+`Zone.MapInstance.set_layer/4` still sends nothing. The original instead called `so_Logout` and left the rest to its
+per-step storm (`ac_Dimension` @ FUN_0041a5a0, P02-B27).
+
 ## `0x1C01`
 
 The client asks for the appear packet of a handle it does not know. In the world, `Zone.Handler` asks the map instance
@@ -135,7 +152,7 @@ call.
 ## Original-server bugs
 
 - **P02-B27 fixed:** objects in different dimensions are not in sight; the original sent an appear and a delete
-  packet on every step.
+  packet on every step; a dimension change sends one exchange instead.
 - **`0x1C01` in-sight check added:** the original answered for any object of the map (decided in issue 90). Z02-B3 is
   not reachable without abstates.
 - **Z09-B13** cannot occur: nothing here keeps a per-player list of seen objects.

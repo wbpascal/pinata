@@ -313,6 +313,9 @@ defmodule Zone.MapInstanceTest do
   describe "GM actions" do
     alias Proto.Packets.BatAbstateinformNoeffectCmd
     alias Proto.Packets.BatAbstateresetCmd
+    alias Proto.Packets.BriefinfoBriefinfodeleteCmd
+    alias Proto.Packets.BriefinfoLogincharacterCmd
+    alias Proto.Packets.BriefinfoRegenmobCmd
     alias Proto.Packets.MapLogoutCmd
 
     # the GM's own packets arrive tagged, the watcher's untagged
@@ -326,10 +329,10 @@ defmodule Zone.MapInstanceTest do
 
     setup do
       pid = start("Rou")
-      _watcher = standing(pid, {500, 500}, self())
+      watcher = standing(pid, {500, 500}, self())
       gm = standing(pid, {600, 600}, gm_conn())
       flush_gm()
-      %{pid: pid, gm: gm}
+      %{pid: pid, gm: gm, watcher: watcher}
     end
 
     defp flush_gm do
@@ -358,17 +361,28 @@ defmodule Zone.MapInstanceTest do
       refute_receive {_, {:packets, _}}, 50
     end
 
-    test "{:dimension, n} sends 0x1805 under the old number, then sets it, also the same number", %{pid: pid, gm: gm} do
+    test "{:dimension, n} sends 0x1805 under the old number, then sets it, also the same number; the GM's view follows",
+         %{pid: pid, gm: gm, watcher: watcher} do
+      npcs = pid |> :sys.get_state() |> Map.fetch!(:npc_index) |> Map.keys() |> Enum.sort()
+      assert npcs != []
+
       :ok = Zone.MapInstance.action(pid, gm, {:dimension, 1})
       assert_receive {:cluster, {:packets, [%MapLogoutCmd{handle: ^gm}]}}
+      assert_receive {:gm, {:packets, deletes}}
+      assert Enum.map(deletes, fn %BriefinfoBriefinfodeleteCmd{handle: h} -> h end) == [watcher | npcs]
       assert {:ok, %Zone.Player{dimension: 1}} = Zone.MapInstance.player(pid, gm)
+      refute_receive {_, {:packets, _}}, 50
 
-      # the watcher no longer sees the GM; back to 0 announces nothing
+      # back to 0: the GM's appear to the watcher, the watcher's and the NPCs' appears to the GM
       :ok = Zone.MapInstance.action(pid, gm, {:dimension, 0})
+      assert_receive {:cluster, {:packets, [%BriefinfoLogincharacterCmd{handle: ^gm}]}}
+      assert_receive {:gm, {:packets, [%BriefinfoLogincharacterCmd{handle: ^watcher} | mobs]}}
+      assert Enum.map(mobs, fn %BriefinfoRegenmobCmd{handle: h} -> h end) == npcs
       refute_receive {_, {:packets, _}}, 50
 
       :ok = Zone.MapInstance.action(pid, gm, {:dimension, 0})
       assert_receive {:cluster, {:packets, [%MapLogoutCmd{handle: ^gm}]}}
+      assert_receive {:cluster, {:packets, [%BriefinfoLogincharacterCmd{handle: ^gm}]}}
       refute_receive {:gm, _}, 50
     end
 
