@@ -332,6 +332,29 @@ defmodule EnterWorldTest do
                WorldManager.Handler.handle_info(state, {:tutorial_skipped, %{}, {:error, :database}})
     end
 
+    test "a kick writes its line before it sends 0x0C18" do
+      state = wm_state(%{character: "X52B", zone: :none})
+
+      assert {_, [{:log, :info, ~s(kicked: character "X52B")}, {:send, %Proto.Packets.UserConnectcutCmd{}} | _]} =
+               WorldManager.Handler.handle_info(state, {:cluster, {:kick, 0x683}})
+    end
+
+    test "a map change writes its line before 0x19C1 and before 0x180A or 0x1809" do
+      state = %Zone.Handler{checksums: [], step: :in_world}
+      p = %{character: %{id: 7}, map: "RouN"}
+      line = {:log, :info, "map change: character 7, map RouN to RouVal01"}
+      town_portal = {:send, %Proto.Packets.MapTownportalAck{error: 0x19C1}}
+
+      assert {_, [^line, ^town_portal, {:send, :cmd}]} =
+               Zone.Handler.handle_info(state, {:linked, :town_portal, p, %{map: "RouVal01"}, {:other, :cmd}})
+
+      assert {_, [^line, {:send, :cmd}]} =
+               Zone.Handler.handle_info(
+                 state,
+                 {:linked, {:gate, "GateRou1", "RouN"}, p, %{map: "RouVal01"}, {:moved, :map, :player, :cmd}}
+               )
+    end
+
     test "a redeem from another node is :wrong_node and keeps the reservation" do
       state = wm_state(%{reservation: @reservation})
 

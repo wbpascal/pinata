@@ -353,11 +353,11 @@ defmodule Zone.Handler do
 
   def handle_info(state, {:town_portal_refused, code}), do: {state, [{:send, %MapTownportalAck{error: code}}]}
 
+  # The line comes before the answers, as the WorldManager refusals do: a reader of the answers finds it written.
   def handle_info(state, {:linked, origin, p, dest, {:other, cmd}}),
     do:
       {%{state | step: :left, map: :none, player: :none, menu: :none},
-       ack(origin) ++
-         [{:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}, {:send, cmd}]}
+       [map_change_line(p, dest) | ack(origin)] ++ [{:send, cmd}]}
 
   def handle_info(state, {:linked, origin, _p, _dest, {:same, player, cmd}}),
     do: {%{state | step: :loading, player: player, menu: :none}, ack(origin) ++ [{:send, cmd}]}
@@ -366,8 +366,7 @@ defmodule Zone.Handler do
   def handle_info(state, {:linked, origin, p, dest, {:moved, map, player, cmd}}),
     do:
       {%{state | step: :loading, map: map, player: player, menu: :none},
-       ack(origin) ++
-         [{:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}, {:send, cmd}]}
+       [map_change_line(p, dest) | ack(origin)] ++ [{:send, cmd}]}
 
   # The player is saved and removed already; nothing to answer.
   def handle_info(state, {:linked, _origin, _p, _dest, {:error, :no_session}}),
@@ -649,6 +648,9 @@ defmodule Zone.Handler do
         end
     end
   end
+
+  defp map_change_line(p, dest),
+    do: {:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}
 
   defp ack(:town_portal), do: [{:send, %MapTownportalAck{error: 0x19C1}}]
   defp ack({:gate, _name, _origin}), do: []

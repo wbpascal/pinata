@@ -154,7 +154,7 @@ A gate answers nothing on a refusal.
 
 | Level | Line | When |
 |---|---|---|
-| `info` | `Zone: map change: character <id>, map <from> to <to>` | `0x180A` sent, or `0x1809` to another map instance of this node |
+| `info` | `Zone: map change: character <id>, map <from> to <to>` | `0x180A` sent, or `0x1809` to another map instance of this node; written before these and the town portal's `0x19C1` |
 | `info` | `Zone: gate <npc> on map <map>: destination <map> is not running` | "Yes" on a gate whose target map no Zone node runs |
 | `info` | `Zone: town portal refused: map <map> is not running` | the town portal target no Zone node runs (`0x19C2`) |
 | `info` | `Zone: gate <npc> on map <map>: no LinkTable row for <argument>` | a click on a Gate NPC without a usable `LinkTable` row |

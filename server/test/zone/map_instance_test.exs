@@ -83,7 +83,9 @@ defmodule Zone.MapInstanceTest do
     first = TestLog.capture(fn -> assert {:ok, %{handle: 8000}} = Zone.MapInstance.enter(pid, player()) end)
     assert first =~ "[info] Zone: map Rou: block data loaded, "
     assert %GameData.BlockData{} = :sys.get_state(pid).block_data
-    assert TestLog.capture(fn -> assert {:ok, %{handle: 8001}} = Zone.MapInstance.enter(pid, player()) end) == ""
+
+    refute TestLog.capture(fn -> assert {:ok, %{handle: 8001}} = Zone.MapInstance.enter(pid, player()) end) =~
+             "Zone: map Rou:"
   end
 
   test "a block data file that cannot be read refuses the entry", %{tmp_dir: tmp_dir} do

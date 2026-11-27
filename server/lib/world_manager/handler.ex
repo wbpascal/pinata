@@ -428,8 +428,8 @@ defmodule WorldManager.Handler do
 
     {%{state | reservation: :none, character: :none},
      [
-       {:send, %UserConnectcutCmd{error: code}},
        {:log, :info, "kicked: character #{inspect(name)}"},
+       {:send, %UserConnectcutCmd{error: code}},
        {:perform, {:leave_world, state.world_no, name}}
      ] ++ zone}
   end
