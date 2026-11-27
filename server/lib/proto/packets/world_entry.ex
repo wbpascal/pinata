@@ -130,3 +130,55 @@ defmodule Proto.Packets.MapLinkendClientCmd do
   use Proto.Packet, opcode: 0x182A
   field :unused, :u8
 end
+
+defmodule Proto.Packets.ShortCutData do
+  @moduledoc "SHORT_CUT_DATA (7 bytes, nested in 0x7032): one slot of the shortcut bar."
+  use Proto.Packet
+  # official: nSlotNo
+  field :slot, :u8
+  # official: nCodeNo
+  field :code, :u16
+  # official: nValue
+  field :value, :i32
+end
+
+defmodule Proto.Packets.KeyMapData do
+  @moduledoc "KEY_MAP_DATA (4 bytes, nested in 0x7033): one key binding."
+  use Proto.Packet
+  # official: nFunctionNo
+  field :function, :u16
+  # official: nExtendKey
+  field :extend_key, :u8
+  # official: nASCIICode
+  field :ascii, :u8
+end
+
+defmodule Proto.Packets.GameOptionData do
+  @moduledoc "GAME_OPTION_DATA (3 bytes, nested in 0x7034): one game option."
+  use Proto.Packet
+  # official: nOptionNo
+  field :option, :u16
+  # official: nValue
+  field :value, :u8
+end
+
+defmodule Proto.Packets.CharOptionImproveGetShortcutdataCmd do
+  @moduledoc "0x7032 NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD, server to client: the stored shortcut bar, pushed after 0x1003 (milestone 4)."
+  use Proto.Packet, opcode: 0x7032
+  # official: ShortCutData, count nShortCutDataCnt
+  array :shortcuts, Proto.Packets.ShortCutData, count: :u16
+end
+
+defmodule Proto.Packets.CharOptionImproveGetKeymapCmd do
+  @moduledoc "0x7033 NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD, server to client: the stored key map, pushed after 0x1003 (milestone 6)."
+  use Proto.Packet, opcode: 0x7033
+  # official: KeyMapData, count nKeyMapDataCnt
+  array :keys, Proto.Packets.KeyMapData, count: :u16
+end
+
+defmodule Proto.Packets.CharOptionImproveGetGameoptionCmd do
+  @moduledoc "0x7034 NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD, server to client: the stored game options, pushed after 0x1003 (milestone 6)."
+  use Proto.Packet, opcode: 0x7034
+  # official: GameOptionData, count nGameOptionDataCnt
+  array :options, Proto.Packets.GameOptionData, count: :u16
+end

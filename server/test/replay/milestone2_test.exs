@@ -14,21 +14,6 @@ defmodule Replay.Milestone2Test.Unbuilt.CharClientAutoPickAck do
   def opcode, do: 0x10BD
 end
 
-defmodule Replay.Milestone2Test.Unbuilt.ShortcutdataCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x7032
-end
-
-defmodule Replay.Milestone2Test.Unbuilt.KeymapCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x7033
-end
-
-defmodule Replay.Milestone2Test.Unbuilt.GameoptionCmd do
-  @spec opcode() :: 0..0xFFFF
-  def opcode, do: 0x7034
-end
-
 defmodule Replay.Milestone2Test.Unbuilt.ItemEquipchangeCmd do
   @spec opcode() :: 0..0xFFFF
   def opcode, do: 0x3002
@@ -180,12 +165,13 @@ defmodule Replay.Milestone2Test do
   defp admin?(<<_unused, _len, "Admin level is ", _::binary>>), do: true
   defp admin?(_payload), do: false
 
-  @options "the option pushes 0x7032 to 0x7034 after 0x1003 (stored shortcuts, key map, game options): issue 132 decides"
-
   @deferrals [
-    {:absent, U.ShortcutdataCmd, 2, @options},
-    {:absent, U.KeymapCmd, 2, @options},
-    {:absent, U.GameoptionCmd, 2, @options},
+    {:payload, P.CharOptionImproveGetShortcutdataCmd, :all, 4,
+     "the stored shortcut bar of the captured character (shortcuts); the placeholder sends an empty list"},
+    {:payload, P.CharOptionImproveGetKeymapCmd, :all, 6,
+     "the stored key map of the captured character (options); the placeholder sends an empty list"},
+    {:payload, P.CharOptionImproveGetGameoptionCmd, :all, 6,
+     "the stored game options of the captured character (options); the placeholder sends an empty list"},
     {:payload, P.CharClientBaseCmd, :fame, 4, "fame has no column yet; the rebuild sends 0"},
     {:payload, P.CharClientBaseCmd, :stat_distribute, 4, "stat distribution has no column yet; the rebuild sends 0"},
     {:payload, P.CharClientQuestReadCmd, :all, 5, "the read quests of the captured character (quests)"},

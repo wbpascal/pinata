@@ -1,6 +1,6 @@
 defmodule WorldManager.Placeholders do
   @moduledoc """
-  The placeholder answers of the WorldManager at map entry (issue 88): packets whose data belongs to a later
+  The placeholder answers of the WorldManager at character login and map entry (issue 88): packets whose data belongs to a later
   milestone, sent empty. Each function names its milestone; the milestone that owns the data replaces it.
   """
 
@@ -9,16 +9,40 @@ defmodule WorldManager.Placeholders do
   alias Proto.Packets.CharGuildCmd
   alias Proto.Packets.CharOptionGetShortcutsizeAck
   alias Proto.Packets.CharOptionGetWindowposAck
+  alias Proto.Packets.CharOptionImproveGetGameoptionCmd
+  alias Proto.Packets.CharOptionImproveGetKeymapCmd
+  alias Proto.Packets.CharOptionImproveGetShortcutdataCmd
   alias Proto.Packets.HolyPromiseListCmd
   alias Proto.Packets.KqJoiningAlarmList
   alias Proto.Packets.PrisonGetAck
 
   @doc """
   Placeholder until milestone 6 (options): the answer `0x7005` to `0x7004`, no stored shortcut sizes (the client
-  then uses its defaults). Issue 132 decides about the stored shortcuts.
+  then uses its defaults). The shortcut bar itself is the push `0x7032` (`shortcut_data/0`, milestone 4).
   """
   @spec shortcut_size() :: CharOptionGetShortcutsizeAck.t()
   def shortcut_size, do: %CharOptionGetShortcutsizeAck{success: 0, data: <<0::size(24 * 8)>>}
+
+  @doc """
+  Placeholder until milestone 4 (shortcuts): the push `0x7032` after `0x1003`, an empty shortcut bar; it matches the
+  empty `0x7005`.
+  """
+  @spec shortcut_data() :: CharOptionImproveGetShortcutdataCmd.t()
+  def shortcut_data, do: %CharOptionImproveGetShortcutdataCmd{shortcuts: []}
+
+  @doc """
+  Placeholder until milestone 6 (options): the push `0x7033` after `0x1003`, no entry; the client keeps its built-in
+  key map and sets its loaded flag.
+  """
+  @spec key_map() :: CharOptionImproveGetKeymapCmd.t()
+  def key_map, do: %CharOptionImproveGetKeymapCmd{keys: []}
+
+  @doc """
+  Placeholder until milestone 6 (options): the push `0x7034` after `0x1003`, no entry; the client keeps its built-in
+  game options.
+  """
+  @spec game_option() :: CharOptionImproveGetGameoptionCmd.t()
+  def game_option, do: %CharOptionImproveGetGameoptionCmd{options: []}
 
   @doc "Placeholder until milestone 6 (options): the answer `0x700D` to `0x700C`, no stored window positions."
   @spec window_pos() :: CharOptionGetWindowposAck.t()

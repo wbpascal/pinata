@@ -116,6 +116,7 @@ defmodule MapChangeTest do
     assert {:ok, %UserLoginworldAck{worldmanager: wm_handle}, wm} = TestClient.recv(wm)
     wm = send!(wm, <<0x01, 0x10, 0>>)
     assert {:ok, <<0x03, 0x10, _::binary>>, wm} = TestClient.recv_raw(wm)
+    wm = TestClient.option_pushes!(wm)
     {zone, handle} = TestPorts.endpoint(:zone) |> connect() |> enter_zone(wm_handle, name)
     {_burst, wm} = until!(wm, 0x182A)
     %{wm: wm, zone: zone, wm_handle: wm_handle, handle: handle}
@@ -398,6 +399,7 @@ defmodule MapChangeTest do
     # the old Zone connection is still open
     wm = send!(p.wm, <<0x01, 0x10, 0>>)
     assert {:ok, <<0x03, 0x10, _::binary>>, wm} = TestClient.recv_raw(wm)
+    wm = TestClient.option_pushes!(wm)
 
     {zone2, handle2} = TestPorts.endpoint(:zone) |> connect() |> enter_zone(p.wm_handle, "Test1235")
     [base | _] = Process.get(:first_burst)
@@ -407,6 +409,17 @@ defmodule MapChangeTest do
 
     assert on_map?("RouN", handle2)
     {_burst, wm} = until!(wm, 0x182A)
+    close_all([wm, zone, zone2])
+  end
+
+  test "a map change does not repeat the option pushes" do
+    _cid = character!("admin", "Test1235", @town)
+    p = in_world("admin", "Test1235")
+    zone = p.zone |> town_portal(1) |> recv!(<<0x1B, 0x18, 0x19C1::little-16>>)
+    {<<0x0A, 0x18, _::binary>>, zone} = next!(zone)
+    {zone2, _handle2} = TestPorts.endpoint(:zone) |> connect() |> enter_zone(p.wm_handle, "Test1235")
+    {burst, wm} = until!(p.wm, 0x182A)
+    refute Enum.any?(burst, &match?(<<low, 0x70, _::binary>> when low in [0x32, 0x33, 0x34], &1))
     close_all([wm, zone, zone2])
   end
 

@@ -190,7 +190,8 @@ A gate answers nothing on a refusal.
   `0x181A` itself is handled), the gate roles `IDGate`, `RandomGate`, `ModeIDGate`, the multi-link `0x181F`, the
   menu close `0x3C0F`.
 - **The option pushes** `0x7032` to `0x7034` are not repeated at a map change in the capture `walk-run-portals`:
-  after each of the five changes the WorldManager connection sends only `0x5826` and `0x182A` (issue 132).
+  after each of the five changes the WorldManager connection sends only `0x5826` and `0x182A`. The rebuild does the
+  same: the pushes follow `0x1003` only.
 
 ## Not checked
 

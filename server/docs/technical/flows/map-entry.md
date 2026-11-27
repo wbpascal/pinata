@@ -84,7 +84,7 @@ sequenceDiagram
 
 | Packet | When | Kind | Milestone |
 |---|---|---|---|
-| `0x7005 {0, 24 zero bytes}` | `0x7004` | empty | 6 (stored shortcuts: issue 132) |
+| `0x7005 {0, 24 zero bytes}` | `0x7004` | empty | 6 (the shortcut bar itself: 0x7032, milestone 4) |
 | `0x700D {0, 392 zero bytes}` | `0x700C` | empty | 6 |
 | `0x7C07 {0x0DB1, 0}` | `0x7C06` | empty | 11 |
 | `0x581C {Unix time, tm}` | first `0x581B` of the session; later ones get nothing; no Kingdom Quest list `0x581D` | real (list: 10) | 2 |
@@ -138,7 +138,7 @@ All are masked in replays (`Replay.Masks.global/0`).
 - `0x0810` and `0x182C` are never sent: only plain field maps run in milestone 2.
 - `0x7005` and `0x700D` carry no stored option block (`bSuccess` 0); the client then uses its defaults.
 - `0x1802` carries the stored position unchanged; moving a player off an occupied cell is not built.
-- The option pushes `0x7032` to `0x7034` after `0x1003` are not sent (issue 132), nor the Kingdom Quest list `0x581D` (milestone 10).
+- The Kingdom Quest list `0x581D` is not sent (milestone 10). The option pushes `0x7032` to `0x7034` are sent empty after `0x1003` ([`enter-world.md`](enter-world.md)).
 - The periodic `0x0849` (every full minute) is not sent; only the first-join copy.
 - The level check of `0x1803` (level 0 or above 150 disconnects) is not built.
 - The answers to `0x7004`, `0x700C` and `0x7C06` come in request order; the original's `0x7C07` came between `0x7005` and `0x700D`.

@@ -122,6 +122,7 @@ defmodule MapEntryTest do
     {wm, handle} = world_login()
     {body, wm} = char_login(wm, 0)
     assert body == ack_1003()
+    wm = TestClient.option_pushes!(wm)
     zone = TestPorts.endpoint(:zone) |> connect() |> send!(map_login(handle))
     {wm, zone, handle}
   end

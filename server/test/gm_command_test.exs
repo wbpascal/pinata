@@ -206,6 +206,7 @@ defmodule GmCommandTest do
     {wm, wm_handle} = world_login(t, account)
     wm = send!(wm, <<0x01, 0x10, 0>>)
     assert {:ok, <<0x03, 0x10, _ip::binary-16, port::little-16>>, wm} = TestClient.recv_raw(wm)
+    wm = TestClient.option_pushes!(wm)
     zone = connect({~c"127.0.0.1", port})
     {handle, zone} = zone |> send!(map_login(wm_handle, character)) |> until_handle()
     %{wm: wm, zone: complete(zone), handle: handle, id: c.id, port: port, wm_handle: wm_handle}

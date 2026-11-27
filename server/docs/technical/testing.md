@@ -204,7 +204,8 @@ The global list is `Replay.Deferrals.global/0` (empty until the issue that defin
 
 | Entry | Milestone | Reason |
 |---|---|---|
-| `{:absent, …}` `0x7032`, `0x7033`, `0x7034` | 2 | the option pushes after `0x1003`: issue 132 decides |
+| `{:payload, CharOptionImproveGetShortcutdataCmd, :all}` (`0x7032`) | 4 | shortcuts: the placeholder sends an empty list |
+| `{:payload, …, :all}` `0x7033`, `0x7034` | 6 | options (key map, game options): the placeholders send empty lists |
 | `{:payload, CharClientBaseCmd, :fame}`, `:stat_distribute` | 4 | no column yet |
 | `{:payload, …, :all}` `0x10CE`, `0x441E` | 5 | quests |
 | `{:payload, …, :all}` `0x103D`, `0x103E` | 4 | skills, passives |
