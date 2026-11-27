@@ -213,14 +213,14 @@ Measured on 2026-11-22: the single-node release (all three parts, SQLite, 2016 `
 | resident set size of the OS process | 195360 kB (191 MB) | `ps -o rss= -p $(bin/pinata pid)` |
 | memory the Erlang VM reports | 128152735 bytes (122 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. The same node with the block data of all 88 field maps loaded (`Zone.MapInstance.enter/2` once on every map), after about one minute more:
+The game data is held in memory, so the size follows the data directory. A node with the Zone part runs one process per field map (88); the block data of a map is read at its first player and never unloaded. The same node with the block data of all 88 field maps loaded (a stub player entered with `Zone.MapInstance.enter/2` and removed with `leave/2` on every map), after about one minute more:
 
 | Measure | Value | Command |
 |---|---|---|
 | resident set size of the OS process | 292848 kB (286 MB) | `ps -o rss= -p $(bin/pinata pid)` |
 | memory the Erlang VM reports | 219610335 bytes (209 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
 
-The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); :ok = Zone.MapInstance.enter(p, :memory_check) end'`. The budget is 512 MB.
+The load command was `bin/pinata rpc 'for %{map_id_client: m} <- GameData.plain_field_maps() do {:ok, p} = Zone.MapInstance.whereis(0, m); pl = %Zone.Player{character: %{}, world_no: 0, map: m, x: 0, y: 0, walk_speed: 0, run_speed: 0, map_type: 0, equipment: %{}, address: nil, last_good: {0, 0}}; with {:ok, %Zone.Player{handle: h}} <- Zone.MapInstance.enter(p, pl), do: Zone.MapInstance.leave(p, h) end'`. The stub is placed on the nearest free cell of (0, 0), else of the map's regen point; the block data is read even when both fail (`{:error, :no_free_cell}`). The budget is 512 MB.
 
 On Windows the two commands are `(Get-Process -Id (bin\pinata pid)).WorkingSet64` (PowerShell, bytes) and `bin\pinata rpc "IO.inspect(:erlang.memory(:total))"`.
 
