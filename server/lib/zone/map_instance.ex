@@ -49,8 +49,10 @@ defmodule Zone.MapInstance do
 
   GM commands (flow: `docs/technical/flows/gm-commands.md`): `action/3` also runs `:hide` (`0x1805` to the players
   that saw the GM, `0x242A` to the GM, sub-layer 3), `:show` (sub-layer 0, `0x2428` to the GM and the players that
-  see it now; nothing when the GM is not hidden) and `{:dimension, n}` (`0x1805` to the players in sight under the old
-  number, then the new number). Coming back into view announces nothing. `relocate/3` and every entry reset both.
+  see it now; nothing when the GM is not hidden) and `{:dimension, n}` (the exchange of `Zone.Sight.dimension/3`:
+  `0x1805` to the players in sight under the old number, to the GM the `0x1C0E` of what it no longer sees and the
+  appears of what it sees only now, the GM's appear to the players that see it under the new number). After `:show`
+  nothing announces the GM. `relocate/3` and every entry reset both.
   `free_spot/1` draws a free point of the map for `&linkto` without argument.
   """
 
@@ -177,8 +179,10 @@ defmodule Zone.MapInstance do
   both clear the emote state (`{0xFF, 0xFFFF}`), the stance change also sets the stance. The GM commands: `:hide`
   sends `0x1805` to the players in sight, sets sub-layer 3 and sends `0x242A {288, 4200000000}` to the GM; `:show`
   of a hidden GM sets sub-layer 0 and sends `0x2428 {handle, 288}` to the GM and the players that see it now, of a
-  GM that is not hidden nothing; `{:dimension, n}` sends `0x1805` to the players in sight under the old number and
-  sets the new one (also when it is the same). The mover is stepped to the millisecond first and keeps running. A
+  GM that is not hidden nothing; `{:dimension, n}` sets the new number (also when it is the same) and sends the
+  exchange of `Zone.Sight.dimension/3`: `0x1805` to the players in sight under the old number, to the GM the
+  `0x1C0E` of the objects it no longer sees and the appears of those it sees only now, the GM's appear to the
+  players that see it under the new number. The mover is stepped to the millisecond first and keeps running. A
   player in mode 0 is ignored.
   """
   @spec action(pid(), 8000..9499, action()) :: :ok | {:error, :not_entered}
@@ -615,8 +619,7 @@ defmodule Zone.MapInstance do
   defp act(state, _player, :show), do: {state, []}
 
   defp act(state, player, {:dimension, n}) do
-    gone = to_sight(state, player, [%MapLogoutCmd{handle: player.handle}])
-    {put_player(state, %{player | dimension: n}), gone}
+    {put_player(state, %{player | dimension: n}), Zone.Sight.dimension(view(state), player, n)}
   end
 
   defp with_self(state, player, packet) do

@@ -190,6 +190,16 @@ defmodule GmCommandTest do
     end
   end
 
+  # the packets up to the answer of a heartbeat
+  defp burst!(client), do: client |> send!(<<0x04, 0x08>>) |> burst!([])
+
+  defp burst!(client, acc) do
+    case TestClient.recv_raw(client) do
+      {:ok, <<0x05, 0x08>>, client} -> {Enum.reverse(acc), client}
+      {:ok, body, client} -> burst!(client, [body | acc])
+    end
+  end
+
   defp until_heartbeat(zone) do
     case TestClient.recv_raw(zone) do
       {:ok, <<0x05, 0x08>>, zone} -> zone
@@ -286,13 +296,18 @@ defmodule GmCommandTest do
       a.zone |> send!(@adminlevel) |> recv!(notice("Admin level is 100")) |> nothing!()
     end
 
-    test "&dimension: 0x1805 to the players in sight under the old number; back announces nothing", t do
+    test "&dimension: 0x1805 under the old number, the GM's deletes; back: appears both ways", t do
       a = in_world(t, "admin", "Test1235", %{admin_level: 100})
       b = in_world(t, "second", "X14B", %{login_x: 6500, login_y: 9800})
-      az = a.zone |> seen!() |> send!(line("&dimension 1")) |> nothing!()
+      az = a.zone |> seen!() |> send!(line("&dimension 1")) |> recv!(<<0x0E, 0x1C, b.handle::little-16>>)
+      {deletes, az} = burst!(az)
+      assert Enum.all?(deletes, &match?(<<0x0E, 0x1C, _::16>>, &1))
       bz = b.zone |> recv!(gone(a.handle)) |> nothing!()
-      az = az |> send!(line("&dimension 0")) |> nothing!()
-      nothing!(bz)
+
+      {appears, az} = az |> send!(line("&dimension 0")) |> seen!() |> burst!()
+      assert length(appears) == length(deletes)
+      assert Enum.all?(appears, &match?(<<0x08, 0x1C, _::binary>>, &1))
+      bz |> seen!() |> nothing!()
       nothing!(az)
     end
 

@@ -1,7 +1,8 @@
 defmodule Zone.Sight do
   @moduledoc """
   The sight rules of a map instance as pure functions (`docs/technical/sight.md`): who sees whom, the entry
-  exchange, the appear and disappear packets of a step, the receivers of a broadcast and the answer to `0x1C01`.
+  exchange, the appear and disappear packets of a step, the exchange of a dimension change, the receivers of a
+  broadcast and the answer to `0x1C01`.
 
   An object is in sight of another when `dist² < Sight²` (`MapInfo.Sight`, the radius of the view), both are in the
   same dimension or one of them in -1, and the sub-layer table lets the one be shown to the other (`sees?/2`).
@@ -14,6 +15,7 @@ defmodule Zone.Sight do
   alias Proto.Packets.BriefinfoCharacterCmd
   alias Proto.Packets.BriefinfoLogincharacterCmd
   alias Proto.Packets.BriefinfoMobCmd
+  alias Proto.Packets.MapLogoutCmd
   alias Zone.Grid
 
   @type object :: Zone.Player.t() | Zone.Npc.t()
@@ -236,6 +238,40 @@ defmodule Zone.Sight do
   defp disappear_both(mover, o) do
     if(sees?(o, mover), do: [{o, [%BriefinfoBriefinfodeleteCmd{handle: mover.handle}]}], else: []) ++
       if sees?(mover, o), do: [{mover, [%BriefinfoBriefinfodeleteCmd{handle: o.handle}]}], else: []
+  end
+
+  @doc """
+  The deliveries of a dimension change of a player in mode 1 (`&dimension`), computed once from its sight under the
+  old number (`old.dimension`) and under `n`. In this order: `0x1805` to the players that saw it under the old
+  number (also when `n` is the same); to the player itself the `0x1C0E` of every object it no longer sees, then the
+  appear packets of every object it sees only now; its own appear to the players that see it under `n`. Players
+  count in mode 1 within the full radius, NPCs without a distance limit, as in `entry/2`. An object whose sight
+  does not change gets nothing more. A player in mode 0 causes nothing.
+  """
+  @spec dimension(view(), Zone.Player.t(), integer()) :: [delivery()]
+  def dimension(_view, %Zone.Player{mode: 0}, _n), do: []
+
+  def dimension(view, %Zone.Player{handle: handle} = old, n) do
+    new = %{old | dimension: n}
+
+    players =
+      for h <- Grid.query(view.grid, {old.x, old.y}, view.radius, handle),
+          %Zone.Player{mode: 1} = o <- [Map.get(view.players, h)],
+          do: o
+
+    npcs = for {_h, %Zone.Npc{brief: %{}} = npc} <- Enum.sort(view.npcs), do: npc
+    gone = for o <- players, sees?(o, old), do: {o, [%MapLogoutCmd{handle: handle}]}
+    shown = for o <- players, sees?(o, new), do: {o, appear(new)}
+    gone ++ own_view(old, new, players ++ npcs) ++ shown
+  end
+
+  # the player's own delivery of a dimension change: deletes of what it no longer sees, then appears of what is new
+  defp own_view(old, new, objects) do
+    deletes =
+      for o <- objects, sees?(old, o) and not sees?(new, o), do: %BriefinfoBriefinfodeleteCmd{handle: o.handle}
+
+    appears = for o <- objects, sees?(new, o) and not sees?(old, o), packet <- appear(o), do: packet
+    if deletes == [] and appears == [], do: [], else: [{new, deletes ++ appears}]
   end
 
   @doc "The players that receive what the sender does: mode 1, in sight at the full radius and shown the sender."

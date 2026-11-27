@@ -80,16 +80,26 @@ sequenceDiagram
     Z->>M: action(handle, {:dimension, n})
     M-)O: 0x1805 {GM handle} (those in sight under the old number, also when n is the same)
     Note over M: dimension n
+    M-)Z: 0x1C0E of each object no longer seen, then the appears of each object seen only now
+    Z->>C: 0x1C0E, 0x1C06 / 0x1C08
+    M-)O: appear of the GM (those that see it under n)
 ```
 
 The actions run like the other actions (`docs/technical/flows/actions.md`): a player in mode 0 is ignored, the
-mover is stepped first. Coming back into view sends no appear: the other client asks with `0x1C01` when it sees a
-move of an object it does not know (`Zone.Sight`, [`../sight.md`](../sight.md)). No abstate is stored: the hide icon
+mover is stepped first. After `&show` nothing announces the GM: the other client asks with `0x1C01` when it sees a
+move of an object it does not know (`Zone.Sight`, [`../sight.md`](../sight.md)). `&dimension` runs one exchange
+(`Zone.Sight.dimension/3`, [`../sight.md`](../sight.md), "Dimension change"), computed from the GM's sight under the
+old number and under the new one: `0x1805 {GM handle}` to the players that saw the GM under the old number; to the
+GM the `0x1C0E` of every object it no longer sees, then the appear packets of every object it sees only now; the
+GM's appear to every player that sees it under the new number. Players count in mode 1 within the full radius,
+NPCs are every NPC of the map. The same number again sends `0x1805` and then the GM's appear to the players that
+see it, and nothing to the GM. No abstate is stored: the hide icon
 is not sent again after a map change or a relog. `Zone.MapInstance.relocate/3` (a `0x1809`) and every entry into a
 map instance reset the dimension and the sub-layer to 0 without a packet.
 
 P02-B27 (fixed by decision, issue 90): the original sends an appear and a delete of each object near a GM in another
-dimension for every step; the rebuild applies the sight rules once.
+dimension for every step; the rebuild applies the sight rules once: the dimension exchange runs once per command,
+nothing runs per step.
 
 ## `&linkto` into the map change
 

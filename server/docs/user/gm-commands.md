@@ -41,14 +41,14 @@ A GM sees "From <address>" (the address it connected from) and its admin level i
 | `&adminlevel` | | 1 | answers "Admin level is <n>" |
 | `&hide` | `&숨어` | 10 | the GM disappears for every other player (they see the GM leave); the GM gets the hide icon |
 | `&show` | `&보여` | 10 | the GM is visible again; the GM and the players in sight see the hide state end. A GM that is not hidden gets no answer |
-| `&dimension <n>` | | 100 | moves the GM into dimension `n`: players in another dimension see the GM leave. Dimension -1 sees everyone and is seen by everyone |
+| `&dimension <n>` | | 100 | moves the GM into dimension `n`: players in another dimension see the GM leave, the GM's own view changes at once and the players of the new dimension see the GM appear. Dimension -1 sees everyone and is seen by everyone |
 | `&linkto` | `&이동` | 10 | moves the GM to a random free spot of its own map |
 | `&linkto <map>` | `&이동` | 10 | moves the GM to the start point of the map (`RegenX`, `RegenY` of `MapInfo`) |
 | `&linkto <map> <x> <y>` | `&이동` | 10 | moves the GM to that point of the map |
 | `&kickout <name>` | `&추방` | 10 | disconnects the named character from the world, on any node; its position is saved |
 
-A player who comes back into view after `&show` or a dimension change appears only when the other client asks for
-it (when one of the two moves); the server sends no appear of its own. A map change ends the hide and sets the
+A player who comes back into view after `&show` appears only when the other client asks for it (when one of the
+two moves); the server sends no appear of its own. A map change ends the hide and sets the
 dimension back to 0; the hide icon is not shown again after it.
 
 Answers:

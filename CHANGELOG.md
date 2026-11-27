@@ -55,6 +55,7 @@ A character enters the world: the client loads the map, walks and runs, takes ga
 - `&kickout` reaches a character on any map and node; the original found only characters of the GM's own zone and answered "<garbled name> is not in game" for the others (Z11-B6) (#116).
 - Every command line of a GM is logged, whatever its admin level; the original logged none of a GM with a level above 100 (Z11-B1) (#116).
 - A GM in another dimension (`&dimension`) does not get an appear and a delete of every object near it on each step (P02-B27) (#116).
+- `&dimension <n>` updates what the GM and the players around it see at once: the GM's client drops the players and NPCs of the dimension it left and shows those of the new one, and the players of the new dimension see the GM appear. The original left this to its appear-and-delete storm on every step (P02-B27) (#154).
 - A rename onto a name that is in use is refused ("The name cannot be used."); the original renamed anyway and two characters shared the name (P02-B42) (#117).
 - The refusal of the rename right carries the slot of the request; the original sent a byte of its own memory (P02-B34) (#117).
 
