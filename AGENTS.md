@@ -21,6 +21,8 @@ The Reconstruction of the original server (protocol, pseudocode, knowledge, capt
 
 `original-data/9Data/` and `test/fixtures/opcodes.json` are copies: refresh them with `../pinata-re/tools/sync-server.sh "$PWD"` and name the `pinata-re` commit it prints in the commit message.
 
+**Worktrees.** `../pinata-re` means next to the *main* checkout of this repository, not next to a worktree (worktrees live elsewhere, e.g. `~/.herdr/worktrees/…` or `.claude/worktrees/…`). From a worktree, find it with `"$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/../pinata-re"`; every `../pinata-re/…` path on this page means that directory. It is the reconstruction's main checkout, on whatever branch it has. Pass this worktree to its scripts explicitly (`sync-server.sh "$PWD"`, `pcap_decode.py --transcript "$PWD"`): their default is pinata's main checkout.
+
 ## The gate
 
 Run `mix check` before you finish or approve anything, and paste its output into the PR. CI runs the same command. It runs, in this order:
