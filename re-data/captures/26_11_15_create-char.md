@@ -1,2 +1,0 @@
-- create character with following values: Cleric, Female, Face 3, Feather Hair, Deep Blue Hair Color, Name "CharCreateTest"
-- deleted character "CharCreateTest"

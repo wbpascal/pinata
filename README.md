@@ -3,8 +3,9 @@
 Pinata is a server for the 2016 client of the online game Fiesta, rebuilt in Elixir from a behavioural specification that was reconstructed from the original server binaries. It speaks the original protocol, so the unmodified client connects to it. It is built one milestone at a time, along the path a new player takes; it cannot be played on yet.
 
 - Latest version: [releases page](https://github.com/wbpascal/pinata/releases/latest); what each version changed: [`CHANGELOG.md`](CHANGELOG.md)
-- Getting started: [quick start](server/docs/user/quick-start.md) with a release archive, and the rest of the [user documentation](server/docs/user/README.md)
-- Building it yourself: [`from-source.md`](server/docs/user/from-source.md)
+- Getting started: [quick start](docs/user/quick-start.md) with a release archive, and the rest of the [user documentation](docs/user/README.md)
+- Building it yourself: [`from-source.md`](docs/user/from-source.md)
+- The reconstruction of the original server it is built from: [`pinata-re`](https://github.com/wbpascal/pinata-re)
 
 ## Progress
 

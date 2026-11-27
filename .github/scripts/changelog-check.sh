@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Changelog step of server.yml (server/AGENTS.md, "Changelog checklist"): passes when the change <from>..<to> adds a
+# Changelog step of server.yml (AGENTS.md, "Changelog checklist"): passes when the change <from>..<to> adds a
 # line to CHANGELOG.md or when the PR description (environment variable PR_BODY) has a line starting with
 # "Changelog: none". Checks nothing else.
 #   PR_BODY=... .github/scripts/changelog-check.sh <from> <to>
@@ -14,5 +14,5 @@ if printf '%s\n' "${PR_BODY:-}" | tr -d '\r' | grep '^Changelog: none' > /dev/nu
   echo "CHANGELOG.md unchanged; the description says why (Changelog: none)"
   exit 0
 fi
-echo "::error::Add a line to CHANGELOG.md, or a line starting with 'Changelog: none' and the reason to the PR description (server/AGENTS.md, \"Changelog checklist\")."
+echo "::error::Add a line to CHANGELOG.md, or a line starting with 'Changelog: none' and the reason to the PR description (AGENTS.md, \"Changelog checklist\")."
 exit 1

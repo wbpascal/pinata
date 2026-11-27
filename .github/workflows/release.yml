@@ -1,4 +1,4 @@
-# Release workflow (server/docs/technical/testing.md, "Release workflow"). A pushed tag v<version> publishes that
+# Release workflow (docs/technical/testing.md, "Release workflow"). A pushed tag v<version> publishes that
 # version; a manual run does everything except publish.
 name: release
 
@@ -13,9 +13,6 @@ permissions:
 jobs:
   consistency:
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: server
     outputs:
       version: ${{ steps.check.outputs.version }}
     steps:
@@ -67,31 +64,22 @@ jobs:
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
-        working-directory: server
         shell: bash
     env:
       V: ${{ needs.consistency.outputs.version }}
       ARCHIVE: pinata-${{ needs.consistency.outputs.version }}-${{ matrix.os }}-${{ matrix.cpu }}.${{ matrix.ext }}
     steps:
-      # Some Files/ paths are longer than Windows allows by default; this must be set before the checkout.
-      - name: Long paths
-        if: runner.os == 'Windows'
-        working-directory: ${{ runner.temp }}
-        run: git config --global core.longpaths true
-
       - uses: actions/checkout@v7
 
       - name: Data set (Git LFS, 9Data only)
-        working-directory: .
-        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+        run: git lfs ls-files -l -I "original-data/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
 
       - uses: actions/cache@v4
         with:
           path: .git/lfs
           key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
 
-      - working-directory: .
-        run: git lfs pull -I "Files/Server/2016/9Data/**"
+      - run: git lfs pull -I "original-data/9Data/**"
 
       - uses: jdx/mise-action@v5
 
@@ -138,7 +126,7 @@ jobs:
           R="$RUNNER_TEMP/unpacked/pinata-$V"
           test -x "$R/bin/pinata"
           cd "$RUNNER_TEMP/node"
-          "$R/bin/pinata" eval "GameData.Release.import_data(~S($GITHUB_WORKSPACE/Files/Server/2016/9Data), ~s(data))"
+          "$R/bin/pinata" eval "GameData.Release.import_data(~S($GITHUB_WORKSPACE/original-data/9Data), ~s(data))"
           "$R/bin/pinata" start > "$RUNNER_TEMP/pinata.out" 2>&1 &
           for i in $(seq 60); do
             if (echo > /dev/tcp/127.0.0.1/9010) 2> /dev/null; then break; fi
@@ -146,7 +134,7 @@ jobs:
             sleep 2
           done
           printf 'smoke-password\n' | "$R/bin/pinata" eval 'Persistence.Release.create_account("smoke")'
-          cd "$GITHUB_WORKSPACE/server"
+          cd "$GITHUB_WORKSPACE"
           MIX_ENV=test mix run --no-start test/support/smoke.exs 9010
           "$R/bin/pinata" stop
 
@@ -160,7 +148,7 @@ jobs:
           if ($top -ne "pinata-$env:V") { throw "top level of the archive: $top" }
           New-Item -ItemType Directory "$env:RUNNER_TEMP\node" | Out-Null
           Set-Location "$env:RUNNER_TEMP\node"
-          & "$env:RUNNER_TEMP\unpacked\pinata-$env:V\bin\pinata.bat" eval "GameData.Release.import_data(~S($env:GITHUB_WORKSPACE\Files\Server\2016\9Data), ~s(data))"
+          & "$env:RUNNER_TEMP\unpacked\pinata-$env:V\bin\pinata.bat" eval "GameData.Release.import_data(~S($env:GITHUB_WORKSPACE\original-data\9Data), ~s(data))"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Without -NoNewWindow and redirections Start-Process does not pass this step's handles on, so the step ends
@@ -213,7 +201,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: server
     env:
       MIX_ENV: test
       IMAGE: ghcr.io/wbpascal/pinata:${{ needs.consistency.outputs.version }}
@@ -221,22 +208,20 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Data set (Git LFS, 9Data only)
-        working-directory: .
-        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+        run: git lfs ls-files -l -I "original-data/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
 
       - uses: actions/cache@v4
         with:
           path: .git/lfs
           key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
 
-      - working-directory: .
-        run: git lfs pull -I "Files/Server/2016/9Data/**"
+      - run: git lfs pull -I "original-data/9Data/**"
 
       - uses: jdx/mise-action@v5
 
       - run: mix deps.get
 
-      - run: mix pinata.import_data ../Files/Server/2016/9Data data
+      - run: mix pinata.import_data original-data/9Data data
 
       # The label links the package to the repository when it is pushed with the workflow's token.
       - name: Image
@@ -304,4 +289,4 @@ jobs:
       - name: GitHub release
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag --title "$(cat dist/title)" --notes-file dist/text.md \
-            dist/pinata-*.tar.gz dist/pinata-*.zip server/compose.yaml server/compose.toml
+            dist/pinata-*.tar.gz dist/pinata-*.zip compose.yaml compose.toml

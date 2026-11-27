@@ -8,7 +8,7 @@ Every node opens its own pool and calls `Persistence` functions directly. There 
 
 ## Consequences
 
-- Schema and queries keep to the portable subset from the [Ecto research](https://github.com/wbpascal/pinata/issues/3). The rules are written down in `server/AGENTS.md` and enforced by CI running the full suite twice: single-node mode on SQLite and multi-node mode on PostgreSQL. There is no lint for them and no separate single-node PostgreSQL run.
+- Schema and queries keep to the portable subset from the [Ecto research](https://github.com/wbpascal/pinata/issues/3). The rules are written down in `AGENTS.md` and enforced by CI running the full suite twice: single-node mode on SQLite and multi-node mode on PostgreSQL. There is no lint for them and no separate single-node PostgreSQL run.
 - Local tests default to SQLite and cannot run async against it.
 - The schema is designed fresh per milestone from what that milestone's operations need. The reconstructed original tables are a checklist of fields, not a template. Client-visible limits (32-bit character id, name length, one-byte level) become column constraints. Until the first release the initial migrations are edited in place.
 - Migrations behave differently per adapter: on SQLite the server runs pending migrations itself at start-up; on PostgreSQL it refuses to start while migrations are pending and an operator runs them with a release command, so nodes starting together cannot race. This difference must be documented for operators when it is implemented.

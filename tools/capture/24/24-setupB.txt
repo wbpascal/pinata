@@ -1,4 +1,0 @@
-# Scenario 24, client B (X24B, HighCleric 20, GM), typed right after login, on the PC the clients run on:
-#   .\gmtype.ps1 -File .\24\24-setupB.txt -Client 2
-# The skills 1620 "Revive [01]" and 1800 "Invincible [01]" come from 24-prep.sql.
-&fullpoint

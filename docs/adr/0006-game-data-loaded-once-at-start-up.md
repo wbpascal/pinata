@@ -19,5 +19,5 @@ Geometry (`BlockInfo/`, `AreaBMP/`) is not loaded with the tables. A field map's
 - The loader computes the MD5 of each of the 49 checksummed client data tables from the raw file. The 14 `View/` tables are hashed and never parsed. Whether a client mismatch is enforced is not decided here.
 - In multi-node mode every node hashes its whole data directory, and WorldManager refuses a Zone node whose digest differs. Single-node mode skips this.
 - Text from data tables is not valid UTF-8 in general. The technical documentation must say so where it describes game data, because printing or pattern-matching it as a string looks like corruption.
-- Loader and schema tests run against the original data set in `Files/`, imported into a temporary data directory per test run; hand-written fixtures cover error cases only. The test suite therefore needs the repo's `Files/` folder.
+- Loader and schema tests run against the original data set in `original-data/9Data/`, imported into a temporary data directory per test run; hand-written fixtures cover error cases only. The test suite therefore needs the repo's `original-data/` folder ([ADR 0013](0013-reconstruction-in-its-own-repo.md)).
 - Parse time and decoded memory size were not measured when this was decided; the first milestone that loads tables measures both.

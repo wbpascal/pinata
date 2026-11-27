@@ -25,4 +25,4 @@ The rebuild must speak the unchanged 2016 client protocol, and the original serv
 
 - Compatibility with the original is no argument for an unchecked client value.
 - A finding is urgent when a client can reach the code today; one about a path no client reaches is ordinary work.
-- `server/docs/user/security.md` tells administrators what follows from the accepted limits, and grows with the server.
+- `docs/user/security.md` tells administrators what follows from the accepted limits, and grows with the server.
