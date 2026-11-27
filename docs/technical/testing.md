@@ -9,7 +9,7 @@ A Transcript is a text file with one line per decrypted client-facing packet of 
 ### Format
 
 ```
-# transcript of 26_11_15_login-logout.pcapng (format: docs/technical/testing.md)
+# transcript of 26_11_15_login-logout.pcapng (format: server/docs/technical/testing.md)
 # start 1794732629.955599
 1794732629.955599 login#1 S 0x0807 6301
 1794732629.964827 login#1 C 0x0C65 3230313531313136...
@@ -289,7 +289,7 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 
 `test/support/smoke.exs` is a script, not an ExUnit test (`test_helper.exs` loads only `support/**/*.ex`). Its one argument is the Login port. It plays login, world select and the character list against `127.0.0.1` with `TestClient`, as the account `smoke` with the password `smoke-password`: Login on the given port, WorldManager on the port of the world-select answer. It retries up to 15 times 2 seconds apart (the nodes need a moment to start and connect) and exits with status 1 when the last try fails. Two CI jobs run it with the Login port 9010:
 
-- `compose-smoke` (Linux) against the Docker Compose example. `compose.yaml` names the published image `ghcr.io/wbpascal/pinata:<version>`, so the job first builds the current commit under exactly that name (taken from `compose.yaml`), and Compose pulls nothing. Locally, in `server/` with a data directory in `data` (the tag is the one in `compose.yaml`):
+- `compose-smoke` (Linux) against the Docker Compose example. `compose.yaml` names the published image `ghcr.io/wbpascal/pinata:<version>`, so the job first builds the current commit under exactly that name (taken from `compose.yaml`), and Compose pulls nothing. Locally, with a data directory in `data` (the tag is the one in `compose.yaml`):
 
   ```
   docker build -t ghcr.io/wbpascal/pinata:0.1.0 .
@@ -301,7 +301,7 @@ The test VM logs at `:warning` (the test settings file sets `log.level`), so tes
 
 - `windows-smoke` against a release built on Windows in single-node mode with SQLite (see "Windows").
 
-The job `otel-smoke` (Linux) runs the release with OpenTelemetry ([`telemetry.md`](telemetry.md)). With export off and `OTEL_TRACES_EXPORTER=otlp` set it checks with the script `test/support/otel_apps.exs` that the three OpenTelemetry applications run, that `Pinata.Figures.print()` answers and that the node output has no line containing `OTLP`, `opentelemetry` or `CA(s)`. Then it starts an OpenTelemetry Collector container (`otel/opentelemetry-collector`, configuration `test/support/otel-collector.yaml`, debug exporter), starts the release with `telemetry.otlp_enabled = true` and `trace_ratio = 1.0`, runs the smoke script, enters one map with the script `test/support/otel_enter.exs` so that it ticks, flushes both providers and waits until the Collector log holds the span `pinata.packet` and the metrics `pinata.packet.duration` and `pinata.tick.duration`. The job runs both scripts with `bin/pinata rpc "Code.eval_file(…)"`, and `test/workflow_test.exs` loads both, so a change to `Zone.Player` or `Zone.MapInstance.enter/2` fails `mix check`; the same test compares the job names of `server.yml` with the table "CI jobs" in `AGENTS.md`. Locally, in `server/` after `MIX_ENV=prod mix release`, with the data directory in `data`, run the commands of the job's steps with `R=_build/prod/rel/pinata` and a temporary directory for `$RUNNER_TEMP`; afterwards remove `data`, `otel.toml` and the container (`docker rm -f otelcol`).
+The job `otel-smoke` (Linux) runs the release with OpenTelemetry ([`telemetry.md`](telemetry.md)). With export off and `OTEL_TRACES_EXPORTER=otlp` set it checks with the script `test/support/otel_apps.exs` that the three OpenTelemetry applications run, that `Pinata.Figures.print()` answers and that the node output has no line containing `OTLP`, `opentelemetry` or `CA(s)`. Then it starts an OpenTelemetry Collector container (`otel/opentelemetry-collector`, configuration `test/support/otel-collector.yaml`, debug exporter), starts the release with `telemetry.otlp_enabled = true` and `trace_ratio = 1.0`, runs the smoke script, enters one map with the script `test/support/otel_enter.exs` so that it ticks, flushes both providers and waits until the Collector log holds the span `pinata.packet` and the metrics `pinata.packet.duration` and `pinata.tick.duration`. The job runs both scripts with `bin/pinata rpc "Code.eval_file(…)"`, and `test/workflow_test.exs` loads both, so a change to `Zone.Player` or `Zone.MapInstance.enter/2` fails `mix check`; the same test compares the job names of `server.yml` with the table "CI jobs" in `AGENTS.md`. Locally, after `MIX_ENV=prod mix release`, with the data directory in `data`, run the commands of the job's steps with `R=_build/prod/rel/pinata` and a temporary directory for `$RUNNER_TEMP`; afterwards remove `data`, `otel.toml` and the container (`docker rm -f otelcol`).
 
 The job `load-smoke` (Linux) starts the release in single-node mode and runs `mix pinata.load` with 50 players for 10 s; it fails when a player does not reach the world, disconnects or crashes, or the node writes an `error` line. `test/load_test.exs` runs the same code (`Load.run/1`) against the test application. See [`load-run.md`](load-run.md), "CI smoke run".
 

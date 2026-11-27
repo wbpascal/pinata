@@ -6,7 +6,7 @@ We chose this because the reconstruction made a clone about 1.7 GB of LFS conten
 
 ## Consequences
 
-- Citations in code and docs (`docs/pseudocode/…`, `docs/protocol/…`, `docs/knowledge/…`, `re-data/captures/…`, item IDs) keep their paths and resolve in `../pinata-re`. They are not links, and nothing checks them.
+- Citations in code and docs (`docs/pseudocode/…`, `docs/protocol/…`, `docs/knowledge/…`, `re-data/captures/…`, `tools/protocol-re/…`, item IDs) keep their paths and resolve in `../pinata-re`. They are not links, and nothing checks them.
 - The tests and every CI job pass on a clone without `pinata-re`. Converting a capture into a Transcript, reading the original's behaviour and refreshing the copies need it.
 - The copies can lag behind `pinata-re`. A change that needs newer data or opcodes runs the sync script in the same PR.
 - `pinata` stays the only issue tracker; the work items of the reconstruction keep their own workflow in `pinata-re`.

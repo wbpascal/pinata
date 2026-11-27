@@ -128,7 +128,7 @@ Every tool output stays in the session, and the reconstruction files are big (`d
 
 - **Fewer, larger calls.** Every turn re-reads the whole context. Read related functions in one call, search several patterns in one `rg -e A -e B`, and send independent calls in parallel.
 - **Code of the original:** read functions only with `../pinata-re/tools/protocol-re/clean.py`, never `cat`, `sed -n` or `head` on `decomp.c`.
-- **Search:** `rg -M 200` on the exports; `-c` or `-l` first when the hit count is unknown.
+- **Search:** `rg -M 200` on the exports in `../pinata-re/re-data/exports/`; `-c` or `-l` first when the hit count is unknown.
 - **Docs over about 15 KB** (pseudocode, knowledge, protocol, `docs/technical/packets.md`): `python3 -I ../pinata-re/tools/protocol-re/sect.py <file>` for the outline, then `sect.py <file> <§|regex>`, or `Read` with `offset` and `limit`. `packets-*.md` and `opcodes-*.md`: `rg` the opcode.
 - **JSON** (`opcodes.json`, `layouts.json`, annotations, client error codes): query with `jq`, selecting only the fields you need.
 - **Tools with unknown output size** (`shn.py`, `pdb.py`, `bak.py`, scripts): pipe through `| head -c 4000` or print counts.
