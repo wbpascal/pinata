@@ -357,7 +357,7 @@ defmodule Zone.Handler do
     do:
       {%{state | step: :left, map: :none, player: :none, menu: :none},
        ack(origin) ++
-         [{:send, cmd}, {:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}]}
+         [{:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}, {:send, cmd}]}
 
   def handle_info(state, {:linked, origin, _p, _dest, {:same, player, cmd}}),
     do: {%{state | step: :loading, player: player, menu: :none}, ack(origin) ++ [{:send, cmd}]}
@@ -367,7 +367,7 @@ defmodule Zone.Handler do
     do:
       {%{state | step: :loading, map: map, player: player, menu: :none},
        ack(origin) ++
-         [{:send, cmd}, {:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}]}
+         [{:log, :info, "map change: character #{p.character.id}, map #{p.map} to #{dest.map}"}, {:send, cmd}]}
 
   # The player is saved and removed already; nothing to answer.
   def handle_info(state, {:linked, _origin, _p, _dest, {:error, :no_session}}),
