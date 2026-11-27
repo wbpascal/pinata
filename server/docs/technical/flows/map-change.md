@@ -95,7 +95,8 @@ sequenceDiagram
    mob name `Gate_Town` on its map; then the `TownPortal.shn` row of the index (`MapName`, `X`, `Y`, `MinLevel`) is
    the destination, map and client map both `MapName`. In step `:loading` the answer is `0x181B {0x19C2}`.
 4. **The change** (`Zone.Link.run/5`), each step only when the one before it succeeded: the `MapInfo` row of the
-   client map (its `ID` is `mapIndex`), the current player from the map instance, then
+   client map (its `ID` is `mapIndex`), the current player from the map instance, then (the map instance places
+   every arriving player on a free cell, see "Differences"; `0x1809` carries the placed point)
    - the same map instance: an auto-save (`:auto`), `relocate/3` (`0x1805` to the players in sight, the new position,
      mode 0, mover and chat state reset, the handle kept) and `0x1809`; the connection goes back to step `:loading`
      and the client's next `0x1803` runs the burst and the WorldManager burst again. The auto-save timer of the first
@@ -161,6 +162,8 @@ A gate answers nothing on a refusal.
 | `info` | `Zone: map change refused: no MapInfo row for <client map>` | a town portal target without a `MapInfo` row |
 | `error` | `Zone: map change refused: save failed: character <id>, <reason>` | the save before the change failed; refused (`0x19C2` for a town portal) |
 | `warning` | `Zone: map change failed: not on the map` | the player was gone from the map instance |
+| `warning` | `Zone: map change refused: no free cell on <map> around (<x>, <y>)` | neither the target point nor the map's regen point has a free cell in reach; refused (`0x19C2` for a town portal) |
+| `info` | `Zone: map <map>: no free cell around (<x>, <y>), placed at the regen point` | an arriving player was placed around the map's regen point instead |
 | `warning` | `Zone: connection closed: map change failed: no session` | the session ended, or the player went back to the character list, between the save and the reservation; the player is saved and removed |
 | `info` | `WorldManager: map-login ticket dropped: back to the character list` | `0x0C18 {1}` while the reservation is open |
 | `debug` | `Zone: NPC click dropped: role <role> is not built` | a click on an NPC of another role |
@@ -184,8 +187,14 @@ A gate answers nothing on a refusal.
   names, the `RegenX` / `RegenY` point of `MapInfo`, or a random free cell of the own map (shortcut: rejection
   sampling of at most 100 draws, not the quadtree of `bd_FindEmptyCoord`). A target map that is not running or has
   no `MapInfo` row answers `0x2011` "Invalid map name"; it has no answer packet of its own otherwise.
-- **No arrival placement**: the original moves an arriving player off an occupied cell (`so_MapMarking`, x + 25 at
-  the town portal NPC of RouN in the capture); here the player stands at the reserved position (milestone 4).
+- **Arrival placement without object spacing**: as the original (`so_MapMarking` → `FieldMap::fm_Marking`), the map
+  instance puts an arriving player on the nearest free cell of a spiral of 31 rings at spacing 25 around the wanted
+  point (`Zone.Placement`), else around the map's `RegenX` / `RegenY` point. The original also keeps 25 units from
+  every other object (`so_collesioncheck`); that test is not built (milestone 4), so there is no x + 25 next to the
+  town portal NPC of RouN as in the capture. The regen-point fallback applies here to every arrival; the original
+  has it at the map login only. When both searches fail, a change is refused with a `warning` line and the answer
+  of its origin (`0x19C2` for a town portal, nothing for a gate or `&linkto`) and the player stays where it is; the
+  original disconnects on the same-zone link with `0x685`.
 - **Not built**: the NPC menu `0x201C` / `0x201D` (so the real client cannot open the town portal window yet;
   `0x181A` itself is handled), the gate roles `IDGate`, `RandomGate`, `ModeIDGate`, the multi-link `0x181F`, the
   menu close `0x3C0F`.

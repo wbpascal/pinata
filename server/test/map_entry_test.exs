@@ -375,6 +375,60 @@ defmodule MapEntryTest do
     assert [_] = Regex.scan(~r/map entry failed/, log)
   end
 
+  defp saved_at!(cid, {x, y}),
+    do: Persistence.Repo.active().query!("UPDATE characters SET login_x = #{x}, login_y = #{y} WHERE id = #{cid}")
+
+  # the position of 0x1802, the packets before it skipped
+  defp placed!(zone) do
+    case next!(zone) do
+      {<<0x02, 0x18, _::binary>> = body, zone} ->
+        <<x::little-32, y::little-32>> = binary_part(body, byte_size(body) - 8, 8)
+        {{x, y}, zone}
+
+      {_other, zone} ->
+        placed!(zone)
+    end
+  end
+
+  defp row(cid), do: Persistence.Repo.active().get!(Persistence.Character, cid)
+
+  test "a character saved on a blocked cell enters on a free cell next to it, and that point is saved", %{cid: cid} do
+    saved_at!(cid, {4801, 4700})
+    {wm, zone, _handle} = entering()
+    {point, zone} = placed!(zone)
+    assert point in [{4813, 4679}, {4789, 4679}]
+    TestClient.close(zone)
+    TestClient.close(wm)
+    wait_until(fn -> {row(cid).login_x, row(cid).login_y} == point end)
+  end
+
+  test "a character saved far outside the walkable area enters at the regen point", %{cid: cid} do
+    saved_at!(cid, {100, 200})
+    {_wm, zone, _handle} = entering()
+    assert {{6445, 8630}, _zone} = placed!(zone)
+  end
+
+  test "no free cell around the saved point nor the regen point answers 0x1804 {0x142, 0xFF} and closes" do
+    {:ok, real} = GameData.BlockData.load(System.fetch_env!("PINATA_TEST_DATA_DIR"), "RouN")
+    {:ok, map} = Zone.MapInstance.whereis(0, "RouN")
+    blocked = %{real | bits: :binary.copy(<<0xFF>>, byte_size(real.bits))}
+    :sys.replace_state(map, &%{&1 | block_data: blocked})
+    on_exit(fn -> :sys.replace_state(map, &%{&1 | block_data: real}) end)
+    {wm, handle} = world_login()
+    {body, _wm} = char_login(wm, 0)
+    assert body == ack_1003()
+
+    log =
+      TestLog.capture(fn ->
+        zone = TestPorts.endpoint(:zone) |> connect() |> send!(map_login(handle))
+        zone = recv!(zone, <<0x04, 0x18, 0x42, 0x01, 0xFF>>)
+        assert TestClient.recv_raw(zone) == {:error, :closed}
+      end)
+
+    assert [_] = Regex.scan(~r/\[warning\] Zone: connection closed: map entry failed: no free cell, peer/, log)
+    assert [_] = Regex.scan(~r/map entry failed/, log)
+  end
+
   test "a closed Zone connection leaves the map; a new entry on the map succeeds", %{cid: cid} do
     {wm, zone, wm_handle} = in_world(cid)
     TestClient.close(zone)

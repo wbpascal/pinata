@@ -43,8 +43,8 @@ A GM sees "From <address>" (the address it connected from) and its admin level i
 | `&show` | `&보여` | 10 | the GM is visible again; the GM and the players in sight see the hide state end. A GM that is not hidden gets no answer |
 | `&dimension <n>` | | 100 | moves the GM into dimension `n`: players in another dimension see the GM leave. Dimension -1 sees everyone and is seen by everyone |
 | `&linkto` | `&이동` | 10 | moves the GM to a random free spot of its own map |
-| `&linkto <map>` | `&이동` | 10 | moves the GM to the start point of the map (`RegenX`, `RegenY` of `MapInfo`) |
-| `&linkto <map> <x> <y>` | `&이동` | 10 | moves the GM to that point of the map |
+| `&linkto <map>` | `&이동` | 10 | moves the GM to the start point of the map (`RegenX`, `RegenY` of `MapInfo`), or the nearest free cell of it |
+| `&linkto <map> <x> <y>` | `&이동` | 10 | moves the GM to the nearest free cell of that point of the map, or to the map's start point when there is none in reach |
 | `&kickout <name>` | `&추방` | 10 | disconnects the named character from the world, on any node; its position is saved |
 
 A player who comes back into view after `&show` or a dimension change appears only when the other client asks for
@@ -62,7 +62,11 @@ Answers:
 
 A player with admin level 0 gets no answer for any `&` line. A GM whose level is below the command's level gets no
 answer either. `&linkto` with a negative coordinate moves nobody and writes the `info` line
-`Zone: &linkto ignored: coordinates out of range`; no free spot found writes `Zone: &linkto ignored: no free spot found`.
+`Zone: &linkto ignored: coordinates out of range`; no free spot found writes `Zone: &linkto ignored: no free spot found`. Every `&linkto` lands on a free cell: on the
+nearest one of the point, else on the map's start point (the `info` line
+`Zone: map <map>: no free cell around (<x>, <y>), placed at the regen point`); with no free cell around either, the
+GM stays where it is and the `warning` line `Zone: map change refused: no free cell on <map> around (<x>, <y>)` is
+written.
 
 ## How a line is read
 

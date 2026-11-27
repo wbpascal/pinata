@@ -12,7 +12,9 @@ defmodule Zone.Link do
   player's map (the original's "same zone", Z01 §7.1) saves (`:auto`), enters the player into the target instance
   under its handle (`Zone.MapInstance.enter/3`), removes it from the old one (`0x1805` to the players in sight) and
   answers `0x1809` on the same connection; a handle in use on the target, or any other failure before the save,
-  falls back to the reconnect. The first failing step is the result and nothing after it runs.
+  falls back to the reconnect. The first failing step is the result and nothing after it runs. The map instance
+  places the arriving player on a free cell (`Zone.Placement`); `0x1809` carries the placed point, and no free cell
+  refuses the change with `:no_free_cell`.
 
   The GM command `&linkto` (flow: `docs/technical/flows/gm-commands.md`) enters through the same path:
   `Zone.Handler.perform/1` with `{:link, :gm, map, player, entered_at, session, dest}`.
@@ -24,7 +26,8 @@ defmodule Zone.Link do
   alias Proto.Packets.ServerMenu
 
   @type dest :: %{map: binary(), map_client: binary(), x: non_neg_integer(), y: non_neg_integer()}
-  @type refusal :: :no_map_info | :not_running | :not_on_map | {:save, :not_found | :database} | :no_session
+  @type refusal ::
+          :no_map_info | :not_running | :not_on_map | :no_free_cell | {:save, :not_found | :database} | :no_session
 
   @doc "The destination of a Gate NPC: the first `LinkTable` row of its argument with a valid position."
   @spec gate(Zone.Npc.t()) :: {:ok, dest()} | {:error, :no_role | :no_link}
@@ -94,8 +97,8 @@ defmodule Zone.Link do
 
   defp same(map, current, map_index, dest) do
     with :ok <- save(current, :auto),
-         {:ok, moved} <- tagged(Zone.MapInstance.relocate(map, current.handle, {dest.x, dest.y}), :not_on_map) do
-      {:same, moved, %MapLinksameCmd{map_index: map_index, x: dest.x, y: dest.y}}
+         {:ok, moved} <- Zone.MapInstance.relocate(map, current.handle, {dest.x, dest.y}) do
+      {:same, moved, %MapLinksameCmd{map_index: map_index, x: moved.x, y: moved.y}}
     end
   end
 
@@ -141,19 +144,20 @@ defmodule Zone.Link do
              current.conn
            ),
          :ok <- save(current, :auto),
-         {:ok, handle} <- enter(target, %{arriving | handle: current.handle}, current.handle) do
-      hand_over(map, target, %{arriving | handle: handle, mode: 0}, map_index, dest)
+         {:ok, entered} <- enter(target, %{arriving | handle: current.handle}, current.handle) do
+      hand_over(map, target, entered, map_index)
     else
       {:error, {:save, _reason}} = refused -> refused
+      {:error, :no_free_cell} = refused -> refused
       _other -> :reconnect
     end
   end
 
-  defp hand_over(map, target, entered, map_index, dest) do
+  defp hand_over(map, target, entered, map_index) do
     case remove(map, entered.handle) do
       {:ok, _left} ->
         _ = Process.monitor(target)
-        {:moved, target, entered, %MapLinksameCmd{map_index: map_index, x: dest.x, y: dest.y}}
+        {:moved, target, entered, %MapLinksameCmd{map_index: map_index, x: entered.x, y: entered.y}}
 
       :error ->
         _ = remove(target, entered.handle)

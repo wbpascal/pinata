@@ -124,7 +124,10 @@ sequenceDiagram
 `&linkto` takes the path of the gates and the town portal ([`map-change.md`](map-change.md)) with the origin `:gm`:
 no answer packet of its own; the refusals other than "not running" and "no `MapInfo` row" log their usual line. The free spot is a random
 point of the map whose cell is free, by rejection sampling of at most 100 draws through `Random.uniform/1`
-(shortcut: not the quadtree of `bd_FindEmptyCoord` FUN_00438960, Z09 §9.4).
+(shortcut: not the quadtree of `bd_FindEmptyCoord` FUN_00438960, Z09 §9.4). Like every arrival, the target point is placed by the map instance: the GM
+lands on the nearest free cell of the point, or on the map's start point (`RegenX` / `RegenY`) when there is none in
+reach, and `0x1809` carries the placed point; with no free cell around either the change is refused with the
+`warning` line `Zone: map change refused: no free cell on <map> around (<x>, <y>)` and no answer.
 
 ## `&kickout` across Zone connection, session and Zone connection
 

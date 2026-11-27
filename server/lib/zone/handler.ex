@@ -132,7 +132,7 @@ defmodule Zone.Handler do
           auto_save?: boolean()
         }
 
-  @type entry_failure :: :not_found | :database | :no_map | :game_data | :no_block_data | :full
+  @type entry_failure :: :not_found | :database | :no_map | :game_data | :no_block_data | :full | :no_free_cell
 
   @impl Net.Handler
   def init(_settings), do: %__MODULE__{checksums: GameData.client_checksums()}
@@ -417,9 +417,9 @@ defmodule Zone.Handler do
     result =
       with {:ok, map} <- whereis(entry),
            {:ok, player} <- Zone.Player.arrive(entry.player, entry, address(), self()),
-           {:ok, handle} <- Zone.MapInstance.enter(map, player) do
+           {:ok, entered} <- Zone.MapInstance.enter(map, player) do
         _ = Process.monitor(map)
-        {:ok, map, %{player | handle: handle}, Clock.monotonic_time(:millisecond)}
+        {:ok, map, entered, Clock.monotonic_time(:millisecond)}
       end
 
     {:entered, result}
@@ -430,9 +430,9 @@ defmodule Zone.Handler do
       with {:ok, character} <- Persistence.load_character(entry.world_no, entry.user_no, entry.character_id),
            {:ok, map} <- whereis(entry),
            {:ok, player} <- Zone.Player.new(character, entry, address(), self()),
-           {:ok, handle} <- Zone.MapInstance.enter(map, player) do
+           {:ok, entered} <- Zone.MapInstance.enter(map, player) do
         _ = Process.monitor(map)
-        {:ok, map, %{player | handle: handle}, Clock.monotonic_time(:millisecond)}
+        {:ok, map, entered, Clock.monotonic_time(:millisecond)}
       end
 
     {:entered, result}
@@ -662,6 +662,7 @@ defmodule Zone.Handler do
   defp level(:no_map_info), do: :info
   defp level({:save, _reason}), do: :error
   defp level(:not_on_map), do: :warning
+  defp level(:no_free_cell), do: :warning
 
   defp refusal_text({:gate, name, _origin}, p, dest, :not_running),
     do: "gate #{name} on map #{p.map}: destination #{dest.map} is not running"
@@ -673,6 +674,9 @@ defmodule Zone.Handler do
     do: "map change refused: save failed: character #{p.character.id}, " <> save_text(reason)
 
   defp refusal_text(_origin, _p, _dest, :not_on_map), do: "map change failed: not on the map"
+
+  defp refusal_text(_origin, _p, dest, :no_free_cell),
+    do: "map change refused: no free cell on #{dest.map} around (#{dest.x}, #{dest.y})"
 
   defp dist2({ax, ay}, {bx, by}), do: (ax - bx) * (ax - bx) + (ay - by) * (ay - by)
 
@@ -711,4 +715,5 @@ defmodule Zone.Handler do
   defp entry_text(:game_data), do: "a game data row is missing"
   defp entry_text(:no_block_data), do: "block data unreadable"
   defp entry_text(:full), do: "map instance full"
+  defp entry_text(:no_free_cell), do: "no free cell"
 end

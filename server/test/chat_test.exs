@@ -214,7 +214,7 @@ defmodule ChatTest do
 
       test "a shout reaches a player out of sight and the shouter (scenario 45)", t do
         a = in_world(t, "first", "X45A", %{level: 40})
-        b = in_world(t, "second", "X45B", %{login_y: 4000})
+        b = in_world(t, "second", "X45B", %{login_x: 7150, login_y: 4125})
         a.zone |> send!(@shout45) |> recv!(@someone45) |> nothing!()
         b.zone |> recv!(@someone45) |> nothing!()
       end
@@ -233,7 +233,7 @@ defmodule ChatTest do
 
     test "normal chat does not reach a player out of sight", t do
       a = in_world(t, "first", "X45A")
-      b = in_world(t, "second", "X45B", %{login_y: 4000})
+      b = in_world(t, "second", "X45B", %{login_x: 7150, login_y: 4125})
       a.zone |> send!(@hello) |> recv!(someone(a.handle, "hello")) |> nothing!()
       nothing!(b.zone)
     end
